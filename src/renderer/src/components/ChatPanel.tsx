@@ -8,6 +8,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import type { ChatMessage, PullRequest } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
@@ -27,22 +28,39 @@ function cleanIpcError(message: string): string {
 }
 
 export default function ChatPanel({ pr }: Props) {
-  const [messages, setMessages] = useState<UiMessage[]>([]);
+  // Persisted history from the main process is the base; `local` overlays it
+  // once the user starts talking (it also holds streaming + failed messages).
+  const [local, setLocal] = useState<UiMessage[] | null>(null);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const streamingIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
+  const historyQuery = useQuery({
+    queryKey: ["chatHistory", pr.repo, pr.number],
+    queryFn: () => window.api.getChatHistory(pr.repo, pr.number),
+  });
+
+  const messages: UiMessage[] =
+    local ??
+    (historyQuery.data ?? []).map((message, index) => ({
+      ...message,
+      id: `history-${index}`,
+    }));
 
   useEffect(() => {
     return window.api.onChatChunk((chunk) => {
       const id = streamingIdRef.current;
       if (!id || chunk.repo !== pr.repo || chunk.prNumber !== pr.number) return;
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === id
-            ? { ...message, content: message.content + chunk.text }
-            : message,
-        ),
+      setLocal((prev) =>
+        prev
+          ? prev.map((message) =>
+              message.id === id
+                ? { ...message, content: message.content + chunk.text }
+                : message,
+            )
+          : prev,
       );
     });
   }, [pr.repo, pr.number]);
@@ -62,30 +80,36 @@ export default function ChatPanel({ pr }: Props) {
 
     const answerId = crypto.randomUUID();
     streamingIdRef.current = answerId;
-    setMessages((prev) => [
-      ...prev,
+    setLocal([
+      ...messages,
       { id: crypto.randomUUID(), role: "user", content: trimmed },
       { id: answerId, role: "assistant", content: "" },
     ]);
 
     try {
       const answer = await window.api.askQuestion(pr.repo, pr.number, trimmed);
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === answerId ? { ...message, content: answer } : message,
-        ),
+      setLocal(
+        (prev) =>
+          prev?.map((message) =>
+            message.id === answerId ? { ...message, content: answer } : message,
+          ) ?? prev,
       );
+      // Sync the persisted history so a remount shows the full conversation.
+      void queryClient.invalidateQueries({
+        queryKey: ["chatHistory", pr.repo, pr.number],
+      });
     } catch (cause) {
       const reason =
         cause instanceof Error
           ? cleanIpcError(cause.message)
           : "Something went wrong.";
-      setMessages((prev) =>
-        prev.map((message) =>
-          message.id === answerId
-            ? { ...message, content: reason, failed: true }
-            : message,
-        ),
+      setLocal(
+        (prev) =>
+          prev?.map((message) =>
+            message.id === answerId
+              ? { ...message, content: reason, failed: true }
+              : message,
+          ) ?? prev,
       );
     } finally {
       streamingIdRef.current = null;

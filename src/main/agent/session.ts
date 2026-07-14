@@ -1,3 +1,6 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { BrowserWindow } from "electron";
 import { type ChatChunk, chatChunkChannel } from "../../shared/ipc";
 import type {
@@ -14,7 +17,13 @@ import { getSecret } from "../store/secrets";
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const CHAT_MODEL = "claude-sonnet-5";
 const MAX_OUTPUT_TOKENS = 4096;
+// Messages sent to the model as context; older ones stay stored and visible.
 const MAX_HISTORY = 20;
+// Messages kept on disk per PR.
+const MAX_STORED = 100;
+
+const configDir = join(homedir(), ".pr-reviewer");
+const chatsPath = join(configDir, "chats.json");
 
 const SYSTEM_PROMPT = `You are a code-review assistant inside a PR review app. The reviewer is reading a pull request and asks you questions about it.
 
@@ -25,12 +34,48 @@ Answer in GitHub-flavored markdown. Be direct and concise — short paragraphs, 
 interface Session {
   headSha: string;
   context: string;
-  history: ChatMessage[];
 }
 
-// One session per PR, alive for the app run. Rebuilt if the PR gets new
+// One context per PR, alive for the app run. Rebuilt if the PR gets new
 // commits; TODO: repo-context tools (read_file, grep_repo, git_log) later.
 const sessions = new Map<string, Session>();
+
+// Chat histories are disk-backed so conversations survive restarts.
+let histories: Map<string, ChatMessage[]> | null = null;
+
+function chatKey(repo: string, prNumber: number): string {
+  return `${repo}#${prNumber}`;
+}
+
+async function loadHistories(): Promise<Map<string, ChatMessage[]>> {
+  if (histories) return histories;
+  try {
+    const raw = JSON.parse(await readFile(chatsPath, "utf8")) as Record<
+      string,
+      ChatMessage[]
+    >;
+    histories = new Map(Object.entries(raw));
+  } catch {
+    histories = new Map();
+  }
+  return histories;
+}
+
+async function saveHistories(store: Map<string, ChatMessage[]>): Promise<void> {
+  await mkdir(configDir, { recursive: true });
+  await writeFile(
+    chatsPath,
+    JSON.stringify(Object.fromEntries(store), null, 2),
+  );
+}
+
+export async function getChatHistory(
+  repo: string,
+  prNumber: number,
+): Promise<ChatMessage[]> {
+  const store = await loadHistories();
+  return store.get(chatKey(repo, prNumber)) ?? [];
+}
 
 function buildContext(
   detail: PullRequestDetail,
@@ -65,8 +110,6 @@ async function getSession(repo: string, prNumber: number): Promise<Session> {
   const session: Session = {
     headSha: detail.headSha,
     context: buildContext(detail, files, analysis),
-    // New commits change the context but the conversation continues.
-    history: existing?.history ?? [],
   };
   sessions.set(key, session);
   return session;
@@ -86,7 +129,8 @@ interface StreamEvent {
 
 async function streamAnswer(
   apiKey: string,
-  session: Session,
+  context: string,
+  history: ChatMessage[],
   question: string,
   onText: (text: string) => void,
 ): Promise<string> {
@@ -107,11 +151,14 @@ async function streamAnswer(
         // follow-ups don't re-pay for the whole context.
         {
           type: "text",
-          text: session.context,
+          text: context,
           cache_control: { type: "ephemeral" },
         },
       ],
-      messages: [...session.history, { role: "user", content: question }],
+      messages: [
+        ...history.slice(-MAX_HISTORY),
+        { role: "user", content: question },
+      ],
     }),
   });
 
@@ -183,17 +230,24 @@ export async function askQuestion(
   }
 
   const session = await getSession(repo, prNumber);
-  const answer = await streamAnswer(apiKey, session, question, (text) =>
-    sendChunk({ repo, prNumber, text }),
+  const store = await loadHistories();
+  const history = store.get(chatKey(repo, prNumber)) ?? [];
+
+  const answer = await streamAnswer(
+    apiKey,
+    session.context,
+    history,
+    question,
+    (text) => sendChunk({ repo, prNumber, text }),
   );
 
-  session.history.push(
-    { role: "user", content: question },
-    { role: "assistant", content: answer },
-  );
-  if (session.history.length > MAX_HISTORY) {
-    session.history.splice(0, session.history.length - MAX_HISTORY);
-  }
+  const updated = [
+    ...history,
+    { role: "user" as const, content: question },
+    { role: "assistant" as const, content: answer },
+  ].slice(-MAX_STORED);
+  store.set(chatKey(repo, prNumber), updated);
+  await saveHistories(store);
 
   return answer;
 }
