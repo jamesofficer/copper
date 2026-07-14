@@ -2,6 +2,7 @@ import type {
   AnalysisResult,
   KeyTestResult,
   PullRequest,
+  PullRequestDetail,
   PullRequestFile,
   Repository,
   SecretProvider,
@@ -13,6 +14,7 @@ export interface IpcApi {
   addRepository(): Promise<Repository | null>;
   removeRepository(path: string): Promise<Repository[]>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
+  getPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
   listPullRequestFiles(
     repo: string,
     prNumber: number,
@@ -33,6 +35,7 @@ export const ipcChannels = [
   "addRepository",
   "removeRepository",
   "listPullRequests",
+  "getPullRequest",
   "listPullRequestFiles",
   "openPullRequest",
   "askQuestion",

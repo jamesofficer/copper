@@ -16,6 +16,33 @@ export interface PullRequest {
   changedFiles: number;
 }
 
+export interface PullRequestLabel {
+  name: string;
+  color: string;
+}
+
+export interface PullRequestDetail {
+  repo: string;
+  number: number;
+  title: string;
+  body: string | null;
+  author: string;
+  state: "open" | "closed";
+  draft: boolean;
+  merged: boolean;
+  baseRef: string;
+  headRef: string;
+  labels: PullRequestLabel[];
+  reviewers: string[];
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  commits: number;
+  createdAt: string;
+  updatedAt: string;
+  url: string;
+}
+
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 
 export interface ChangedFile {

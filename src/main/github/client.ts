@@ -1,6 +1,7 @@
 import type {
   FileStatus,
   PullRequest,
+  PullRequestDetail,
   PullRequestFile,
 } from "../../shared/types";
 import { getGitHubToken } from "./auth";
@@ -16,9 +17,20 @@ interface GitHubPullSummary {
 }
 
 interface GitHubPullDetail extends GitHubPullSummary {
+  body: string | null;
+  state: "open" | "closed";
+  draft: boolean;
+  merged: boolean;
+  base: { ref: string };
+  head: { sha: string; ref: string };
+  labels: Array<{ name: string; color: string }>;
+  requested_reviewers: Array<{ login: string }> | null;
   additions: number;
   deletions: number;
   changed_files: number;
+  commits: number;
+  created_at: string;
+  updated_at: string;
 }
 
 async function githubFetch<T>(token: string, path: string): Promise<T> {
@@ -85,6 +97,50 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
     deletions: pull.deletions,
     changedFiles: pull.changed_files,
   }));
+}
+
+export async function getPullRequest(
+  repo: string,
+  prNumber: number,
+): Promise<PullRequestDetail> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const pull = await githubFetch<GitHubPullDetail>(
+    token,
+    `/repos/${repo}/pulls/${prNumber}`,
+  );
+
+  return {
+    repo,
+    number: pull.number,
+    title: pull.title,
+    body: pull.body,
+    author: pull.user?.login ?? "unknown",
+    state: pull.state,
+    draft: pull.draft,
+    merged: pull.merged,
+    baseRef: pull.base.ref,
+    headRef: pull.head.ref,
+    labels: pull.labels.map((label) => ({
+      name: label.name,
+      color: label.color,
+    })),
+    reviewers: (pull.requested_reviewers ?? []).map(
+      (reviewer) => reviewer.login,
+    ),
+    additions: pull.additions,
+    deletions: pull.deletions,
+    changedFiles: pull.changed_files,
+    commits: pull.commits,
+    createdAt: pull.created_at,
+    updatedAt: pull.updated_at,
+    url: pull.html_url,
+  };
 }
 
 interface GitHubFile {
