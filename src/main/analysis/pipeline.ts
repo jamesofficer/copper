@@ -12,7 +12,7 @@ import { getSecret } from "../store/secrets";
 import { getCachedAnalysis, setCachedAnalysis } from "./cache";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-sonnet-5";
+const MODEL = "claude-opus-4-8";
 const MAX_OUTPUT_TOKENS = 8192;
 
 // Huge PRs get their patches truncated so the prompt stays a sane size; the
@@ -38,6 +38,7 @@ Rules:
 - groups: split the diff into logical change groups, ordered as a reading guide — the group a reviewer should read first comes first. Every changed file appears in exactly one group. Risk levels: "attention" = new or changed logic the reviewer must think carefully about; "routine" = ordinary changes worth reading but unlikely to hide problems; "mechanical" = renames, lockfiles, generated code, formatting — skimmable. Within a group, list files in the order they should be read.
 - risks: concrete things that could break, each anchored to the exact file and line the claim is based on. Only risks visible in the diff — never invent generic concerns. Empty list if nothing stands out.
 - behaviorChanges: what callers or users will experience differently after this merges, anchored the same way. Empty list if behavior is unchanged.
+- Every risk and behavior change carries a title: a very short label (3–6 words) naming it for a navigation list, alongside the full text.
 - outOfScope: related work this PR deliberately does NOT do — things a reviewer might expect but won't find. Short entries.
 - Anchors use line numbers in the NEW version of the file, derived from the @@ hunk headers. Use null for a whole-file claim.
 - Never claim anything the diff does not show. If a patch is truncated or omitted, say less rather than guessing.`;
@@ -61,10 +62,14 @@ const anchorSchema = {
 const claimSchema = {
   type: "object",
   properties: {
+    title: {
+      type: "string",
+      description: "Very short label (3–6 words) naming this claim",
+    },
     text: { type: "string" },
     anchors: { type: "array", items: anchorSchema },
   },
-  required: ["text", "anchors"],
+  required: ["title", "text", "anchors"],
 };
 
 const analysisTool = {
@@ -108,6 +113,7 @@ interface RawAnchor {
 }
 
 interface RawClaim {
+  title?: string;
   text?: string;
   anchors?: RawAnchor[];
 }
@@ -134,7 +140,7 @@ export async function getExistingAnalysis(
   prNumber: number,
 ): Promise<AnalysisResult | null> {
   const detail = await getPullRequest(repo, prNumber);
-  return getCachedAnalysis(repo, prNumber, detail.headSha) ?? null;
+  return (await getCachedAnalysis(repo, prNumber, detail.headSha)) ?? null;
 }
 
 export async function analyzePullRequest(
@@ -149,13 +155,13 @@ export async function analyzePullRequest(
   }
 
   const detail = await getPullRequest(repo, prNumber);
-  const cached = getCachedAnalysis(repo, prNumber, detail.headSha);
+  const cached = await getCachedAnalysis(repo, prNumber, detail.headSha);
   if (cached) return cached;
 
   const files = await listPullRequestFiles(repo, prNumber);
   const raw = await requestAnalysis(apiKey, buildPrompt(detail, files));
   const result = toAnalysisResult(raw, detail, files);
-  setCachedAnalysis(result);
+  await setCachedAnalysis(result);
   return result;
 }
 
@@ -299,6 +305,11 @@ function normalizeAnchors(
     }));
 }
 
+function fallbackTitle(text: string): string {
+  const words = text.trim().split(/\s+/);
+  return words.slice(0, 6).join(" ") + (words.length > 6 ? "…" : "");
+}
+
 function normalizeClaims(
   claims: RawClaim[] | undefined,
   validPaths: Set<string>,
@@ -306,6 +317,7 @@ function normalizeClaims(
   return (claims ?? [])
     .filter((claim) => claim.text?.trim())
     .map((claim) => ({
+      title: claim.title?.trim() || fallbackTitle(claim.text as string),
       text: (claim.text as string).trim(),
       anchors: normalizeAnchors(claim.anchors, validPaths),
     }));

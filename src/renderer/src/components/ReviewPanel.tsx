@@ -5,7 +5,6 @@ import {
   Flex,
   Heading,
   HStack,
-  Input,
   Spinner,
   Text,
   VStack,
@@ -13,19 +12,20 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuSparkles } from "react-icons/lu";
-import type { ChatMessage, PullRequest } from "../../../shared/types";
+import type { PullRequest } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
-import AnalysisView from "./AnalysisView";
+import AnalysisDetail from "./AnalysisDetail";
+import AnalysisNav, { type AnalysisSelection } from "./AnalysisNav";
+import ChatPanel from "./ChatPanel";
 
 interface Props {
   pr: PullRequest;
 }
 
 export default function ReviewPanel({ pr }: Props) {
-  const [messages, setMessages] = useState<Array<ChatMessage & { id: string }>>(
-    [],
-  );
-  const [question, setQuestion] = useState("");
+  const [selection, setSelection] = useState<AnalysisSelection>({
+    kind: "summary",
+  });
   const queryClient = useQueryClient();
 
   const analysisQuery = useQuery({
@@ -42,24 +42,11 @@ export default function ReviewPanel({ pr }: Props) {
 
   const analyzeMutation = useMutation({
     mutationFn: () => window.api.analyzePullRequest(pr.repo, pr.number),
-    onSuccess: (result) =>
-      queryClient.setQueryData(["analysis", pr.repo, pr.number], result),
+    onSuccess: (result) => {
+      queryClient.setQueryData(["analysis", pr.repo, pr.number], result);
+      setSelection({ kind: "summary" });
+    },
   });
-
-  async function ask() {
-    const trimmed = question.trim();
-    if (!trimmed) return;
-    setQuestion("");
-    setMessages((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), role: "user", content: trimmed },
-    ]);
-    const answer = await window.api.askQuestion(pr.repo, pr.number, trimmed);
-    setMessages((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), role: "assistant", content: answer },
-    ]);
-  }
 
   if (analysisQuery.isPending) {
     return (
@@ -123,49 +110,31 @@ export default function ReviewPanel({ pr }: Props) {
   }
 
   return (
-    <Flex direction="column" h="full" minH="0">
-      <Box flex="1" minH="0" overflowY="auto" css={scrollbar}>
-        <Box maxW="4xl" mx="auto" px="8" py="8">
-          <AnalysisView analysis={analysis} files={filesQuery.data} />
-        </Box>
+    <Flex h="full" minH="0">
+      <Box
+        w="300px"
+        flexShrink="0"
+        borderRightWidth="1px"
+        overflowY="auto"
+        css={scrollbar}
+      >
+        <AnalysisNav
+          analysis={analysis}
+          selection={selection}
+          onSelect={setSelection}
+        />
       </Box>
 
-      <Box borderTopWidth="1px" px="8" py="4" flexShrink="0">
-        <Box maxW="4xl" mx="auto">
-          {messages.length > 0 && (
-            <VStack
-              alignItems="stretch"
-              gap="2"
-              mb="3"
-              maxH="40"
-              overflowY="auto"
-              css={scrollbar}
-            >
-              {messages.map((message) => (
-                <Text
-                  key={message.id}
-                  fontSize="sm"
-                  color={message.role === "user" ? "colorPalette.fg" : "fg"}
-                >
-                  {message.content}
-                </Text>
-              ))}
-            </VStack>
-          )}
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              void ask();
-            }}
-          >
-            <Input
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ask about this PR…"
-              size="sm"
-            />
-          </form>
-        </Box>
+      <Box flex="1" minW="0" overflowY="auto" css={scrollbar}>
+        <AnalysisDetail
+          analysis={analysis}
+          files={filesQuery.data}
+          selection={selection}
+        />
+      </Box>
+
+      <Box w="340px" flexShrink="0" borderLeftWidth="1px">
+        <ChatPanel pr={pr} />
       </Box>
     </Flex>
   );

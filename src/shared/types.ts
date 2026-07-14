@@ -75,6 +75,7 @@ export interface ChangeGroup {
 }
 
 export interface AnalysisClaim {
+  title: string;
   text: string;
   anchors: DiffAnchor[];
 }
