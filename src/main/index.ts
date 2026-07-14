@@ -1,32 +1,32 @@
-import { app, BrowserWindow } from 'electron'
-import { join } from 'node:path'
-import { registerIpcHandlers } from './ipc/router'
+import { app, BrowserWindow } from "electron";
+import { join } from "node:path";
+import { registerIpcHandlers } from "./ipc/router";
 
 function createWindow(): void {
-  const window = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js')
-    }
-  })
+	const window = new BrowserWindow({
+		width: 1440,
+		height: 900,
+		webPreferences: {
+			preload: join(__dirname, "../preload/index.js"),
+		},
+	});
 
-  if (process.env.ELECTRON_RENDERER_URL) {
-    void window.loadURL(process.env.ELECTRON_RENDERER_URL)
-  } else {
-    void window.loadFile(join(__dirname, '../renderer/index.html'))
-  }
+	if (process.env.ELECTRON_RENDERER_URL) {
+		void window.loadURL(process.env.ELECTRON_RENDERER_URL);
+	} else {
+		void window.loadFile(join(__dirname, "../renderer/index.html"));
+	}
 }
 
 void app.whenReady().then(() => {
-  registerIpcHandlers()
-  createWindow()
+	registerIpcHandlers();
+	createWindow();
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
-  })
-})
+	app.on("activate", () => {
+		if (BrowserWindow.getAllWindows().length === 0) createWindow();
+	});
+});
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+app.on("window-all-closed", () => {
+	if (process.platform !== "darwin") app.quit();
+});
