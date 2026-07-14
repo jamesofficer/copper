@@ -159,7 +159,10 @@ export async function analyzePullRequest(
   if (cached) return cached;
 
   const files = await listPullRequestFiles(repo, prNumber);
-  const raw = await requestAnalysis(apiKey, buildPrompt(detail, files));
+  const raw = await requestAnalysis(
+    apiKey,
+    buildPullRequestContext(detail, files),
+  );
   const result = toAnalysisResult(raw, detail, files);
   await setCachedAnalysis(result);
   return result;
@@ -203,7 +206,8 @@ function buildDiffSection(files: PullRequestFile[]): string {
   return sections.join("\n\n");
 }
 
-function buildPrompt(
+// Also the chat's context block, so both features describe the PR the same way.
+export function buildPullRequestContext(
   detail: PullRequestDetail,
   files: PullRequestFile[],
 ): string {

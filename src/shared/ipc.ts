@@ -31,6 +31,22 @@ export interface IpcApi {
   clearSecret(provider: SecretProvider): Promise<SecretsStatus>;
 }
 
+// Streaming chat answers are pushed main → renderer as deltas, outside the
+// invoke/handle pattern above. askQuestion still resolves with the full text.
+export interface ChatChunk {
+  repo: string;
+  prNumber: number;
+  text: string;
+}
+
+export const chatChunkChannel = "chatChunk";
+
+export interface RendererEvents {
+  onChatChunk(listener: (chunk: ChatChunk) => void): () => void;
+}
+
+export type WindowApi = IpcApi & RendererEvents;
+
 export const ipcChannels = [
   "listRepositories",
   "addRepository",

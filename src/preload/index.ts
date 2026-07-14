@@ -1,7 +1,11 @@
-import { contextBridge, ipcRenderer } from "electron";
-import type { IpcApi } from "../shared/ipc";
+import { contextBridge, type IpcRendererEvent, ipcRenderer } from "electron";
+import {
+  type ChatChunk,
+  chatChunkChannel,
+  type WindowApi,
+} from "../shared/ipc";
 
-const api: IpcApi = {
+const api: WindowApi = {
   listRepositories: () => ipcRenderer.invoke("listRepositories"),
   addRepository: () => ipcRenderer.invoke("addRepository"),
   removeRepository: (path) => ipcRenderer.invoke("removeRepository", path),
@@ -20,6 +24,12 @@ const api: IpcApi = {
   saveSecret: (provider, value) =>
     ipcRenderer.invoke("saveSecret", provider, value),
   clearSecret: (provider) => ipcRenderer.invoke("clearSecret", provider),
+  onChatChunk: (listener) => {
+    const handler = (_event: IpcRendererEvent, chunk: ChatChunk) =>
+      listener(chunk);
+    ipcRenderer.on(chatChunkChannel, handler);
+    return () => ipcRenderer.off(chatChunkChannel, handler);
+  },
 };
 
 contextBridge.exposeInMainWorld("api", api);
