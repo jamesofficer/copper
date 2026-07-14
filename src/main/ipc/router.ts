@@ -8,6 +8,7 @@ import {
   listRepositories,
   removeRepository,
 } from "../repo/local";
+import { clearKey, getKeyStatus, saveKey } from "../settings/keys";
 
 const handlers: IpcApi = {
   listRepositories: () => listRepositories(),
@@ -17,6 +18,9 @@ const handlers: IpcApi = {
   openPullRequest: (repo, prNumber) => analyzePullRequest(repo, prNumber),
   askQuestion: (repo, prNumber, question) =>
     askQuestion(repo, prNumber, question),
+  getSecretsStatus: () => getKeyStatus(),
+  saveSecret: (provider, value) => saveKey(provider, value),
+  clearSecret: (provider) => clearKey(provider),
 };
 
 export function registerIpcHandlers(): void {

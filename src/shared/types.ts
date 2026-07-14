@@ -58,3 +58,12 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+export type SecretProvider = "anthropic" | "github";
+
+export type SecretsStatus = Record<SecretProvider, boolean>;
+
+export interface KeyTestResult {
+  ok: boolean;
+  message: string;
+}

@@ -1,4 +1,11 @@
-import type { AnalysisResult, PullRequest, Repository } from "./types";
+import type {
+  AnalysisResult,
+  KeyTestResult,
+  PullRequest,
+  Repository,
+  SecretProvider,
+  SecretsStatus,
+} from "./types";
 
 export interface IpcApi {
   listRepositories(): Promise<Repository[]>;
@@ -11,6 +18,9 @@ export interface IpcApi {
     prNumber: number,
     question: string,
   ): Promise<string>;
+  getSecretsStatus(): Promise<SecretsStatus>;
+  saveSecret(provider: SecretProvider, value: string): Promise<KeyTestResult>;
+  clearSecret(provider: SecretProvider): Promise<SecretsStatus>;
 }
 
 export const ipcChannels = [
@@ -20,4 +30,7 @@ export const ipcChannels = [
   "listPullRequests",
   "openPullRequest",
   "askQuestion",
+  "getSecretsStatus",
+  "saveSecret",
+  "clearSecret",
 ] as const satisfies readonly (keyof IpcApi)[];

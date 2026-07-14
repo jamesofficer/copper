@@ -1,4 +1,6 @@
-// TODO: GitHub OAuth device flow, token stored in the system keychain
-export async function getGitHubToken(): Promise<string> {
-  throw new Error("GitHub auth not implemented yet");
+import { getSecret } from "../store/secrets";
+
+// TODO: add GitHub OAuth device flow as an alternative to a pasted token.
+export function getGitHubToken(): Promise<string | null> {
+  return getSecret("github");
 }

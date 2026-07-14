@@ -7,6 +7,7 @@ import {
   Heading,
   HStack,
   Icon,
+  IconButton,
   Menu,
   Portal,
   Spinner,
@@ -20,9 +21,11 @@ import {
   LuFolderGit2,
   LuFolderPlus,
   LuGitPullRequestArrow,
+  LuSettings,
   LuTrash2,
 } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
+import SettingsDialog from "../components/SettingsDialog";
 import { toaster } from "../components/ui/toaster";
 
 interface Props {
@@ -33,6 +36,7 @@ export default function Welcome({ onSelect }: Props) {
   const [repositories, setRepositories] = useState<Repository[] | null>(null);
   const [active, setActive] = useState<Repository | null>(null);
   const [prs, setPrs] = useState<PullRequest[] | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     void window.api.listRepositories().then((repos) => {
@@ -91,7 +95,19 @@ export default function Welcome({ onSelect }: Props) {
   }
 
   return (
-    <Center minH="100vh" px="6">
+    <Center minH="100vh" px="6" position="relative">
+      <IconButton
+        aria-label="Settings"
+        variant="ghost"
+        color="fg.muted"
+        position="absolute"
+        top="4"
+        right="4"
+        onClick={() => setSettingsOpen(true)}
+      >
+        <LuSettings />
+      </IconButton>
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <VStack gap="10" w="full" maxW="xl" py="16">
         <VStack gap="2">
           <HStack gap="2.5" color="colorPalette.fg">

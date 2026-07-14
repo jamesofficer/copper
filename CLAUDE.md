@@ -44,23 +44,24 @@ src/
 ├── main/
 │   ├── index.ts            # app lifecycle, window creation
 │   ├── ipc/router.ts       # implements IpcApi, registers ipcMain handlers
-│   ├── github/             # auth.ts (OAuth device flow — stub), client.ts (Octokit — MOCK DATA)
+│   ├── github/             # auth.ts (reads stored GitHub token), client.ts (Octokit — MOCK DATA)
 │   ├── repo/               # local.ts (repo registry + folder picker), workspace.ts (stub), git.ts (stub)
 │   ├── analysis/           # pipeline.ts (MOCK DATA), diff-parser.ts (stub), cache.ts (in-memory)
 │   ├── agent/              # session.ts (Q&A — stub echo)
-│   └── store/db.ts         # SQLite — stub
+│   ├── settings/keys.ts    # validate (test API call) + save/clear keys
+│   └── store/              # secrets.ts (safeStorage-encrypted API keys), db.ts (SQLite — stub)
 ├── preload/                # index.ts (window.api bridge), index.d.ts (Window typing)
-├── renderer/src/           # App.tsx, theme.ts, screens/Welcome.tsx, screens/Review.tsx, components/ui/toaster.tsx
+├── renderer/src/           # App.tsx, theme.ts, screens/{Welcome,Review}.tsx, components/{SettingsDialog,ui/toaster}.tsx
 └── shared/                 # types.ts, ipc.ts — the contract between processes
 ```
 
 ## Current status (as of 2026-07-14)
 
-Scaffold complete and verified: `pnpm typecheck` and `pnpm build` pass, `pnpm dev` opens the app. The UI is built with Chakra UI v3. Repository management is real: add local git repos via the native folder dialog, the GitHub slug is read from the `origin` remote, and the list persists to `~/.pr-reviewer/repositories.json`. The rest runs on mock data — PR list per repo → open PR → grouped changes with risk badges, summary panel, chat that echoes through IPC. Nothing talks to GitHub or Claude yet.
+Scaffold complete and verified: `pnpm typecheck` and `pnpm build` pass, `pnpm dev` opens the app. The UI is built with Chakra UI v3. Two things are real: (1) repository management — add local git repos via the native folder dialog, the GitHub slug is read from the `origin` remote, list persists to `~/.pr-reviewer/repositories.json`; (2) API-key settings — a gear on the welcome screen opens a dialog to enter a Claude API key and a GitHub token. Keys are validated with a live API call before saving, encrypted with Electron `safeStorage` (macOS Keychain), and stored in `~/.pr-reviewer/secrets.json`. Raw keys never cross IPC to the renderer; only status (set/not-set) does. The rest runs on mock data — PR list per repo → open PR → grouped changes with risk badges, summary panel, chat that echoes through IPC. Nothing yet *uses* the stored keys (no Octokit/Claude calls beyond validation).
 
 Roadmap (rough order):
 
-1. Real GitHub: OAuth device flow (`github/auth.ts`, token in keychain) + Octokit review queue (`github/client.ts`).
+1. Real GitHub: use the stored token in `github/client.ts` (Octokit) to load the live review queue. `github/auth.ts` already returns the stored token; OAuth device flow is an optional later alternative to the pasted token.
 2. Repo workspace: blobless clone/fetch + PR head refs (`repo/`).
 3. Diff parsing + mechanical classification (`analysis/diff-parser.ts`).
 4. Analysis pipeline with the Agent SDK: grouping/reading order first, then summary lenses.

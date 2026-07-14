@@ -10,6 +10,10 @@ const api: IpcApi = {
     ipcRenderer.invoke("openPullRequest", repo, prNumber),
   askQuestion: (repo, prNumber, question) =>
     ipcRenderer.invoke("askQuestion", repo, prNumber, question),
+  getSecretsStatus: () => ipcRenderer.invoke("getSecretsStatus"),
+  saveSecret: (provider, value) =>
+    ipcRenderer.invoke("saveSecret", provider, value),
+  clearSecret: (provider) => ipcRenderer.invoke("clearSecret", provider),
 };
 
 contextBridge.exposeInMainWorld("api", api);
