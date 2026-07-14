@@ -1,18 +1,12 @@
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";
-import type { FileStatus, PullRequestFile } from "../../../shared/types";
+import type { PullRequestFile } from "../../../shared/types";
+import { statusMeta } from "../lib/fileStatus";
 
 interface Props {
   files: PullRequestFile[];
   selectedPath: string | null;
   onSelect(path: string): void;
 }
-
-const statusMeta: Record<FileStatus, { label: string; color: string }> = {
-  added: { label: "A", color: "green.fg" },
-  modified: { label: "M", color: "yellow.fg" },
-  deleted: { label: "D", color: "red.fg" },
-  renamed: { label: "R", color: "purple.fg" },
-};
 
 export default function FileList({ files, selectedPath, onSelect }: Props) {
   return (
