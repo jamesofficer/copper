@@ -19,7 +19,8 @@ export interface IpcApi {
     repo: string,
     prNumber: number,
   ): Promise<PullRequestFile[]>;
-  openPullRequest(repo: string, prNumber: number): Promise<AnalysisResult>;
+  getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
+  analyzePullRequest(repo: string, prNumber: number): Promise<AnalysisResult>;
   askQuestion(
     repo: string,
     prNumber: number,
@@ -37,7 +38,8 @@ export const ipcChannels = [
   "listPullRequests",
   "getPullRequest",
   "listPullRequestFiles",
-  "openPullRequest",
+  "getAnalysis",
+  "analyzePullRequest",
   "askQuestion",
   "getSecretsStatus",
   "saveSecret",

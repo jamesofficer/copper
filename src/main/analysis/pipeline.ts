@@ -1,62 +1,362 @@
-import type { AnalysisResult } from "../../shared/types";
+import type {
+  AnalysisClaim,
+  AnalysisResult,
+  ChangeGroup,
+  ChangeGroupRisk,
+  DiffAnchor,
+  PullRequestDetail,
+  PullRequestFile,
+} from "../../shared/types";
+import { getPullRequest, listPullRequestFiles } from "../github/client";
+import { getSecret } from "../store/secrets";
+import { getCachedAnalysis, setCachedAnalysis } from "./cache";
 
-// TODO: real pipeline — sync repo, parse diff, then agent passes for
-// grouping, summary lenses, and blast radius, streamed to the renderer
+const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
+const MODEL = "claude-sonnet-5";
+const MAX_OUTPUT_TOKENS = 8192;
+
+// Huge PRs get their patches truncated so the prompt stays a sane size; the
+// model still sees every file's name, status, and line counts.
+const PATCH_CHAR_LIMIT = 12_000;
+const TOTAL_PATCH_BUDGET = 200_000;
+
+const MECHANICAL_PATTERNS = [
+  /(^|\/)pnpm-lock\.yaml$/,
+  /(^|\/)package-lock\.json$/,
+  /(^|\/)yarn\.lock$/,
+  /(^|\/)Cargo\.lock$/,
+  /(^|\/)Gemfile\.lock$/,
+  /(^|\/)go\.sum$/,
+  /\.min\.(js|css)$/,
+  /\.snap$/,
+];
+
+const SYSTEM_PROMPT = `You are an expert code reviewer. Turn a pull request diff into a guided review: what changed, why, in what order to read it, and where the risk is.
+
+Rules:
+- summary: 2–4 plain-English sentences saying what this PR does and why — the description the author should have written. No hype, no hedging.
+- groups: split the diff into logical change groups, ordered as a reading guide — the group a reviewer should read first comes first. Every changed file appears in exactly one group. Risk levels: "attention" = new or changed logic the reviewer must think carefully about; "routine" = ordinary changes worth reading but unlikely to hide problems; "mechanical" = renames, lockfiles, generated code, formatting — skimmable. Within a group, list files in the order they should be read.
+- risks: concrete things that could break, each anchored to the exact file and line the claim is based on. Only risks visible in the diff — never invent generic concerns. Empty list if nothing stands out.
+- behaviorChanges: what callers or users will experience differently after this merges, anchored the same way. Empty list if behavior is unchanged.
+- outOfScope: related work this PR deliberately does NOT do — things a reviewer might expect but won't find. Short entries.
+- Anchors use line numbers in the NEW version of the file, derived from the @@ hunk headers. Use null for a whole-file claim.
+- Never claim anything the diff does not show. If a patch is truncated or omitted, say less rather than guessing.`;
+
+const anchorSchema = {
+  type: "object",
+  properties: {
+    path: {
+      type: "string",
+      description: "File path exactly as it appears in the diff",
+    },
+    line: {
+      type: ["integer", "null"],
+      description:
+        "Line number in the new version of the file, or null for a whole-file claim",
+    },
+  },
+  required: ["path", "line"],
+};
+
+const claimSchema = {
+  type: "object",
+  properties: {
+    text: { type: "string" },
+    anchors: { type: "array", items: anchorSchema },
+  },
+  required: ["text", "anchors"],
+};
+
+const analysisTool = {
+  name: "report_analysis",
+  description: "Report the structured review analysis of the pull request.",
+  input_schema: {
+    type: "object",
+    properties: {
+      summary: { type: "string" },
+      groups: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            story: {
+              type: "string",
+              description:
+                "One short paragraph: what this group changes and why",
+            },
+            risk: {
+              type: "string",
+              enum: ["attention", "routine", "mechanical"],
+            },
+            files: { type: "array", items: { type: "string" } },
+          },
+          required: ["title", "story", "risk", "files"],
+        },
+      },
+      risks: { type: "array", items: claimSchema },
+      behaviorChanges: { type: "array", items: claimSchema },
+      outOfScope: { type: "array", items: { type: "string" } },
+    },
+    required: ["summary", "groups", "risks", "behaviorChanges", "outOfScope"],
+  },
+};
+
+interface RawAnchor {
+  path?: string;
+  line?: number | null;
+}
+
+interface RawClaim {
+  text?: string;
+  anchors?: RawAnchor[];
+}
+
+interface RawGroup {
+  title?: string;
+  story?: string;
+  risk?: string;
+  files?: string[];
+}
+
+interface RawAnalysis {
+  summary?: string;
+  groups?: RawGroup[];
+  risks?: RawClaim[];
+  behaviorChanges?: RawClaim[];
+  outOfScope?: string[];
+}
+
+// Cheap lookup used by the renderer to decide between showing a cached
+// analysis and the "Analyse PR" empty state. Never calls the model.
+export async function getExistingAnalysis(
+  repo: string,
+  prNumber: number,
+): Promise<AnalysisResult | null> {
+  const detail = await getPullRequest(repo, prNumber);
+  return getCachedAnalysis(repo, prNumber, detail.headSha) ?? null;
+}
+
 export async function analyzePullRequest(
   repo: string,
   prNumber: number,
 ): Promise<AnalysisResult> {
-  return {
-    repo,
-    prNumber,
-    headSha: "mock",
-    files: [
-      {
-        path: "src/api/campaigns.ts",
-        status: "modified",
-        additions: 120,
-        deletions: 10,
-        mechanical: false,
-      },
-      {
-        path: "src/db/schema.ts",
-        status: "modified",
-        additions: 24,
-        deletions: 2,
-        mechanical: false,
-      },
-      {
-        path: "pnpm-lock.yaml",
-        status: "modified",
-        additions: 368,
-        deletions: 76,
-        mechanical: true,
-      },
-    ],
-    groups: [
-      {
-        id: "scheduling",
-        title: "Campaign scheduling core",
-        why: "Adds the schedule column and the API endpoint that writes it.",
-        files: ["src/db/schema.ts", "src/api/campaigns.ts"],
-        risk: "high",
-        mechanical: false,
-      },
-      {
-        id: "deps",
-        title: "Dependency updates",
-        why: "Lockfile churn from adding the cron parsing library.",
-        files: ["pnpm-lock.yaml"],
-        risk: "low",
-        mechanical: true,
-      },
-    ],
-    readingOrder: ["scheduling", "deps"],
-    summaries: {
-      overview: "Mock analysis — the real pipeline is not wired up yet.",
-      risks: "None: this is placeholder data.",
-      behavior: "No behavior changes; placeholder.",
-      scope: "Placeholder.",
+  const apiKey = await getSecret("anthropic");
+  if (!apiKey) {
+    throw new Error(
+      "Connect a Claude API key in settings to analyse pull requests.",
+    );
+  }
+
+  const detail = await getPullRequest(repo, prNumber);
+  const cached = getCachedAnalysis(repo, prNumber, detail.headSha);
+  if (cached) return cached;
+
+  const files = await listPullRequestFiles(repo, prNumber);
+  const raw = await requestAnalysis(apiKey, buildPrompt(detail, files));
+  const result = toAnalysisResult(raw, detail, files);
+  setCachedAnalysis(result);
+  return result;
+}
+
+function isMechanical(path: string): boolean {
+  return MECHANICAL_PATTERNS.some((pattern) => pattern.test(path));
+}
+
+function fileHeader(file: PullRequestFile): string {
+  const rename = file.previousPath
+    ? ` (renamed from ${file.previousPath})`
+    : "";
+  return `=== ${file.path}${rename} [${file.status}, +${file.additions}/-${file.deletions}]`;
+}
+
+function buildDiffSection(files: PullRequestFile[]): string {
+  const sections: string[] = [];
+  let budget = TOTAL_PATCH_BUDGET;
+
+  for (const file of files) {
+    const header = fileHeader(file);
+    if (!file.patch || isMechanical(file.path)) {
+      sections.push(`${header}\n(patch omitted)`);
+      continue;
+    }
+
+    let patch = file.patch;
+    if (patch.length > PATCH_CHAR_LIMIT) {
+      patch = `${patch.slice(0, PATCH_CHAR_LIMIT)}\n… (patch truncated)`;
+    }
+    if (patch.length > budget) {
+      sections.push(`${header}\n(patch omitted — prompt size limit)`);
+      continue;
+    }
+
+    budget -= patch.length;
+    sections.push(`${header}\n${patch}`);
+  }
+
+  return sections.join("\n\n");
+}
+
+function buildPrompt(
+  detail: PullRequestDetail,
+  files: PullRequestFile[],
+): string {
+  return [
+    `Repository: ${detail.repo}`,
+    `Pull request #${detail.number}: ${detail.title}`,
+    `Author: ${detail.author}`,
+    `Merging ${detail.headRef} into ${detail.baseRef}`,
+    `${detail.commits} commits, ${detail.changedFiles} files, +${detail.additions}/-${detail.deletions}`,
+    "",
+    "Author's description:",
+    detail.body?.trim() || "(no description provided)",
+    "",
+    `Diff (${files.length} files):`,
+    "",
+    buildDiffSection(files),
+  ].join("\n");
+}
+
+async function requestAnalysis(
+  apiKey: string,
+  prompt: string,
+): Promise<RawAnalysis> {
+  const res = await fetch(ANTHROPIC_API, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
     },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: MAX_OUTPUT_TOKENS,
+      system: SYSTEM_PROMPT,
+      messages: [{ role: "user", content: prompt }],
+      tools: [analysisTool],
+      tool_choice: { type: "tool", name: "report_analysis" },
+    }),
+  });
+
+  if (res.status === 401) {
+    throw new Error(
+      "Anthropic rejected your API key. Re-check it in settings.",
+    );
+  }
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const body = (await res.json()) as { error?: { message?: string } };
+      detail = body.error?.message ?? "";
+    } catch {
+      // Non-JSON error body; fall back to the status code.
+    }
+    throw new Error(
+      detail
+        ? `Anthropic error: ${detail}`
+        : `Anthropic returned status ${res.status}.`,
+    );
+  }
+
+  const message = (await res.json()) as {
+    content: Array<{ type: string; input?: unknown }>;
+  };
+  const toolUse = message.content.find((block) => block.type === "tool_use");
+  if (!toolUse?.input) {
+    throw new Error("The model returned no analysis. Try again.");
+  }
+  return toolUse.input as RawAnalysis;
+}
+
+const riskLevels: readonly string[] = ["attention", "routine", "mechanical"];
+
+function toRisk(value: string | undefined): ChangeGroupRisk {
+  return riskLevels.includes(value ?? "")
+    ? (value as ChangeGroupRisk)
+    : "routine";
+}
+
+function slugify(title: string, index: number, seen: Set<string>): string {
+  const base =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || `group-${index + 1}`;
+  const id = seen.has(base) ? `${base}-${index + 1}` : base;
+  seen.add(id);
+  return id;
+}
+
+function normalizeAnchors(
+  anchors: RawAnchor[] | undefined,
+  validPaths: Set<string>,
+): DiffAnchor[] {
+  return (anchors ?? [])
+    .filter((anchor) => anchor.path && validPaths.has(anchor.path))
+    .map((anchor) => ({
+      path: anchor.path as string,
+      line: typeof anchor.line === "number" ? anchor.line : null,
+    }));
+}
+
+function normalizeClaims(
+  claims: RawClaim[] | undefined,
+  validPaths: Set<string>,
+): AnalysisClaim[] {
+  return (claims ?? [])
+    .filter((claim) => claim.text?.trim())
+    .map((claim) => ({
+      text: (claim.text as string).trim(),
+      anchors: normalizeAnchors(claim.anchors, validPaths),
+    }));
+}
+
+function toAnalysisResult(
+  raw: RawAnalysis,
+  detail: PullRequestDetail,
+  files: PullRequestFile[],
+): AnalysisResult {
+  const validPaths = new Set(files.map((file) => file.path));
+  const seenIds = new Set<string>();
+
+  const groups: ChangeGroup[] = (raw.groups ?? [])
+    .map((group, index) => ({
+      id: slugify(group.title ?? "", index, seenIds),
+      title: group.title?.trim() || `Change ${index + 1}`,
+      story: group.story?.trim() ?? "",
+      risk: toRisk(group.risk),
+      files: (group.files ?? []).filter((path) => validPaths.has(path)),
+    }))
+    .filter((group) => group.files.length > 0);
+
+  // Every file must land somewhere, so the review provably covers the whole
+  // diff even if the model missed a few.
+  const grouped = new Set(groups.flatMap((group) => group.files));
+  const ungrouped = files
+    .map((file) => file.path)
+    .filter((path) => !grouped.has(path));
+  if (ungrouped.length > 0) {
+    groups.push({
+      id: "everything-else",
+      title: "Everything else",
+      story: "Files the analysis didn't place in a group.",
+      risk: "routine",
+      files: ungrouped,
+    });
+  }
+
+  return {
+    repo: detail.repo,
+    prNumber: detail.number,
+    headSha: detail.headSha,
+    model: MODEL,
+    analyzedAt: new Date().toISOString(),
+    summary: raw.summary?.trim() || "The analysis returned no summary.",
+    groups,
+    risks: normalizeClaims(raw.risks, validPaths),
+    behaviorChanges: normalizeClaims(raw.behaviorChanges, validPaths),
+    outOfScope: (raw.outOfScope ?? [])
+      .map((entry) => entry?.trim())
+      .filter((entry): entry is string => Boolean(entry)),
   };
 }

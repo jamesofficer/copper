@@ -32,6 +32,7 @@ export interface PullRequestDetail {
   merged: boolean;
   baseRef: string;
   headRef: string;
+  headSha: string;
   labels: PullRequestLabel[];
   reviewers: string[];
   additions: number;
@@ -45,14 +46,6 @@ export interface PullRequestDetail {
 
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 
-export interface ChangedFile {
-  path: string;
-  status: FileStatus;
-  additions: number;
-  deletions: number;
-  mechanical: boolean;
-}
-
 export interface PullRequestFile {
   path: string;
   previousPath: string | null;
@@ -62,32 +55,41 @@ export interface PullRequestFile {
   patch: string | null;
 }
 
-export type Risk = "low" | "medium" | "high";
+// "attention" = changed logic worth careful thought, "routine" = ordinary
+// changes, "mechanical" = renames/lockfiles/generated code — skimmable.
+export type ChangeGroupRisk = "attention" | "routine" | "mechanical";
+
+// Points a claim at the exact place in the diff it's based on. `line` is a
+// line number in the new version of the file; null means the whole file.
+export interface DiffAnchor {
+  path: string;
+  line: number | null;
+}
 
 export interface ChangeGroup {
   id: string;
   title: string;
-  why: string;
+  story: string;
+  risk: ChangeGroupRisk;
   files: string[];
-  risk: Risk;
-  mechanical: boolean;
 }
 
-export interface SummaryLenses {
-  overview: string;
-  risks: string;
-  behavior: string;
-  scope: string;
+export interface AnalysisClaim {
+  text: string;
+  anchors: DiffAnchor[];
 }
 
 export interface AnalysisResult {
   repo: string;
   prNumber: number;
   headSha: string;
-  files: ChangedFile[];
+  model: string;
+  analyzedAt: string;
+  summary: string;
   groups: ChangeGroup[];
-  readingOrder: string[];
-  summaries: SummaryLenses | null;
+  risks: AnalysisClaim[];
+  behaviorChanges: AnalysisClaim[];
+  outOfScope: string[];
 }
 
 export interface ChatMessage {

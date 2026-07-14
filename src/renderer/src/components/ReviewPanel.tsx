@@ -1,8 +1,17 @@
-import { Box, Flex, Heading, Input, Text, VStack } from "@chakra-ui/react";
-import { useQuery } from "@tanstack/react-query";
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  Input,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { ChatMessage, PullRequest } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
+import Markdown from "./Markdown";
 
 interface Props {
   pr: PullRequest;
@@ -13,11 +22,20 @@ export default function ReviewPanel({ pr }: Props) {
     [],
   );
   const [question, setQuestion] = useState("");
+  const queryClient = useQueryClient();
 
   const analysisQuery = useQuery({
     queryKey: ["analysis", pr.repo, pr.number],
-    queryFn: () => window.api.openPullRequest(pr.repo, pr.number),
+    queryFn: () => window.api.getAnalysis(pr.repo, pr.number),
   });
+
+  const analyzeMutation = useMutation({
+    mutationFn: () => window.api.analyzePullRequest(pr.repo, pr.number),
+    onSuccess: (result) =>
+      queryClient.setQueryData(["analysis", pr.repo, pr.number], result),
+  });
+
+  const analysis = analysisQuery.data;
 
   async function ask() {
     const trimmed = question.trim();
@@ -55,9 +73,38 @@ export default function ReviewPanel({ pr }: Props) {
         >
           Summary
         </Heading>
-        <Text fontSize="sm">
-          {analysisQuery.data?.summaries?.overview ?? "Generating…"}
-        </Text>
+        {/* TODO: temporary raw output — the real Review UI (groups with
+            embedded diffs, risk sections) replaces this next. */}
+        {analysis ? (
+          <VStack alignItems="stretch" gap="2">
+            <Markdown>{analysis.summary}</Markdown>
+            {analysis.groups.map((group) => (
+              <Text key={group.id} fontSize="sm" color="fg.muted">
+                {group.title} — {group.risk} ({group.files.length} file
+                {group.files.length === 1 ? "" : "s"})
+              </Text>
+            ))}
+          </VStack>
+        ) : (
+          <VStack alignItems="flex-start" gap="2">
+            <Button
+              size="sm"
+              onClick={() => analyzeMutation.mutate()}
+              loading={analyzeMutation.isPending}
+              loadingText="Analysing…"
+              disabled={analysisQuery.isPending}
+            >
+              Analyse PR
+            </Button>
+            {analyzeMutation.isError && (
+              <Text fontSize="sm" color="fg.error">
+                {analyzeMutation.error instanceof Error
+                  ? analyzeMutation.error.message
+                  : "Analysis failed."}
+              </Text>
+            )}
+          </VStack>
+        )}
       </Box>
 
       <Flex direction="column" flex="1" minH="0">

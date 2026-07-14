@@ -10,8 +10,10 @@ const api: IpcApi = {
     ipcRenderer.invoke("getPullRequest", repo, prNumber),
   listPullRequestFiles: (repo, prNumber) =>
     ipcRenderer.invoke("listPullRequestFiles", repo, prNumber),
-  openPullRequest: (repo, prNumber) =>
-    ipcRenderer.invoke("openPullRequest", repo, prNumber),
+  getAnalysis: (repo, prNumber) =>
+    ipcRenderer.invoke("getAnalysis", repo, prNumber),
+  analyzePullRequest: (repo, prNumber) =>
+    ipcRenderer.invoke("analyzePullRequest", repo, prNumber),
   askQuestion: (repo, prNumber, question) =>
     ipcRenderer.invoke("askQuestion", repo, prNumber, question),
   getSecretsStatus: () => ipcRenderer.invoke("getSecretsStatus"),

@@ -126,6 +126,7 @@ export async function getPullRequest(
     merged: pull.merged,
     baseRef: pull.base.ref,
     headRef: pull.head.ref,
+    headSha: pull.head.sha,
     labels: pull.labels.map((label) => ({
       name: label.name,
       color: label.color,
