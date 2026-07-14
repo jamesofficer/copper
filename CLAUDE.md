@@ -65,7 +65,7 @@ Roadmap (rough order):
 2. Analysis pipeline with the Agent SDK: grouping/reading order, then summary lenses (feeds the right-hand panel and change groups).
 3. Q&A agent session with repo tools (read_file, grep_repo, git_log, get_diff) (`agent/session.ts`).
 4. SQLite persistence (`store/db.ts`, replace in-memory `analysis/cache.ts`).
-5. Diff viewer polish: syntax highlighting + virtualization for very large patches (current `DiffView` is a plain unified renderer).
+5. Diff viewer polish: virtualization for very large patches (`DiffView` already does per-line syntax highlighting via highlight.js).
 6. Comment drafts + batch submit review via the GitHub API.
 7. Blast radius and the other post-MVP features.
 

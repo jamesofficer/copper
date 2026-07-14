@@ -30,6 +30,7 @@ import type { PullRequest, Repository } from "../../../shared/types";
 import SettingsDialog from "../components/SettingsDialog";
 import SetupBanner from "../components/SetupBanner";
 import { toaster } from "../components/ui/toaster";
+import { scrollbar } from "../lib/scrollbar";
 
 interface Props {
   onSelect(pr: PullRequest): void;
@@ -257,22 +258,7 @@ export default function Welcome({ onSelect }: Props) {
                     rounded="xl"
                     bg="transparent"
                     p="3"
-                    css={{
-                      "&::-webkit-scrollbar": { width: "16px" },
-                      "&::-webkit-scrollbar-track": {
-                        background: "transparent",
-                      },
-                      "&::-webkit-scrollbar-thumb": {
-                        background: "var(--chakra-colors-border-emphasized)",
-                        borderRadius: "9999px",
-                        border: "5px solid transparent",
-                        backgroundClip: "padding-box",
-                      },
-                      "&::-webkit-scrollbar-thumb:hover": {
-                        background: "var(--chakra-colors-border-muted)",
-                        backgroundClip: "padding-box",
-                      },
-                    }}
+                    css={scrollbar}
                   >
                     {prs.map((pr) => (
                       <Box
