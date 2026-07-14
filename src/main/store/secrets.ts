@@ -23,10 +23,11 @@ async function writeStore(store: SecretStore): Promise<void> {
 }
 
 export async function getSecretsStatus(): Promise<SecretsStatus> {
-  const store = await readStore();
+  // Decrypt rather than just check presence — getSecret drops entries that
+  // can no longer be decrypted, so stale keys report as not set.
   return {
-    anthropic: Boolean(store.anthropic),
-    github: Boolean(store.github),
+    anthropic: Boolean(await getSecret("anthropic")),
+    github: Boolean(await getSecret("github")),
   };
 }
 
@@ -58,5 +59,13 @@ export async function getSecret(
   const store = await readStore();
   const encrypted = store[provider];
   if (!encrypted) return null;
-  return safeStorage.decryptString(Buffer.from(encrypted, "base64"));
+  try {
+    return safeStorage.decryptString(Buffer.from(encrypted, "base64"));
+  } catch {
+    // Undecryptable (e.g. the encryption key changed when the app was
+    // renamed) — drop it so the app treats the key as not set.
+    delete store[provider];
+    await writeStore(store);
+    return null;
+  }
 }

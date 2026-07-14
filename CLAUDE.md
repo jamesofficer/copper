@@ -73,6 +73,7 @@ Roadmap (rough order):
 - `pnpm dev` — run the app. `pnpm typecheck` — both tsconfig projects. `pnpm build` — production build.
 - `pnpm format` — Biome formatter (write). `pnpm lint` — Biome linter (check only). `pnpm check` — Biome format + lint + import sorting (write). Config in `biome.json`: 2-space indent, double quotes, respects `.gitignore`.
 - pnpm 10 blocks dependency install scripts; `electron` and `esbuild` are allowlisted in package.json (`pnpm.onlyBuiltDependencies`). If `node_modules/electron/dist` is missing after install, run `node node_modules/electron/install.js`.
+- Branding: the app is "Reviewr" (`productName` in package.json). Icon source is `resources/icon.svg` → rendered to `resources/icon.png` (1024px, via `rsvg-convert`) → `build/icon.icns` (via `sips` + `iconutil`). The main process sets the dock icon at runtime (`setDockIcon` in `main/index.ts`). Because dev runs the stock Electron binary, `scripts/brand-dev-electron.sh` (postinstall) rewrites the bundled Electron.app's Info.plist name, swaps its icns, and re-signs it ad-hoc so the dock says "Reviewr" during `pnpm dev`.
 - Pinned: vite 7 + @vitejs/plugin-react 5 (electron-vite 5 doesn't support vite 8 yet).
 
 ## Conventions

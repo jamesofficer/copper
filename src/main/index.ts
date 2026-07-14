@@ -1,6 +1,15 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, nativeImage, shell } from "electron";
 import { registerIpcHandlers } from "./ipc/router";
+
+function setDockIcon(): void {
+  if (process.platform !== "darwin" || !app.dock) return;
+  const iconPath = join(app.getAppPath(), "resources", "icon.png");
+  if (existsSync(iconPath)) {
+    app.dock.setIcon(nativeImage.createFromPath(iconPath));
+  }
+}
 
 function openExternal(url: string): void {
   if (url.startsWith("http://") || url.startsWith("https://")) {
@@ -37,6 +46,7 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
+  setDockIcon();
   registerIpcHandlers();
   createWindow();
 
