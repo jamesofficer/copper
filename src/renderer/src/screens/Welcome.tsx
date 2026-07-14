@@ -26,6 +26,7 @@ import {
 } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
 import SettingsDialog from "../components/SettingsDialog";
+import SetupBanner from "../components/SetupBanner";
 import { toaster } from "../components/ui/toaster";
 
 interface Props {
@@ -122,6 +123,11 @@ export default function Welcome({ onSelect }: Props) {
             Pick a repository to see its open pull requests.
           </Text>
         </VStack>
+
+        <SetupBanner
+          settingsOpen={settingsOpen}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
 
         {repositories === null ? (
           <Spinner color="fg.muted" />
