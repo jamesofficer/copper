@@ -80,12 +80,20 @@ export interface AnalysisClaim {
   anchors: DiffAnchor[];
 }
 
+export interface AnalysisUsage {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
 export interface AnalysisResult {
   repo: string;
   prNumber: number;
   headSha: string;
   model: string;
   analyzedAt: string;
+  // Optional: analyses cached before cost tracking existed don't have it.
+  usage?: AnalysisUsage;
   summary: string;
   groups: ChangeGroup[];
   risks: AnalysisClaim[];

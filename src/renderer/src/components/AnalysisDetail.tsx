@@ -12,6 +12,7 @@ import type { ReactNode } from "react";
 import type {
   AnalysisClaim,
   AnalysisResult,
+  AnalysisUsage,
   ChangeGroup,
   PullRequestFile,
 } from "../../../shared/types";
@@ -115,7 +116,7 @@ function DiffCards({
 
 function SummaryPane({ analysis }: { analysis: AnalysisResult }) {
   return (
-    <VStack alignItems="stretch" gap="6">
+    <VStack alignItems="stretch" gap="6" maxW="3xl">
       <VStack alignItems="stretch" gap="3">
         <SectionHeading>Summary</SectionHeading>
         <Markdown>{analysis.summary}</Markdown>
@@ -136,9 +137,16 @@ function SummaryPane({ analysis }: { analysis: AnalysisResult }) {
 
       <Text fontSize="xs" color="fg.subtle" fontFamily="mono">
         Analysed commit {analysis.headSha.slice(0, 7)} · {analysis.model}
+        {analysis.usage ? ` · ${formatCost(analysis.usage)}` : ""}
       </Text>
     </VStack>
   );
+}
+
+function formatCost(usage: AnalysisUsage): string {
+  const cost =
+    usage.costUsd < 0.01 ? "<$0.01" : `~$${usage.costUsd.toFixed(2)}`;
+  return `${cost} (${usage.inputTokens.toLocaleString()} in, ${usage.outputTokens.toLocaleString()} out)`;
 }
 
 function ClaimPane({
@@ -153,9 +161,11 @@ function ClaimPane({
   const paths = [...new Set(claim.anchors.map((anchor) => anchor.path))];
   return (
     <VStack alignItems="stretch" gap="4">
-      <Heading size="md">{claim.title}</Heading>
-      <Markdown>{claim.text}</Markdown>
-      <AnchorChips claim={claim} />
+      <VStack alignItems="stretch" gap="4" maxW="3xl">
+        <Heading size="md">{claim.title}</Heading>
+        <Markdown>{claim.text}</Markdown>
+        <AnchorChips claim={claim} />
+      </VStack>
       {paths.length > 0 && (
         <>
           <SectionHeading>Relevant changes</SectionHeading>
@@ -183,14 +193,21 @@ function GroupPane({
 }) {
   return (
     <VStack alignItems="stretch" gap="4">
-      <HStack gap="3" alignItems="baseline">
-        <Text fontFamily="mono" fontSize="sm" color="fg.subtle" flexShrink="0">
-          {index + 1}
-        </Text>
-        <Heading size="md">{group.title}</Heading>
-        <RiskBadge risk={group.risk} />
-      </HStack>
-      {group.story && <Markdown>{group.story}</Markdown>}
+      <VStack alignItems="stretch" gap="4" maxW="3xl">
+        <HStack gap="3" alignItems="baseline">
+          <Text
+            fontFamily="mono"
+            fontSize="sm"
+            color="fg.subtle"
+            flexShrink="0"
+          >
+            {index + 1}
+          </Text>
+          <Heading size="md">{group.title}</Heading>
+          <RiskBadge risk={group.risk} />
+        </HStack>
+        {group.story && <Markdown>{group.story}</Markdown>}
+      </VStack>
       {files ? (
         <DiffCards
           paths={group.files}

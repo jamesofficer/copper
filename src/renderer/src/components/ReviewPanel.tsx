@@ -22,11 +22,43 @@ interface Props {
   pr: PullRequest;
 }
 
+const CHAT_WIDTH_KEY = "chatPanelWidth";
+const CHAT_MIN_WIDTH = 280;
+const CHAT_MAX_WIDTH = 640;
+
+function storedChatWidth(): number {
+  const stored = Number(localStorage.getItem(CHAT_WIDTH_KEY));
+  return stored >= CHAT_MIN_WIDTH && stored <= CHAT_MAX_WIDTH ? stored : 340;
+}
+
 export default function ReviewPanel({ pr }: Props) {
   const [selection, setSelection] = useState<AnalysisSelection>({
     kind: "summary",
   });
+  const [chatWidth, setChatWidth] = useState(storedChatWidth);
   const queryClient = useQueryClient();
+
+  function startChatResize(event: React.PointerEvent) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = chatWidth;
+    let latest = startWidth;
+
+    function onMove(move: PointerEvent) {
+      latest = Math.min(
+        CHAT_MAX_WIDTH,
+        Math.max(CHAT_MIN_WIDTH, startWidth + startX - move.clientX),
+      );
+      setChatWidth(latest);
+    }
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      localStorage.setItem(CHAT_WIDTH_KEY, String(latest));
+    }
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 
   const analysisQuery = useQuery({
     queryKey: ["analysis", pr.repo, pr.number],
@@ -133,9 +165,19 @@ export default function ReviewPanel({ pr }: Props) {
         />
       </Box>
 
-      <Box w="340px" flexShrink="0" borderLeftWidth="1px">
-        <ChatPanel pr={pr} />
-      </Box>
+      <Flex flexShrink="0" style={{ width: chatWidth }}>
+        <Box
+          w="1"
+          flexShrink="0"
+          cursor="col-resize"
+          onPointerDown={startChatResize}
+          _hover={{ bg: "border.emphasized" }}
+          transition="background 0.15s"
+        />
+        <Box flex="1" minW="0" borderLeftWidth="1px">
+          <ChatPanel pr={pr} />
+        </Box>
+      </Flex>
     </Flex>
   );
 }

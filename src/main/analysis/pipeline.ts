@@ -1,6 +1,7 @@
 import type {
   AnalysisClaim,
   AnalysisResult,
+  AnalysisUsage,
   ChangeGroup,
   ChangeGroupRisk,
   DiffAnchor,
@@ -14,6 +15,10 @@ import { getCachedAnalysis, setCachedAnalysis } from "./cache";
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
 const MAX_OUTPUT_TOKENS = 8192;
+
+// USD per million tokens for MODEL — update alongside it.
+const INPUT_USD_PER_MTOK = 5;
+const OUTPUT_USD_PER_MTOK = 25;
 
 // Huge PRs get their patches truncated so the prompt stays a sane size; the
 // model still sees every file's name, status, and line counts.
@@ -159,11 +164,11 @@ export async function analyzePullRequest(
   if (cached) return cached;
 
   const files = await listPullRequestFiles(repo, prNumber);
-  const raw = await requestAnalysis(
+  const { raw, usage } = await requestAnalysis(
     apiKey,
     buildPullRequestContext(detail, files),
   );
-  const result = toAnalysisResult(raw, detail, files);
+  const result = toAnalysisResult(raw, detail, files, usage);
   await setCachedAnalysis(result);
   return result;
 }
@@ -230,7 +235,7 @@ export function buildPullRequestContext(
 async function requestAnalysis(
   apiKey: string,
   prompt: string,
-): Promise<RawAnalysis> {
+): Promise<{ raw: RawAnalysis; usage: AnalysisUsage | undefined }> {
   const res = await fetch(ANTHROPIC_API, {
     method: "POST",
     headers: {
@@ -270,12 +275,27 @@ async function requestAnalysis(
 
   const message = (await res.json()) as {
     content: Array<{ type: string; input?: unknown }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
   const toolUse = message.content.find((block) => block.type === "tool_use");
   if (!toolUse?.input) {
     throw new Error("The model returned no analysis. Try again.");
   }
-  return toolUse.input as RawAnalysis;
+
+  const inputTokens = message.usage?.input_tokens ?? 0;
+  const outputTokens = message.usage?.output_tokens ?? 0;
+  const usage: AnalysisUsage | undefined = message.usage
+    ? {
+        inputTokens,
+        outputTokens,
+        costUsd:
+          (inputTokens * INPUT_USD_PER_MTOK +
+            outputTokens * OUTPUT_USD_PER_MTOK) /
+          1_000_000,
+      }
+    : undefined;
+
+  return { raw: toolUse.input as RawAnalysis, usage };
 }
 
 const riskLevels: readonly string[] = ["attention", "routine", "mechanical"];
@@ -331,6 +351,7 @@ function toAnalysisResult(
   raw: RawAnalysis,
   detail: PullRequestDetail,
   files: PullRequestFile[],
+  usage: AnalysisUsage | undefined,
 ): AnalysisResult {
   const validPaths = new Set(files.map((file) => file.path));
   const seenIds = new Set<string>();
@@ -367,6 +388,7 @@ function toAnalysisResult(
     headSha: detail.headSha,
     model: MODEL,
     analyzedAt: new Date().toISOString(),
+    usage,
     summary: raw.summary?.trim() || "The analysis returned no summary.",
     groups,
     risks: normalizeClaims(raw.risks, validPaths),

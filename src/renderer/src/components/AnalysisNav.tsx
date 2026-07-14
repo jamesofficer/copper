@@ -1,5 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import { LuScrollText } from "react-icons/lu";
 import type { AnalysisResult, ChangeGroupRisk } from "../../../shared/types";
 
 export type AnalysisSelection =
@@ -89,9 +90,14 @@ export default function AnalysisNav({ analysis, selection, onSelect }: Props) {
         selected={sameSelection(selection, { kind: "summary" })}
         onClick={() => onSelect({ kind: "summary" })}
       >
-        <Text fontSize="xs" fontWeight="medium">
-          Summary
-        </Text>
+        <HStack gap="2">
+          <Box color="colorPalette.fg" flexShrink="0">
+            <LuScrollText size={13} />
+          </Box>
+          <Text fontSize="xs" fontWeight="medium">
+            Summary
+          </Text>
+        </HStack>
       </NavItem>
 
       <VStack alignItems="stretch" gap="1">

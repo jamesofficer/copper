@@ -3,9 +3,9 @@ import {
   Flex,
   Heading,
   HStack,
-  Input,
   Spinner,
   Text,
+  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useRef, useState } from "react";
@@ -159,20 +159,22 @@ export default function ChatPanel({ pr }: Props) {
       </VStack>
 
       <Box p="3" borderTopWidth="1px" flexShrink="0">
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void ask();
+        <Textarea
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void ask();
+            }
           }}
-        >
-          <Input
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder={busy ? "Answering…" : "Ask about this PR…"}
-            disabled={busy}
-            size="sm"
-          />
-        </form>
+          placeholder={busy ? "Answering…" : "Ask about this PR…"}
+          disabled={busy}
+          size="sm"
+          rows={1}
+          autoresize
+          maxH="40"
+        />
       </Box>
     </Flex>
   );
