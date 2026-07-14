@@ -1,7 +1,7 @@
 import type { IpcApi } from "../shared/ipc";
 
 declare global {
-	interface Window {
-		api: IpcApi;
-	}
+  interface Window {
+    api: IpcApi;
+  }
 }

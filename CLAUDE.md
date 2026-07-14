@@ -73,7 +73,7 @@ Roadmap (rough order):
 ## Development
 
 - `pnpm dev` — run the app. `pnpm typecheck` — both tsconfig projects. `pnpm build` — production build.
-- `pnpm format` — Biome formatter (write). `pnpm lint` — Biome linter (check only). `pnpm check` — Biome format + lint + import sorting (write). Config in `biome.json`: tabs, double quotes, respects `.gitignore`.
+- `pnpm format` — Biome formatter (write). `pnpm lint` — Biome linter (check only). `pnpm check` — Biome format + lint + import sorting (write). Config in `biome.json`: 2-space indent, double quotes, respects `.gitignore`.
 - pnpm 10 blocks dependency install scripts; `electron` and `esbuild` are allowlisted in package.json (`pnpm.onlyBuiltDependencies`). If `node_modules/electron/dist` is missing after install, run `node node_modules/electron/install.js`.
 - Pinned: vite 7 + @vitejs/plugin-react 5 (electron-vite 5 doesn't support vite 8 yet).
 
@@ -83,5 +83,5 @@ Roadmap (rough order):
 - React components and functions inside them use the `function` keyword, not arrow functions.
 - Component props: `interface Props {}` (or a descriptive exported name if they must be exported).
 - No unnecessary comments; TODOs mark unimplemented stubs.
-- Formatting and linting are handled by Biome (tabs, double quotes). Run `pnpm check` before committing.
+- Formatting and linting are handled by Biome (2-space indent, double quotes). Run `pnpm check` before committing.
 - Conventional commits (`feat:`, `fix:`, `chore:`).
