@@ -1,9 +1,8 @@
 import { Alert, Button } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
-import type { SecretProvider, SecretsStatus } from "../../../shared/types";
+import { useQuery } from "@tanstack/react-query";
+import type { SecretProvider } from "../../../shared/types";
 
 interface Props {
-  settingsOpen: boolean;
   onOpenSettings(): void;
 }
 
@@ -12,13 +11,11 @@ const secretLabels: Record<SecretProvider, string> = {
   github: "GitHub token",
 };
 
-export default function SetupBanner({ settingsOpen, onOpenSettings }: Props) {
-  const [secrets, setSecrets] = useState<SecretsStatus | null>(null);
-
-  useEffect(() => {
-    if (settingsOpen) return;
-    void window.api.getSecretsStatus().then(setSecrets);
-  }, [settingsOpen]);
+export default function SetupBanner({ onOpenSettings }: Props) {
+  const { data: secrets } = useQuery({
+    queryKey: ["secretsStatus"],
+    queryFn: () => window.api.getSecretsStatus(),
+  });
 
   const missingSecrets = secrets
     ? (Object.keys(secretLabels) as SecretProvider[]).filter(

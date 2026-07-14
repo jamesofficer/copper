@@ -10,12 +10,9 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import type {
-  KeyTestResult,
-  SecretProvider,
-  SecretsStatus,
-} from "../../../shared/types";
+import type { KeyTestResult, SecretProvider } from "../../../shared/types";
 
 interface Props {
   open: boolean;
@@ -47,7 +44,11 @@ const PROVIDERS: ProviderConfig[] = [
 type ResultMap = Partial<Record<SecretProvider, KeyTestResult>>;
 
 export default function SettingsDialog({ open, onOpenChange }: Props) {
-  const [status, setStatus] = useState<SecretsStatus | null>(null);
+  const queryClient = useQueryClient();
+  const { data: status } = useQuery({
+    queryKey: ["secretsStatus"],
+    queryFn: () => window.api.getSecretsStatus(),
+  });
   const [values, setValues] = useState<Record<SecretProvider, string>>({
     anthropic: "",
     github: "",
@@ -56,27 +57,32 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
   const [busy, setBusy] = useState<SecretProvider | null>(null);
 
   useEffect(() => {
-    if (!open) return;
-    setResults({});
-    void window.api.getSecretsStatus().then(setStatus);
+    if (open) setResults({});
   }, [open]);
+
+  async function refreshAfterChange(provider: SecretProvider) {
+    await queryClient.invalidateQueries({ queryKey: ["secretsStatus"] });
+    if (provider === "github") {
+      await queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
+    }
+  }
 
   async function save(provider: SecretProvider) {
     setBusy(provider);
     const result = await window.api.saveSecret(provider, values[provider]);
     setResults((prev) => ({ ...prev, [provider]: result }));
     if (result.ok) {
-      setStatus((prev) => (prev ? { ...prev, [provider]: true } : prev));
       setValues((prev) => ({ ...prev, [provider]: "" }));
+      await refreshAfterChange(provider);
     }
     setBusy(null);
   }
 
   async function clear(provider: SecretProvider) {
     setBusy(provider);
-    const next = await window.api.clearSecret(provider);
-    setStatus(next);
+    await window.api.clearSecret(provider);
     setResults((prev) => ({ ...prev, [provider]: undefined }));
+    await refreshAfterChange(provider);
     setBusy(null);
   }
 

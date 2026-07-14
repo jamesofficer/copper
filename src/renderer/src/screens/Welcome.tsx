@@ -1,4 +1,5 @@
 import {
+  Alert,
   Badge,
   Box,
   Button,
@@ -15,7 +16,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   LuChevronsUpDown,
   LuFolderGit2,
@@ -34,36 +36,41 @@ interface Props {
 }
 
 export default function Welcome({ onSelect }: Props) {
-  const [repositories, setRepositories] = useState<Repository[] | null>(null);
-  const [active, setActive] = useState<Repository | null>(null);
-  const [prs, setPrs] = useState<PullRequest[] | null>(null);
+  const queryClient = useQueryClient();
+  const [activePath, setActivePath] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  useEffect(() => {
-    void window.api.listRepositories().then((repos) => {
-      setRepositories(repos);
-      setActive(repos[0] ?? null);
-    });
-  }, []);
+  const reposQuery = useQuery({
+    queryKey: ["repositories"],
+    queryFn: () => window.api.listRepositories(),
+  });
+  const repositories = reposQuery.data;
+  const active =
+    repositories?.find((repo) => repo.path === activePath) ??
+    repositories?.[0] ??
+    null;
 
-  useEffect(() => {
-    if (!active) {
-      setPrs(null);
-      return;
-    }
-    setPrs(null);
-    void window.api.listPullRequests(active.slug ?? active.name).then(setPrs);
-  }, [active]);
+  const prsQuery = useQuery({
+    queryKey: ["pullRequests", active?.slug],
+    queryFn: () => window.api.listPullRequests(active?.slug ?? ""),
+    enabled: Boolean(active?.slug),
+  });
+  const prs = prsQuery.data;
+  const prsError = prsQuery.error
+    ? prsQuery.error instanceof Error
+      ? prsQuery.error.message
+      : "Couldn't load pull requests."
+    : null;
 
   async function addRepository() {
     try {
       const added = await window.api.addRepository();
       if (!added) return;
-      setRepositories((prev) => [
+      queryClient.setQueryData<Repository[]>(["repositories"], (prev) => [
         added,
         ...(prev ?? []).filter((repo) => repo.path !== added.path),
       ]);
-      setActive(added);
+      setActivePath(added.path);
     } catch (cause) {
       toaster.create({
         type: "error",
@@ -80,8 +87,8 @@ export default function Welcome({ onSelect }: Props) {
   async function removeActive() {
     if (!active) return;
     const remaining = await window.api.removeRepository(active.path);
-    setRepositories(remaining);
-    setActive(remaining[0] ?? null);
+    queryClient.setQueryData(["repositories"], remaining);
+    setActivePath(remaining[0]?.path ?? null);
   }
 
   function handleMenuSelect(value: string) {
@@ -90,8 +97,7 @@ export default function Welcome({ onSelect }: Props) {
     } else if (value === "remove") {
       void removeActive();
     } else {
-      const repo = repositories?.find((known) => known.path === value);
-      if (repo) setActive(repo);
+      setActivePath(value);
     }
   }
 
@@ -124,14 +130,11 @@ export default function Welcome({ onSelect }: Props) {
           </Text>
         </VStack>
 
-        <SetupBanner
-          settingsOpen={settingsOpen}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
+        <SetupBanner onOpenSettings={() => setSettingsOpen(true)} />
 
-        {repositories === null ? (
+        {reposQuery.isPending ? (
           <Spinner color="fg.muted" />
-        ) : repositories.length === 0 ? (
+        ) : !repositories || repositories.length === 0 ? (
           <EmptyState.Root borderWidth="1px" borderStyle="dashed" rounded="xl">
             <EmptyState.Content>
               <EmptyState.Indicator>
@@ -215,8 +218,19 @@ export default function Welcome({ onSelect }: Props) {
               </Text>
             )}
 
-            {active &&
-              (prs === null ? (
+            {prsError && (
+              <Alert.Root status="error" rounded="lg" w="full">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Title>Couldn’t load pull requests</Alert.Title>
+                  <Alert.Description>{prsError}</Alert.Description>
+                </Alert.Content>
+              </Alert.Root>
+            )}
+
+            {active?.slug &&
+              !prsError &&
+              (prsQuery.isPending || !prs ? (
                 <HStack color="fg.muted" py="8">
                   <Spinner size="sm" />
                   <Text fontSize="sm">Loading open pull requests…</Text>
@@ -235,55 +249,85 @@ export default function Welcome({ onSelect }: Props) {
                   >
                     Open pull requests
                   </Text>
-                  {prs.map((pr) => (
-                    <Box
-                      key={`${pr.repo}#${pr.number}`}
-                      as="button"
-                      onClick={() => onSelect(pr)}
-                      textAlign="left"
-                      borderWidth="1px"
-                      rounded="lg"
-                      px="5"
-                      py="4"
-                      cursor="pointer"
-                      transition="backgrounds"
-                      _hover={{
-                        bg: "bg.subtle",
-                        borderColor: "colorPalette.muted",
-                      }}
-                    >
-                      <HStack justifyContent="space-between" gap="4">
-                        <VStack gap="1" alignItems="flex-start" minW="0">
-                          <Text fontWeight="semibold" truncate>
-                            {pr.title}
-                          </Text>
+                  <Stack
+                    gap="3"
+                    maxH="22rem"
+                    overflowY="auto"
+                    borderWidth="1px"
+                    rounded="xl"
+                    bg="transparent"
+                    p="3"
+                    css={{
+                      "&::-webkit-scrollbar": { width: "16px" },
+                      "&::-webkit-scrollbar-track": {
+                        background: "transparent",
+                      },
+                      "&::-webkit-scrollbar-thumb": {
+                        background: "var(--chakra-colors-border-emphasized)",
+                        borderRadius: "9999px",
+                        border: "5px solid transparent",
+                        backgroundClip: "padding-box",
+                      },
+                      "&::-webkit-scrollbar-thumb:hover": {
+                        background: "var(--chakra-colors-border-muted)",
+                        backgroundClip: "padding-box",
+                      },
+                    }}
+                  >
+                    {prs.map((pr) => (
+                      <Box
+                        key={`${pr.repo}#${pr.number}`}
+                        as="button"
+                        onClick={() => onSelect(pr)}
+                        textAlign="left"
+                        borderWidth="1px"
+                        rounded="lg"
+                        px="5"
+                        py="4"
+                        cursor="pointer"
+                        transition="backgrounds"
+                        _hover={{
+                          bg: "bg.subtle",
+                          borderColor: "colorPalette.muted",
+                        }}
+                      >
+                        <HStack
+                          justifyContent="space-between"
+                          gap="4"
+                          alignItems="flex-start"
+                        >
+                          <VStack gap="1" alignItems="flex-start" minW="0">
+                            <Text fontWeight="semibold" wordBreak="break-word">
+                              {pr.title}
+                            </Text>
+                            <HStack
+                              fontFamily="mono"
+                              fontSize="xs"
+                              color="fg.muted"
+                              gap="3"
+                            >
+                              <Text>#{pr.number}</Text>
+                              <Text>{pr.author}</Text>
+                              <Text>{pr.changedFiles} files</Text>
+                            </HStack>
+                          </VStack>
                           <HStack
                             fontFamily="mono"
                             fontSize="xs"
-                            color="fg.muted"
-                            gap="3"
+                            gap="2"
+                            flexShrink="0"
                           >
-                            <Text>#{pr.number}</Text>
-                            <Text>{pr.author}</Text>
-                            <Text>{pr.changedFiles} files</Text>
+                            <Badge colorPalette="green" variant="surface">
+                              +{pr.additions}
+                            </Badge>
+                            <Badge colorPalette="red" variant="surface">
+                              −{pr.deletions}
+                            </Badge>
                           </HStack>
-                        </VStack>
-                        <HStack
-                          fontFamily="mono"
-                          fontSize="xs"
-                          gap="2"
-                          flexShrink="0"
-                        >
-                          <Badge colorPalette="green" variant="surface">
-                            +{pr.additions}
-                          </Badge>
-                          <Badge colorPalette="red" variant="surface">
-                            −{pr.deletions}
-                          </Badge>
                         </HStack>
-                      </HStack>
-                    </Box>
-                  ))}
+                      </Box>
+                    ))}
+                  </Stack>
                 </Stack>
               ))}
           </VStack>
