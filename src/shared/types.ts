@@ -26,6 +26,15 @@ export interface ChangedFile {
   mechanical: boolean;
 }
 
+export interface PullRequestFile {
+  path: string;
+  previousPath: string | null;
+  status: FileStatus;
+  additions: number;
+  deletions: number;
+  patch: string | null;
+}
+
 export type Risk = "low" | "medium" | "high";
 
 export interface ChangeGroup {

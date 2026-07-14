@@ -1,5 +1,4 @@
 import {
-  Badge,
   Box,
   Button,
   Center,
@@ -9,40 +8,40 @@ import {
   HStack,
   Input,
   Spinner,
-  Stack,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
-import type {
-  AnalysisResult,
-  ChatMessage,
-  PullRequest,
-  Risk,
-} from "../../../shared/types";
+import type { ChatMessage, PullRequest } from "../../../shared/types";
+import DiffView from "../components/DiffView";
+import FileList from "../components/FileList";
 
 interface Props {
   pr: PullRequest;
   onBack(): void;
 }
 
-const riskColor: Record<Risk, string> = {
-  low: "green",
-  medium: "yellow",
-  high: "red",
-};
-
 export default function Review({ pr, onBack }: Props) {
-  const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [messages, setMessages] = useState<Array<ChatMessage & { id: string }>>(
     [],
   );
   const [question, setQuestion] = useState("");
 
-  useEffect(() => {
-    void window.api.openPullRequest(pr.repo, pr.number).then(setAnalysis);
-  }, [pr.repo, pr.number]);
+  const filesQuery = useQuery({
+    queryKey: ["pullRequestFiles", pr.repo, pr.number],
+    queryFn: () => window.api.listPullRequestFiles(pr.repo, pr.number),
+  });
+  const files = filesQuery.data;
+  const selectedFile =
+    files?.find((file) => file.path === selectedPath) ?? files?.[0] ?? null;
+
+  const analysisQuery = useQuery({
+    queryKey: ["analysis", pr.repo, pr.number],
+    queryFn: () => window.api.openPullRequest(pr.repo, pr.number),
+  });
 
   async function ask() {
     const trimmed = question.trim();
@@ -74,74 +73,57 @@ export default function Review({ pr, onBack }: Props) {
       </HStack>
 
       <Grid templateColumns="300px 1fr 340px" flex="1" minH="0">
-        <Stack gap="3" p="4" overflowY="auto" borderRightWidth="1px">
+        <Flex direction="column" borderRightWidth="1px" minH="0">
           <Heading
             size="xs"
             color="fg.muted"
             textTransform="uppercase"
             letterSpacing="wider"
+            px="4"
+            py="3"
+            flexShrink="0"
           >
-            Changes
+            Files{files ? ` (${files.length})` : ""}
           </Heading>
-          {analysis === null ? (
-            <HStack color="fg.muted">
-              <Spinner size="sm" />
-              <Text fontSize="sm">Analyzing…</Text>
-            </HStack>
-          ) : (
-            analysis.readingOrder.map((groupId) => {
-              const group = analysis.groups.find(
-                (candidate) => candidate.id === groupId,
-              );
-              if (!group) return null;
-              return (
-                <Box
-                  key={group.id}
-                  borderWidth="1px"
-                  borderLeftWidth="3px"
-                  borderLeftColor={`${riskColor[group.risk]}.solid`}
-                  rounded="md"
-                  p="3"
-                >
-                  <HStack justifyContent="space-between" mb="1">
-                    <Text fontWeight="semibold" fontSize="sm">
-                      {group.title}
-                    </Text>
-                    <Badge
-                      colorPalette={riskColor[group.risk]}
-                      variant="surface"
-                      size="xs"
-                    >
-                      {group.risk}
-                    </Badge>
-                  </HStack>
-                  <Text fontSize="sm" color="fg.muted" mb="2">
-                    {group.why}
-                  </Text>
-                  <Stack gap="0.5">
-                    {group.files.map((file) => (
-                      <Text
-                        key={file}
-                        fontFamily="mono"
-                        fontSize="xs"
-                        color="fg.subtle"
-                        truncate
-                      >
-                        {file}
-                      </Text>
-                    ))}
-                  </Stack>
-                </Box>
-              );
-            })
-          )}
-        </Stack>
+          <Box flex="1" overflowY="auto" px="3" pb="3">
+            {filesQuery.isPending ? (
+              <HStack color="fg.muted" px="1">
+                <Spinner size="sm" />
+                <Text fontSize="sm">Loading changed files…</Text>
+              </HStack>
+            ) : filesQuery.isError ? (
+              <Text fontSize="sm" color="fg.error" px="1">
+                {filesQuery.error instanceof Error
+                  ? filesQuery.error.message
+                  : "Couldn't load changed files."}
+              </Text>
+            ) : files && files.length > 0 ? (
+              <FileList
+                files={files}
+                selectedPath={selectedFile?.path ?? null}
+                onSelect={setSelectedPath}
+              />
+            ) : (
+              <Text fontSize="sm" color="fg.muted" px="1">
+                No changed files.
+              </Text>
+            )}
+          </Box>
+        </Flex>
 
-        <Center p="4">
-          <Text color="fg.muted" fontSize="sm">
-            Diff viewer goes here.
-          </Text>
-        </Center>
+        <Box minH="0" minW="0">
+          {selectedFile ? (
+            <DiffView file={selectedFile} />
+          ) : (
+            <Center h="full" p="4">
+              <Text color="fg.muted" fontSize="sm">
+                {filesQuery.isPending
+                  ? "Loading diff…"
+                  : "Select a file to view its diff."}
+              </Text>
+            </Center>
+          )}
+        </Box>
 
         <Flex direction="column" gap="6" p="4" borderLeftWidth="1px" minH="0">
           <Box>
@@ -155,7 +137,7 @@ export default function Review({ pr, onBack }: Props) {
               Summary
             </Heading>
             <Text fontSize="sm">
-              {analysis?.summaries?.overview ?? "Generating…"}
+              {analysisQuery.data?.summaries?.overview ?? "Generating…"}
             </Text>
           </Box>
           <Flex direction="column" flex="1" minH="0">

@@ -2,7 +2,7 @@ import { ipcMain } from "electron";
 import type { IpcApi } from "../../shared/ipc";
 import { askQuestion } from "../agent/session";
 import { analyzePullRequest } from "../analysis/pipeline";
-import { listReviewRequests } from "../github/client";
+import { listPullRequestFiles, listReviewRequests } from "../github/client";
 import {
   addRepository,
   listRepositories,
@@ -15,6 +15,8 @@ const handlers: IpcApi = {
   addRepository: () => addRepository(),
   removeRepository: (path) => removeRepository(path),
   listPullRequests: (repo) => listReviewRequests(repo),
+  listPullRequestFiles: (repo, prNumber) =>
+    listPullRequestFiles(repo, prNumber),
   openPullRequest: (repo, prNumber) => analyzePullRequest(repo, prNumber),
   askQuestion: (repo, prNumber, question) =>
     askQuestion(repo, prNumber, question),

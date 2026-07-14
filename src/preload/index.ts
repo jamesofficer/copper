@@ -6,6 +6,8 @@ const api: IpcApi = {
   addRepository: () => ipcRenderer.invoke("addRepository"),
   removeRepository: (path) => ipcRenderer.invoke("removeRepository", path),
   listPullRequests: (repo) => ipcRenderer.invoke("listPullRequests", repo),
+  listPullRequestFiles: (repo, prNumber) =>
+    ipcRenderer.invoke("listPullRequestFiles", repo, prNumber),
   openPullRequest: (repo, prNumber) =>
     ipcRenderer.invoke("openPullRequest", repo, prNumber),
   askQuestion: (repo, prNumber, question) =>

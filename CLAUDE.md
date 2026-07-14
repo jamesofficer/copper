@@ -44,7 +44,7 @@ src/
 ├── main/
 │   ├── index.ts            # app lifecycle, window creation
 │   ├── ipc/router.ts       # implements IpcApi, registers ipcMain handlers
-│   ├── github/             # auth.ts (reads stored GitHub token), client.ts (live REST fetch — open PRs)
+│   ├── github/             # auth.ts (reads stored GitHub token), client.ts (live REST fetch — open PRs + PR file diffs)
 │   ├── repo/               # local.ts (repo registry + folder picker), workspace.ts (stub), git.ts (stub)
 │   ├── analysis/           # pipeline.ts (MOCK DATA), diff-parser.ts (stub), cache.ts (in-memory)
 │   ├── agent/              # session.ts (Q&A — stub echo)
@@ -57,18 +57,17 @@ src/
 
 ## Current status (as of 2026-07-14)
 
-Scaffold complete and verified: `pnpm typecheck` and `pnpm build` pass, `pnpm dev` opens the app. The UI is built with Chakra UI v3. Three things are real: (1) repository management — add local git repos via the native folder dialog, the GitHub slug is read from the `origin` remote, list persists to `~/.pr-reviewer/repositories.json`; (2) API-key settings — a gear on the welcome screen opens a dialog to enter a Claude API key and a GitHub token. Keys are validated with a live API call before saving, encrypted with Electron `safeStorage` (macOS Keychain), and stored in `~/.pr-reviewer/secrets.json`. Raw keys never cross IPC to the renderer; only status (set/not-set) does. (3) live open PRs — `github/client.ts` uses the stored token to fetch a repo's open pull requests via the GitHub REST API (plain `fetch`, no Octokit), including per-PR line/file counts. The rest runs on mock data — opening a PR → grouped changes with risk badges, summary panel, chat that echoes through IPC. The Claude key isn't used yet beyond validation.
+Scaffold complete and verified: `pnpm typecheck` and `pnpm build` pass, `pnpm dev` opens the app. The UI is built with Chakra UI v3. Three things are real: (1) repository management — add local git repos via the native folder dialog, the GitHub slug is read from the `origin` remote, list persists to `~/.pr-reviewer/repositories.json`; (2) API-key settings — a gear on the welcome screen opens a dialog to enter a Claude API key and a GitHub token. Keys are validated with a live API call before saving, encrypted with Electron `safeStorage` (macOS Keychain), and stored in `~/.pr-reviewer/secrets.json`. Raw keys never cross IPC to the renderer; only status (set/not-set) does. (3) live open PRs and diffs — `github/client.ts` uses the stored token to fetch a repo's open pull requests via the GitHub REST API (plain `fetch`, no Octokit), including per-PR line/file counts, and each PR's changed files with their patches (`/pulls/{n}/files`). The Review screen renders a real, selectable file list (left) and a unified diff of the selected file (center, `components/DiffView.tsx`). Still mock: the right-hand summary panel and the Q&A chat (echo stub). The Claude key isn't used yet beyond validation.
 
 Roadmap (rough order):
 
-1. Repo workspace: blobless clone/fetch + PR head refs (`repo/`).
-2. Diff parsing + mechanical classification (`analysis/diff-parser.ts`).
-3. Analysis pipeline with the Agent SDK: grouping/reading order first, then summary lenses.
-4. Q&A agent session with repo tools (read_file, grep_repo, git_log, get_diff) (`agent/session.ts`).
-5. SQLite persistence (`store/db.ts`, replace in-memory `analysis/cache.ts`).
-6. Real diff viewer (virtualized, syntax highlighting off the main thread).
-7. Comment drafts + batch submit review via the GitHub API.
-8. Blast radius and the other post-MVP features.
+1. Repo workspace: blobless clone/fetch + PR head refs (`repo/`) — needed for full-repo Q&A context, not for the diff (that comes from the API).
+2. Analysis pipeline with the Agent SDK: grouping/reading order, then summary lenses (feeds the right-hand panel and change groups).
+3. Q&A agent session with repo tools (read_file, grep_repo, git_log, get_diff) (`agent/session.ts`).
+4. SQLite persistence (`store/db.ts`, replace in-memory `analysis/cache.ts`).
+5. Diff viewer polish: syntax highlighting + virtualization for very large patches (current `DiffView` is a plain unified renderer).
+6. Comment drafts + batch submit review via the GitHub API.
+7. Blast radius and the other post-MVP features.
 
 ## Development
 

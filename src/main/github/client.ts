@@ -1,4 +1,8 @@
-import type { PullRequest } from "../../shared/types";
+import type {
+  FileStatus,
+  PullRequest,
+  PullRequestFile,
+} from "../../shared/types";
 import { getGitHubToken } from "./auth";
 
 const API = "https://api.github.com";
@@ -80,5 +84,59 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
     additions: pull.additions,
     deletions: pull.deletions,
     changedFiles: pull.changed_files,
+  }));
+}
+
+interface GitHubFile {
+  filename: string;
+  previous_filename?: string;
+  status: string;
+  additions: number;
+  deletions: number;
+  patch?: string;
+}
+
+function toFileStatus(status: string): FileStatus {
+  switch (status) {
+    case "added":
+      return "added";
+    case "removed":
+      return "deleted";
+    case "renamed":
+      return "renamed";
+    default:
+      return "modified";
+  }
+}
+
+export async function listPullRequestFiles(
+  repo: string,
+  prNumber: number,
+): Promise<PullRequestFile[]> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const files: GitHubFile[] = [];
+  // GitHub caps the files endpoint at 3000 files (30 pages of 100).
+  for (let page = 1; page <= 30; page++) {
+    const batch = await githubFetch<GitHubFile[]>(
+      token,
+      `/repos/${repo}/pulls/${prNumber}/files?per_page=100&page=${page}`,
+    );
+    files.push(...batch);
+    if (batch.length < 100) break;
+  }
+
+  return files.map((file) => ({
+    path: file.filename,
+    previousPath: file.previous_filename ?? null,
+    status: toFileStatus(file.status),
+    additions: file.additions,
+    deletions: file.deletions,
+    patch: file.patch ?? null,
   }));
 }
