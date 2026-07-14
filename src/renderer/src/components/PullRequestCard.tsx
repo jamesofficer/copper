@@ -7,6 +7,7 @@ interface Props {
   onSelect(pr: PullRequest): void;
   showRepo?: boolean;
   viewedAt?: string;
+  maxW?: string;
 }
 
 export default function PullRequestCard({
@@ -14,11 +15,13 @@ export default function PullRequestCard({
   onSelect,
   showRepo,
   viewedAt,
+  maxW,
 }: Props) {
   return (
     <Box
       as="button"
       onClick={() => onSelect(pr)}
+      maxW={maxW}
       textAlign="left"
       borderWidth="1px"
       rounded="lg"

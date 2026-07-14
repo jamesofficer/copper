@@ -30,6 +30,10 @@ export function recordRecentPullRequest(pr: PullRequest): void {
   );
 }
 
+export function clearRecentPullRequests(): void {
+  localStorage.removeItem(STORAGE_KEY);
+}
+
 export function timeAgo(iso: string): string {
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (seconds < 60) return "just now";
