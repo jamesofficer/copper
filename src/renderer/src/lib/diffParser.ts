@@ -81,6 +81,40 @@ function highlight(text: string, language: string | null): string {
   return escapeHtml(text);
 }
 
+// One row of a side-by-side diff. Context/hunk/meta lines appear on both
+// sides; paired del/add lines sit opposite each other; an unpaired change
+// leaves the other side empty (null).
+export interface SplitRow {
+  left: DiffLine | null;
+  right: DiffLine | null;
+}
+
+export function buildSplitRows(lines: DiffLine[]): SplitRow[] {
+  const rows: SplitRow[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.kind === "del") {
+      // A run of deletions followed by a run of additions is one change
+      // block — zip the two runs so old and new sit opposite each other.
+      const dels: DiffLine[] = [];
+      while (i < lines.length && lines[i].kind === "del") dels.push(lines[i++]);
+      const adds: DiffLine[] = [];
+      while (i < lines.length && lines[i].kind === "add") adds.push(lines[i++]);
+      for (let j = 0; j < Math.max(dels.length, adds.length); j++) {
+        rows.push({ left: dels[j] ?? null, right: adds[j] ?? null });
+      }
+    } else if (line.kind === "add") {
+      rows.push({ left: null, right: line });
+      i++;
+    } else {
+      rows.push({ left: line, right: line });
+      i++;
+    }
+  }
+  return rows;
+}
+
 export function parsePatch(patch: string, language: string | null): DiffLine[] {
   const lines: DiffLine[] = [];
   let oldNumber = 0;
