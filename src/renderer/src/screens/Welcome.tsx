@@ -9,6 +9,7 @@ import {
   IconButton,
   Spinner,
   Stack,
+  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -17,8 +18,11 @@ import { useState } from "react";
 import {
   LuFolderGit2,
   LuFolderPlus,
+  LuGitPullRequest,
   LuGitPullRequestArrow,
+  LuHistory,
   LuSettings,
+  LuTrash2,
 } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
 import PullRequestCard from "../components/PullRequestCard";
@@ -27,6 +31,10 @@ import RepoSidebar from "../components/RepoSidebar";
 import SettingsDialog from "../components/SettingsDialog";
 import SetupBanner from "../components/SetupBanner";
 import { toaster } from "../components/ui/toaster";
+import {
+  clearRecentPullRequests,
+  listRecentPullRequests,
+} from "../lib/recentPrs";
 import { scrollbar } from "../lib/scrollbar";
 
 interface Props {
@@ -37,6 +45,13 @@ export default function Welcome({ onSelect }: Props) {
   const queryClient = useQueryClient();
   const [activePath, setActivePath] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tab, setTab] = useState("open");
+  const [recent, setRecent] = useState(() => listRecentPullRequests());
+
+  function clearRecent() {
+    clearRecentPullRequests();
+    setRecent([]);
+  }
 
   const reposQuery = useQuery({
     queryKey: ["repositories"],
@@ -127,100 +142,119 @@ export default function Welcome({ onSelect }: Props) {
           onRemove={() => void removeActive()}
         />
 
-        <Flex direction="column" flex="1" minW="0">
-          <Heading
-            size="xs"
-            color="fg.muted"
-            textTransform="uppercase"
-            letterSpacing="wider"
-            px="4"
-            py="3"
-            flexShrink="0"
-          >
-            Open pull requests
-          </Heading>
-
-          <Stack
-            flex="1"
-            minH="0"
-            overflowY="auto"
-            gap="3"
-            px="4"
-            pb="4"
-            css={scrollbar}
-          >
-            <SetupBanner onOpenSettings={() => setSettingsOpen(true)} />
-
-            {!reposQuery.isPending &&
-            (!repositories || repositories.length === 0) ? (
-              <EmptyState.Root
-                borderWidth="1px"
-                borderStyle="dashed"
-                rounded="xl"
-                maxW="2xl"
+        <Tabs.Root
+          value={tab}
+          onValueChange={(event) => setTab(event.value)}
+          display="flex"
+          flexDirection="column"
+          flex="1"
+          minW="0"
+        >
+          <Tabs.List flexShrink="0" px="4" alignItems="center">
+            <Tabs.Trigger value="open">
+              <LuGitPullRequest /> Open pull requests
+            </Tabs.Trigger>
+            <Tabs.Trigger value="recent">
+              <LuHistory /> Recently viewed
+            </Tabs.Trigger>
+            {tab === "recent" && recent.length > 0 && (
+              <Button
+                ml="auto"
+                size="xs"
+                variant="ghost"
+                color="fg.muted"
+                onClick={clearRecent}
               >
-                <EmptyState.Content>
-                  <EmptyState.Indicator>
-                    <LuFolderGit2 />
-                  </EmptyState.Indicator>
-                  <VStack textAlign="center">
-                    <EmptyState.Title>No repositories yet</EmptyState.Title>
-                    <EmptyState.Description>
-                      Add a local git repository to start reviewing its pull
-                      requests.
-                    </EmptyState.Description>
-                  </VStack>
-                  <Button onClick={addRepository}>
-                    <LuFolderPlus /> Add repository
-                  </Button>
-                </EmptyState.Content>
-              </EmptyState.Root>
-            ) : (
-              <>
-                {active && !active.slug && (
-                  <Text fontSize="sm" color="fg.muted">
-                    This repository has no GitHub remote, so pull requests can’t
-                    be loaded.
-                  </Text>
-                )}
-
-                {prsError && (
-                  <Alert.Root status="error" rounded="lg" maxW="2xl">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Couldn’t load pull requests</Alert.Title>
-                      <Alert.Description>{prsError}</Alert.Description>
-                    </Alert.Content>
-                  </Alert.Root>
-                )}
-
-                {active?.slug &&
-                  !prsError &&
-                  (prsQuery.isPending || !prs ? (
-                    <HStack color="fg.muted" py="4">
-                      <Spinner size="sm" />
-                      <Text fontSize="sm">Loading open pull requests…</Text>
-                    </HStack>
-                  ) : prs.length === 0 ? (
-                    <Text fontSize="sm" color="fg.muted" py="4">
-                      No open pull requests. Nice and quiet.
-                    </Text>
-                  ) : (
-                    prs.map((pr) => (
-                      <PullRequestCard
-                        key={`${pr.repo}#${pr.number}`}
-                        pr={pr}
-                        onSelect={onSelect}
-                        maxW="2xl"
-                      />
-                    ))
-                  ))}
-              </>
+                <LuTrash2 /> Clear history
+              </Button>
             )}
-          </Stack>
-        </Flex>
+          </Tabs.List>
 
-        <RecentPanel onSelect={onSelect} />
+          <Tabs.Content value="open" flex="1" minH="0" p="0">
+            <Stack
+              h="full"
+              minH="0"
+              overflowY="auto"
+              gap="3"
+              px="4"
+              py="4"
+              css={scrollbar}
+            >
+              <SetupBanner onOpenSettings={() => setSettingsOpen(true)} />
+
+              {!reposQuery.isPending &&
+              (!repositories || repositories.length === 0) ? (
+                <EmptyState.Root
+                  borderWidth="1px"
+                  borderStyle="dashed"
+                  rounded="xl"
+                  maxW="2xl"
+                >
+                  <EmptyState.Content>
+                    <EmptyState.Indicator>
+                      <LuFolderGit2 />
+                    </EmptyState.Indicator>
+                    <VStack textAlign="center">
+                      <EmptyState.Title>No repositories yet</EmptyState.Title>
+                      <EmptyState.Description>
+                        Add a local git repository to start reviewing its pull
+                        requests.
+                      </EmptyState.Description>
+                    </VStack>
+                    <Button onClick={addRepository}>
+                      <LuFolderPlus /> Add repository
+                    </Button>
+                  </EmptyState.Content>
+                </EmptyState.Root>
+              ) : (
+                <>
+                  {active && !active.slug && (
+                    <Text fontSize="sm" color="fg.muted">
+                      This repository has no GitHub remote, so pull requests
+                      can’t be loaded.
+                    </Text>
+                  )}
+
+                  {prsError && (
+                    <Alert.Root status="error" rounded="lg" maxW="2xl">
+                      <Alert.Indicator />
+                      <Alert.Content>
+                        <Alert.Title>Couldn’t load pull requests</Alert.Title>
+                        <Alert.Description>{prsError}</Alert.Description>
+                      </Alert.Content>
+                    </Alert.Root>
+                  )}
+
+                  {active?.slug &&
+                    !prsError &&
+                    (prsQuery.isPending || !prs ? (
+                      <HStack color="fg.muted" py="4">
+                        <Spinner size="sm" />
+                        <Text fontSize="sm">Loading open pull requests…</Text>
+                      </HStack>
+                    ) : prs.length === 0 ? (
+                      <Text fontSize="sm" color="fg.muted" py="4">
+                        No open pull requests. Nice and quiet.
+                      </Text>
+                    ) : (
+                      prs.map((pr) => (
+                        <PullRequestCard
+                          key={`${pr.repo}#${pr.number}`}
+                          pr={pr}
+                          onSelect={onSelect}
+                          maxW="2xl"
+                        />
+                      ))
+                    ))}
+                </>
+              )}
+            </Stack>
+          </Tabs.Content>
+
+          <Tabs.Content value="recent" flex="1" minH="0" p="0">
+            <RecentPanel recent={recent} onSelect={onSelect} />
+          </Tabs.Content>
+        </Tabs.Root>
       </Flex>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
