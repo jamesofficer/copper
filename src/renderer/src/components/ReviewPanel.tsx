@@ -28,7 +28,7 @@ const CHAT_MAX_WIDTH = 640;
 
 function storedChatWidth(): number {
   const stored = Number(localStorage.getItem(CHAT_WIDTH_KEY));
-  return stored >= CHAT_MIN_WIDTH && stored <= CHAT_MAX_WIDTH ? stored : 340;
+  return stored >= CHAT_MIN_WIDTH && stored <= CHAT_MAX_WIDTH ? stored : 420;
 }
 
 export default function ReviewPanel({ pr }: Props) {

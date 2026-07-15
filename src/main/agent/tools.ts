@@ -6,7 +6,7 @@ import {
   logForPath,
   showFile,
 } from "../repo/git";
-import { ensureFullClone, ensureRepo } from "../repo/workspace";
+import { ensureHeadBlobs, ensureRepo } from "../repo/workspace";
 
 const MAX_FILE_LINES = 2000;
 const MAX_TEXT = 40_000;
@@ -158,7 +158,7 @@ export async function runTool(
     case "grep_repo": {
       const pattern = stringArg(input, "pattern");
       if (!pattern) throw new Error("grep_repo requires a pattern.");
-      await ensureFullClone(ctx.repo);
+      await ensureHeadBlobs(ctx.repo, ctx.headSha);
       const out = await grepAtCommit(
         dir,
         ctx.headSha,

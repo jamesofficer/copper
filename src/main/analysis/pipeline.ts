@@ -46,6 +46,7 @@ Rules:
 - Every risk and behavior change carries a title: a very short label (3–6 words) naming it for a navigation list, alongside the full text.
 - outOfScope: related work this PR deliberately does NOT do — things a reviewer might expect but won't find. Short entries.
 - Anchors use line numbers in the NEW version of the file, derived from the @@ hunk headers. Use null for a whole-file claim.
+- Text fields render as GitHub-flavored markdown. Tag fenced code blocks with a language (\`\`\`ts, \`\`\`diff, …) so they get syntax highlighting.
 - Never claim anything the diff does not show. If a patch is truncated or omitted, say less rather than guessing.`;
 
 const anchorSchema = {

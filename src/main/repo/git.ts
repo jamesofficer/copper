@@ -6,9 +6,11 @@ const run = promisify(execFile);
 
 // git show on a large file can produce a lot of output.
 const MAX_BUFFER = 32 * 1024 * 1024;
-// Generous — a first-time clone upgrade of a big repo is legitimately slow —
-// but bounded so a wedged network call can't hang a chat answer forever.
+// Generous — a first blob backfill of a big repo is legitimately slow — but
+// bounded so a wedged network call can't hang a chat answer forever.
 const TIMEOUT_MS = 10 * 60 * 1000;
+// Blob ids per fetch: 5000 × 41 bytes stays well under the OS argv limit.
+const FETCH_CHUNK = 5000;
 
 // The token is passed per-command through the environment instead of the
 // remote URL so it never lands in the clone's config on disk. Every command
@@ -104,8 +106,54 @@ export function logForPath(
   return git(args);
 }
 
-// Search file contents at a commit. Only call on a full clone (see
-// ensureFullClone) — on a blobless one this would lazily fetch every blob.
+// Blobs of the commit's tree that aren't in the object store yet. "Missing"
+// already accounts for objects borrowed from the donor checkout (alternates),
+// and --missing=print never triggers lazy fetching itself.
+export async function listMissingBlobs(
+  repoDir: string,
+  sha: string,
+): Promise<string[]> {
+  const out = await git([
+    "-C",
+    repoDir,
+    "rev-list",
+    "--objects",
+    "--missing=print",
+    "--no-object-names",
+    `${sha}^{tree}`,
+  ]);
+  return out
+    .split("\n")
+    .filter((line) => line.startsWith("?"))
+    .map((line) => line.slice(1));
+}
+
+// Download specific blobs by id in batched requests — the same want-by-oid
+// fetch git's lazy fetching uses, minus the one-request-per-blob overhead.
+// noop negotiation skips the have/want dance; we only state wants.
+export async function fetchBlobs(
+  repoDir: string,
+  oids: string[],
+): Promise<void> {
+  for (let start = 0; start < oids.length; start += FETCH_CHUNK) {
+    await git([
+      "-C",
+      repoDir,
+      "-c",
+      "fetch.negotiationAlgorithm=noop",
+      "fetch",
+      "origin",
+      "--no-tags",
+      "--no-write-fetch-head",
+      "--recurse-submodules=no",
+      ...oids.slice(start, start + FETCH_CHUNK),
+    ]);
+  }
+}
+
+// Search file contents at a commit. Backfill the tree's blobs first (see
+// ensureHeadBlobs) — on a blobless clone this would otherwise lazily fetch
+// every candidate blob one at a time.
 export async function grepAtCommit(
   repoDir: string,
   sha: string,

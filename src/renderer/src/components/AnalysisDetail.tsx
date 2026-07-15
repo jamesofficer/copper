@@ -260,7 +260,8 @@ export default function AnalysisDetail({ analysis, files, selection }: Props) {
   }
 
   return (
-    <Box px="8" py="6">
+    // Extra bottom padding so scrollable content can overscroll past the end.
+    <Box px="8" pt="6" pb="80">
       {resolve()}
     </Box>
   );

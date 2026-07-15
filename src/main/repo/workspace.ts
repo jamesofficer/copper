@@ -2,7 +2,13 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { fetchPullRequestRef, git, hasCommit } from "./git";
+import {
+  fetchBlobs,
+  fetchPullRequestRef,
+  git,
+  hasCommit,
+  listMissingBlobs,
+} from "./git";
 import { listRepositories } from "./local";
 
 // Refresh at most this often — ensureRepo is called on every PR open.
@@ -70,38 +76,33 @@ export function ensureRepo(slug: string): Promise<string> {
   return task;
 }
 
-async function upgradeToFullClone(slug: string): Promise<string> {
+const backfills = new Map<string, Promise<void>>();
+const backfilled = new Set<string>();
+
+async function backfillHeadBlobs(slug: string, sha: string): Promise<void> {
   const dir = await ensureRepo(slug);
-  const filter = await git([
-    "-C",
-    dir,
-    "config",
-    "--get",
-    "remote.origin.partialclonefilter",
-  ]).catch(() => "");
-  if (!filter.trim()) return dir;
-  await git([
-    "-C",
-    dir,
-    "config",
-    "--unset",
-    "remote.origin.partialclonefilter",
-  ]);
-  await git(["-C", dir, "fetch", "--refetch", "origin"]);
-  return dir;
+  const missing = await listMissingBlobs(dir, sha);
+  if (missing.length > 0) await fetchBlobs(dir, missing);
 }
 
-const upgrades = new Map<string, Promise<string>>();
-
-// Content search needs every blob — lazy per-file fetching would be unusably
-// slow — so the first grep upgrades the blobless clone to a full one. One-off
-// per repo; no-op once the partial-clone filter is gone.
-export function ensureFullClone(slug: string): Promise<string> {
-  const inFlight = upgrades.get(slug);
+// Content search needs the whole tree's blobs — lazy per-file fetching would
+// be unusably slow — so before a grep (and during warm-up) we batch-download
+// whatever the commit's tree is missing. The donor checkout and blobs pulled
+// for earlier PRs already count as present, so this is usually a small delta.
+export async function ensureHeadBlobs(
+  slug: string,
+  sha: string,
+): Promise<void> {
+  const key = `${slug}@${sha}`;
+  if (backfilled.has(key)) return;
+  const inFlight = backfills.get(key);
   if (inFlight) return inFlight;
-  const task = upgradeToFullClone(slug).finally(() => upgrades.delete(slug));
-  upgrades.set(slug, task);
-  return task;
+  const task = backfillHeadBlobs(slug, sha).finally(() =>
+    backfills.delete(key),
+  );
+  backfills.set(key, task);
+  await task;
+  backfilled.add(key);
 }
 
 // Fired in the background when a PR is opened so the workspace is usually
@@ -117,6 +118,7 @@ export async function warmUpPullRequest(
     if (!(await hasCommit(dir, headSha))) {
       await fetchPullRequestRef(dir, prNumber);
     }
+    await ensureHeadBlobs(repo, headSha);
   } catch (cause) {
     console.warn(
       `Workspace warm-up failed for ${repo}#${prNumber}:`,
