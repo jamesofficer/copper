@@ -1,6 +1,7 @@
 import {
   Box,
   Center,
+  Collapsible,
   Flex,
   Heading,
   HStack,
@@ -9,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { LuChevronRight } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
 import CommitList from "./CommitList";
@@ -53,33 +55,41 @@ export default function ChangesView({ pr }: Props) {
         minH="0"
       >
         {commits && commits.length > 1 && (
-          <>
-            <Heading
-              size="xs"
-              color="fg.muted"
-              textTransform="uppercase"
-              letterSpacing="wider"
-              px="4"
-              py="3"
-              flexShrink="0"
-            >
-              Commits ({commits.length})
-            </Heading>
-            <Box
-              maxH="180px"
-              overflowY="auto"
-              px="3"
-              pb="3"
-              flexShrink="0"
-              css={scrollbar}
-            >
-              <CommitList
-                commits={commits}
-                selectedSha={selectedCommit}
-                onSelect={setSelectedCommit}
-              />
-            </Box>
-          </>
+          <Collapsible.Root flexShrink="0">
+            <Collapsible.Trigger w="full" cursor="pointer">
+              <HStack gap="1.5" px="4" py="3" color="fg.muted">
+                <Heading
+                  size="xs"
+                  color="fg.muted"
+                  textTransform="uppercase"
+                  letterSpacing="wider"
+                >
+                  Commits ({commits.length})
+                </Heading>
+                {selectedCommit && (
+                  <Text fontFamily="mono" fontSize="2xs">
+                    · {selectedCommit.slice(0, 7)}
+                  </Text>
+                )}
+                <Collapsible.Indicator
+                  ml="auto"
+                  transition="transform 0.2s"
+                  _open={{ transform: "rotate(90deg)" }}
+                >
+                  <LuChevronRight size="14" />
+                </Collapsible.Indicator>
+              </HStack>
+            </Collapsible.Trigger>
+            <Collapsible.Content>
+              <Box maxH="180px" overflowY="auto" px="3" pb="3" css={scrollbar}>
+                <CommitList
+                  commits={commits}
+                  selectedSha={selectedCommit}
+                  onSelect={setSelectedCommit}
+                />
+              </Box>
+            </Collapsible.Content>
+          </Collapsible.Root>
         )}
 
         <Heading
