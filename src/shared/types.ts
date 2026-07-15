@@ -4,12 +4,17 @@ export interface Repository {
   slug: string | null;
 }
 
+// GitHub's review decision: each reviewer's latest submitted review counts,
+// and one "request changes" outranks any number of approvals.
+export type ReviewStatus = "approved" | "changes_requested" | "awaiting_review";
+
 export interface PullRequest {
   repo: string;
   number: number;
   title: string;
   author: string;
   draft: boolean;
+  reviewStatus: ReviewStatus;
   headSha: string;
   url: string;
   additions: number;
@@ -31,6 +36,7 @@ export interface PullRequestDetail {
   state: "open" | "closed";
   draft: boolean;
   merged: boolean;
+  reviewStatus: ReviewStatus;
   baseRef: string;
   headRef: string;
   headSha: string;

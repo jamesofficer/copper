@@ -21,6 +21,7 @@ import {
 import type { PullRequest, PullRequestDetail } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
 import Markdown from "./Markdown";
+import ReviewStatusBadge from "./ReviewStatusBadge";
 
 interface Props {
   pr: PullRequest;
@@ -82,21 +83,26 @@ export default function PullRequestOverview({ pr }: Props) {
 
   const detail = detailQuery.data;
   const state = stateMeta(detail);
+  // "Awaiting review" is only meaningful while the PR is still open; a
+  // definitive verdict stays interesting even after merge/close.
+  const showReviewStatus =
+    (detail.state === "open" && !detail.merged) ||
+    detail.reviewStatus !== "awaiting_review";
 
   return (
     <Box h="full" overflowY="auto" css={scrollbar}>
       <VStack gap="6" alignItems="stretch" maxW="3xl" mx="auto" px="8" py="8">
         <VStack gap="3" alignItems="stretch">
           <HStack gap="3" alignItems="flex-start">
-            <Badge
-              colorPalette={state.palette}
-              variant="surface"
-              size="lg"
-              flexShrink="0"
-            >
-              {state.icon}
-              {state.label}
-            </Badge>
+            <HStack gap="1.5" flexShrink="0">
+              <Badge colorPalette={state.palette} variant="surface" size="lg">
+                {state.icon}
+                {state.label}
+              </Badge>
+              {showReviewStatus && (
+                <ReviewStatusBadge status={detail.reviewStatus} size="lg" />
+              )}
+            </HStack>
             <Heading size="lg" lineHeight="1.3">
               {detail.title}
             </Heading>

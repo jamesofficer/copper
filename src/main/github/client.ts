@@ -3,6 +3,7 @@ import type {
   PullRequest,
   PullRequestDetail,
   PullRequestFile,
+  ReviewStatus,
   ReviewVerdict,
 } from "../../shared/types";
 import { getGitHubToken } from "./auth";
@@ -89,6 +90,40 @@ async function githubErrorDetail(res: Response): Promise<string> {
   }
 }
 
+interface GitHubReview {
+  user: { login: string } | null;
+  state: string;
+}
+
+// Mirrors GitHub's review decision. Reviews arrive oldest-first, so each
+// reviewer's latest APPROVED/CHANGES_REQUESTED wins; a dismissal wipes their
+// vote; COMMENTED and PENDING reviews don't count.
+async function getReviewStatus(
+  token: string,
+  repo: string,
+  prNumber: number,
+): Promise<ReviewStatus> {
+  const reviews = await githubFetch<GitHubReview[]>(
+    token,
+    `/repos/${repo}/pulls/${prNumber}/reviews?per_page=100`,
+  );
+
+  const latestByReviewer = new Map<string, string>();
+  for (const review of reviews) {
+    if (!review.user) continue;
+    if (review.state === "APPROVED" || review.state === "CHANGES_REQUESTED") {
+      latestByReviewer.set(review.user.login, review.state);
+    } else if (review.state === "DISMISSED") {
+      latestByReviewer.delete(review.user.login);
+    }
+  }
+
+  const states = [...latestByReviewer.values()];
+  if (states.includes("CHANGES_REQUESTED")) return "changes_requested";
+  if (states.includes("APPROVED")) return "approved";
+  return "awaiting_review";
+}
+
 export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
   if (!repo.includes("/")) {
     throw new Error(
@@ -109,20 +144,25 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
   );
 
   const details = await Promise.all(
-    summaries.map((summary) =>
-      githubFetch<GitHubPullDetail>(
-        token,
-        `/repos/${repo}/pulls/${summary.number}`,
-      ),
-    ),
+    summaries.map(async (summary) => {
+      const [pull, reviewStatus] = await Promise.all([
+        githubFetch<GitHubPullDetail>(
+          token,
+          `/repos/${repo}/pulls/${summary.number}`,
+        ),
+        getReviewStatus(token, repo, summary.number),
+      ]);
+      return { pull, reviewStatus };
+    }),
   );
 
-  return details.map((pull) => ({
+  return details.map(({ pull, reviewStatus }) => ({
     repo,
     number: pull.number,
     title: pull.title,
     author: pull.user?.login ?? "unknown",
     draft: pull.draft,
+    reviewStatus,
     headSha: pull.head.sha.slice(0, 7),
     url: pull.html_url,
     additions: pull.additions,
@@ -142,10 +182,10 @@ export async function getPullRequest(
     );
   }
 
-  const pull = await githubFetch<GitHubPullDetail>(
-    token,
-    `/repos/${repo}/pulls/${prNumber}`,
-  );
+  const [pull, reviewStatus] = await Promise.all([
+    githubFetch<GitHubPullDetail>(token, `/repos/${repo}/pulls/${prNumber}`),
+    getReviewStatus(token, repo, prNumber),
+  ]);
 
   return {
     repo,
@@ -156,6 +196,7 @@ export async function getPullRequest(
     state: pull.state,
     draft: pull.draft,
     merged: pull.merged,
+    reviewStatus,
     baseRef: pull.base.ref,
     headRef: pull.head.ref,
     headSha: pull.head.sha,

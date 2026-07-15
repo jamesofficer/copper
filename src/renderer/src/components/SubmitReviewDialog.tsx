@@ -8,7 +8,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuPenLine } from "react-icons/lu";
 import type { PullRequest, ReviewVerdict } from "../../../shared/types";
@@ -45,6 +45,7 @@ interface Props {
 }
 
 export default function SubmitReviewDialog({ pr }: Props) {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [verdict, setVerdict] = useState<ReviewVerdict>("comment");
@@ -61,6 +62,11 @@ export default function SubmitReviewDialog({ pr }: Props) {
       setOpen(false);
       setBody("");
       setVerdict("comment");
+      // The review changes the PR's review status; refetch what shows it.
+      void queryClient.invalidateQueries({
+        queryKey: ["pullRequest", pr.repo, pr.number],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
     },
     onError: (cause) => {
       toaster.create({

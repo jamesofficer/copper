@@ -2,6 +2,7 @@ import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { LuGitPullRequest, LuGitPullRequestDraft } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import { timeAgo } from "../lib/recentPrs";
+import ReviewStatusBadge from "./ReviewStatusBadge";
 
 interface Props {
   pr: PullRequest;
@@ -34,10 +35,13 @@ export default function PullRequestCard({
     >
       <HStack justifyContent="space-between" gap="4" alignItems="flex-start">
         <VStack gap="1" alignItems="flex-start" minW="0">
-          <Badge colorPalette={pr.draft ? "gray" : "green"} variant="surface">
-            {pr.draft ? <LuGitPullRequestDraft /> : <LuGitPullRequest />}
-            {pr.draft ? "Draft" : "Open"}
-          </Badge>
+          <HStack gap="1.5" flexWrap="wrap">
+            <Badge colorPalette={pr.draft ? "gray" : "green"} variant="surface">
+              {pr.draft ? <LuGitPullRequestDraft /> : <LuGitPullRequest />}
+              {pr.draft ? "Draft" : "Open"}
+            </Badge>
+            <ReviewStatusBadge status={pr.reviewStatus} />
+          </HStack>
           <Text fontWeight="semibold" wordBreak="break-word">
             {pr.title}
           </Text>
