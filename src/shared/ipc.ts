@@ -46,6 +46,7 @@ export interface IpcApi {
     repo: string,
     prNumber: number,
     personality: ReviewPersonality,
+    force?: boolean,
   ): Promise<AnalysisResult>;
   askQuestion(
     repo: string,

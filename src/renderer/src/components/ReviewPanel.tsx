@@ -10,9 +10,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { LuSparkles } from "react-icons/lu";
-import type { PullRequest } from "../../../shared/types";
+import type {
+  PullRequest,
+  RiskClaim,
+  RiskSeverity,
+} from "../../../shared/types";
 import { getReviewPersonality } from "../lib/reviewPersonality";
 import { scrollbar } from "../lib/scrollbar";
 import AnalysisDetail from "./AnalysisDetail";
@@ -30,6 +34,22 @@ const CHAT_MAX_WIDTH = 640;
 function storedChatWidth(): number {
   const stored = Number(localStorage.getItem(CHAT_WIDTH_KEY));
   return stored >= CHAT_MIN_WIDTH && stored <= CHAT_MAX_WIDTH ? stored : 420;
+}
+
+const severityRank: Record<RiskSeverity, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+// Sort is stable, so risks without a severity (older cached analyses) keep
+// the model's order; classified ones rank high → medium → low.
+function sortRisksBySeverity(risks: RiskClaim[]): RiskClaim[] {
+  return [...risks].sort(
+    (a, b) =>
+      severityRank[a.severity ?? "medium"] -
+      severityRank[b.severity ?? "medium"],
+  );
 }
 
 export default function ReviewPanel({ pr }: Props) {
@@ -65,7 +85,11 @@ export default function ReviewPanel({ pr }: Props) {
     queryKey: ["analysis", pr.repo, pr.number],
     queryFn: () => window.api.getAnalysis(pr.repo, pr.number),
   });
-  const analysis = analysisQuery.data;
+  const analysis = useMemo(() => {
+    const data = analysisQuery.data;
+    if (!data) return data;
+    return { ...data, risks: sortRisksBySeverity(data.risks) };
+  }, [analysisQuery.data]);
 
   const filesQuery = useQuery({
     queryKey: ["pullRequestFiles", pr.repo, pr.number],
@@ -74,8 +98,13 @@ export default function ReviewPanel({ pr }: Props) {
   });
 
   const analyzeMutation = useMutation({
-    mutationFn: () =>
-      window.api.analyzePullRequest(pr.repo, pr.number, getReviewPersonality()),
+    mutationFn: (force: boolean) =>
+      window.api.analyzePullRequest(
+        pr.repo,
+        pr.number,
+        getReviewPersonality(),
+        force,
+      ),
     onSuccess: (result) => {
       queryClient.setQueryData(["analysis", pr.repo, pr.number], result);
       setSelection({ kind: "summary" });
@@ -119,7 +148,7 @@ export default function ReviewPanel({ pr }: Props) {
             claim tied to the code it came from.
           </Text>
           <Button
-            onClick={() => analyzeMutation.mutate()}
+            onClick={() => analyzeMutation.mutate(false)}
             loading={analyzeMutation.isPending}
             loadingText="Analysing…"
           >
@@ -164,6 +193,8 @@ export default function ReviewPanel({ pr }: Props) {
           analysis={analysis}
           files={filesQuery.data}
           selection={selection}
+          onReanalyze={() => analyzeMutation.mutate(true)}
+          reanalyzing={analyzeMutation.isPending}
         />
       </Box>
 

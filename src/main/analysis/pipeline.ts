@@ -42,7 +42,7 @@ const MECHANICAL_PATTERNS = [
 const SYSTEM_PROMPT = `You are an expert code reviewer. Turn a pull request diff into a guided review: what changed, why, in what order to read it, and where the risk is.
 
 Rules:
-- summary: 2–4 plain-English sentences saying what this PR does and why — the description the author should have written. No hype, no hedging.
+- summary: 2–4 plain-English sentences saying what this PR does and why — the description the author should have written. No hype, no hedging. Prose only: never embed JSON or repeat the other fields' content inside it.
 - groups: split the diff into logical change groups, ordered as a reading guide — the group a reviewer should read first comes first. Every changed file appears in exactly one group. Use as many or as few groups as the change naturally splits into — don't merge unrelated changes to keep the list short. Risk levels: "attention" = new or changed logic the reviewer must think carefully about; "routine" = ordinary changes worth reading but unlikely to hide problems; "mechanical" = renames, lockfiles, generated code, formatting — skimmable. Within a group, list files in the order they should be read.
 - risks: concrete things that could break, each anchored to the exact file and line the claim is based on. Only risks visible in the diff — never invent generic concerns. Empty list if nothing stands out.
 - Every risk carries a severity: "high" = could plausibly break production, lose data, or open a security hole; "medium" = a real bug or regression is plausible and worth checking; "low" = unlikely to bite or low-impact if it does. Judge each risk on its own — don't grade on a curve to get a spread of severities.
@@ -59,17 +59,38 @@ Rules:
 // severities, or list sizes.
 const PERSONALITY_PROMPTS: Record<ReviewPersonality, string> = {
   standard: "",
-  technical:
-    "Write for a staff-level engineer who knows this stack deeply. Use precise technical vocabulary, name the exact APIs, data structures, and algorithms involved, and skip explanations of standard concepts. Density over accessibility.",
-  non_technical:
-    "Write for a non-engineer, like a product manager. Explain what each change means for the product and its users. Avoid jargon entirely; when a technical term is unavoidable, explain it in everyday words the first time it appears.",
-  simplified:
-    "Use short sentences and everyday words, the way you'd explain things to a developer in their first week. One idea per sentence. Prefer concrete examples over abstract descriptions.",
-  grug: 'Write in the voice of the grug-brained developer (grugbrain.dev): simple caveman speak, lowercase, third person — "grug see big function, grug worry", "complexity very, very bad". The humour must never soften or hide a finding: grug still spot every danger and say it plain.',
-  mentor:
-    "Write like a patient senior engineer mentoring the reviewer. For each observation, explain why it matters and name the underlying pattern or principle, so the reviewer learns something they can reuse on future reviews.",
-  concise:
-    "Be as brief as possible. Short declarative sentences, no filler, no restating what the code makes obvious. Cut words, never content — every finding is still listed.",
+  technical: `Write for a staff-level engineer who knows this stack deeply.
+- Name the exact functions, types, APIs, and mechanisms involved — "the useEffect cleanup", "the ETag header", not "some cleanup logic". Use precise domain vocabulary (idempotency, race condition, memoization) without defining it.
+- State implications, not narration. Never describe what a line obviously does; say what follows from it.
+- Quantify where the diff allows: complexity, allocations, payload sizes, round trips.
+- No analogies, no hand-holding, no softening. Density over accessibility.`,
+  non_technical: `Write for a smart reader who doesn't write code — a product manager or designer.
+- Lead every explanation with what the user or the business will notice: what works now that didn't, what could go wrong and what that would look like in the product.
+- No jargon at all. Describe code by its job, not its name: "the file that decides how an email looks in Outlook", not "the Image primitive". If a technical term is truly unavoidable, explain it in everyday words the first time.
+- Everyday analogies are welcome when they make a mechanism click.
+- Short paragraphs. If a detail only matters to programmers, leave it out.`,
+  simplified: `Write for a developer in their first week on the job.
+- Short sentences. One idea per sentence. Everyday words.
+- Assume they can program but don't know this codebase or its tricks. Briefly define anything specialised the first time it appears ("Outlook uses Word to draw emails — Word ignores a lot of normal HTML").
+- Prefer a concrete example over an abstract description. Show the before and after in plain terms.
+- No nested clauses, no rhetorical flourishes. If a sentence needs a comma, try splitting it.`,
+  grug: `Write in the voice of the grug-brained developer (grugbrain.dev). Style rules:
+- lowercase everywhere. drop articles and helper verbs: "complexity bad", "grug see big function, grug worry". present tense only.
+- grug always talks about himself in third person: "grug say", "grug like", "grug recommend". the reader is "you" or "young grug".
+- short declarative bursts. repetition for emphasis: "complexity very, very bad".
+- complexity is a living enemy: the "complexity demon". danger gets called out plain: "danger here!", "grug reach for club".
+- over-clever code comes from "big brain developers". money is "shiney rock". mild approval is "is fine" or "is good, actually". parenthetical asides for grumbles: "(sad but true)".
+- self-deprecating humour is good, but the humour never softens or hides a finding — grug spot every danger and say it plain.
+- technical facts stay exact: file names, function names, and line references keep their real spelling and casing.`,
+  mentor: `Write like a patient senior engineer walking a colleague through the review.
+- For every finding: what it is, why it matters, and the general principle or named pattern behind it ("this is the classic time-of-check/time-of-use gap") so the lesson transfers to future reviews.
+- When the author did something well that's worth imitating, say so and explain why it works.
+- Where useful, add what to look for next time a change like this comes up.
+- Encouraging and direct, never condescending. Teach, don't lecture.`,
+  concise: `Be as brief as possible while staying grammatical.
+- One or two short sentences per point. Active voice.
+- No throat-clearing ("it's worth noting", "importantly"), no restating context the reader already has, no describing what the code makes obvious.
+- Cut words, never content: every finding is still listed, every anchor still explained.`,
 };
 
 function buildSystemPrompt(personality: ReviewPersonality): string {
@@ -224,6 +245,7 @@ export async function analyzePullRequest(
   repo: string,
   prNumber: number,
   personality: ReviewPersonality = "standard",
+  force = false,
 ): Promise<AnalysisResult> {
   const apiKey = await getSecret("anthropic");
   if (!apiKey) {
@@ -233,8 +255,10 @@ export async function analyzePullRequest(
   }
 
   const detail = await getPullRequest(repo, prNumber);
-  const cached = await getCachedAnalysis(repo, prNumber, detail.headSha);
-  if (cached) return cached;
+  if (!force) {
+    const cached = await getCachedAnalysis(repo, prNumber, detail.headSha);
+    if (cached) return cached;
+  }
 
   const files = await listPullRequestFiles(repo, prNumber);
   const { raw, usage } = await requestAnalysis(
@@ -449,6 +473,29 @@ function normalizeRisks(value: unknown, validPaths: Set<string>): RiskClaim[] {
     }));
 }
 
+// The model occasionally leaks the groups JSON into the end of the summary
+// string. Split it off, and if the real groups field came back empty, keep
+// the leaked copy so the analysis isn't reduced to an "Everything else" bin.
+function splitLeakedGroups(summary: string): {
+  prose: string;
+  leaked: RawGroup[] | null;
+} {
+  const start = summary.indexOf('[{"');
+  if (start === -1) return { prose: summary, leaked: null };
+  try {
+    const parsed: unknown = JSON.parse(summary.slice(start).trim());
+    if (Array.isArray(parsed)) {
+      return {
+        prose: summary.slice(0, start).trim(),
+        leaked: parsed as RawGroup[],
+      };
+    }
+  } catch {
+    // Not valid JSON — treat it as legitimate prose and leave it alone.
+  }
+  return { prose: summary, leaked: null };
+}
+
 function toAnalysisResult(
   raw: RawAnalysis,
   detail: PullRequestDetail,
@@ -458,7 +505,13 @@ function toAnalysisResult(
   const validPaths = new Set(files.map((file) => file.path));
   const seenIds = new Set<string>();
 
-  const groups: ChangeGroup[] = (toList(raw.groups, "groups") as RawGroup[])
+  const { prose, leaked } = splitLeakedGroups(
+    typeof raw.summary === "string" ? raw.summary.trim() : "",
+  );
+  const groupList = toList(raw.groups, "groups") as RawGroup[];
+  const groupSource = groupList.length > 0 ? groupList : (leaked ?? []);
+
+  const groups: ChangeGroup[] = groupSource
     .map((group, index) => ({
       id: slugify(group.title ?? "", index, seenIds),
       title: group.title?.trim() || `Change ${index + 1}`,
@@ -491,9 +544,7 @@ function toAnalysisResult(
     model: MODEL,
     analyzedAt: new Date().toISOString(),
     usage,
-    summary:
-      (typeof raw.summary === "string" && raw.summary.trim()) ||
-      "The analysis returned no summary.",
+    summary: prose || "The analysis returned no summary.",
     groups,
     risks: normalizeRisks(raw.risks, validPaths),
     behaviorChanges: normalizeClaims(

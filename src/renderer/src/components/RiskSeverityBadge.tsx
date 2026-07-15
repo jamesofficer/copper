@@ -4,7 +4,7 @@ import type { RiskSeverity } from "../../../shared/types";
 const severityMeta: Record<RiskSeverity, { label: string; palette: string }> = {
   high: { label: "High", palette: "red" },
   medium: { label: "Medium", palette: "orange" },
-  low: { label: "Low", palette: "yellow" },
+  low: { label: "Low", palette: "blue" },
 };
 
 // Nav-list dot colours, matching the chip palettes. Undefined severity

@@ -42,8 +42,8 @@ const handlers: IpcApi = {
   addPullRequestComment: (repo, prNumber, body) =>
     addPullRequestComment(repo, prNumber, body),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
-  analyzePullRequest: (repo, prNumber, personality) =>
-    analyzePullRequest(repo, prNumber, personality),
+  analyzePullRequest: (repo, prNumber, personality, force) =>
+    analyzePullRequest(repo, prNumber, personality, force),
   askQuestion: (repo, prNumber, question) =>
     askQuestion(repo, prNumber, question),
   getChatHistory: (repo, prNumber) => getChatHistory(repo, prNumber),
