@@ -54,6 +54,15 @@ export interface PullRequestDetail {
 // Mirrors GitHub's review events: comment, approve, or request changes.
 export type ReviewVerdict = "comment" | "approve" | "request_changes";
 
+// A conversation comment on the PR itself (GitHub calls these issue
+// comments) — not an inline review comment on a diff line.
+export interface PullRequestComment {
+  id: number;
+  author: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface PullRequestCommit {
   sha: string;
   subject: string;

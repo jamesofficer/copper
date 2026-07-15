@@ -1,6 +1,8 @@
 import { Box, Link } from "@chakra-ui/react";
 import hljs from "highlight.js/lib/common";
 import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
@@ -144,7 +146,14 @@ const prose = {
     borderColor: "var(--chakra-colors-border-muted)",
     margin: "1.25em 0",
   },
-  "& img": { maxWidth: "100%", borderRadius: "6px" },
+  // Chakra's reset makes img display:block; markdown images (status dots,
+  // badges) must flow inline with text like they do on GitHub.
+  "& img": {
+    display: "inline-block",
+    verticalAlign: "text-bottom",
+    maxWidth: "100%",
+    borderRadius: "6px",
+  },
   ...tokenColors,
   ...innerScrollbar,
 } as const;
@@ -154,11 +163,18 @@ export default function Markdown({ children }: Props) {
     <Box css={prose}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        // GitHub allows inline HTML in markdown (bots lean on it for links),
+        // so parse it — then sanitize, since comment HTML is untrusted.
+        rehypePlugins={[rehypeRaw, rehypeSanitize]}
         components={{
           a: ({ href, children }) => (
             <Link
               href={href}
               color="colorPalette.fg"
+              textDecoration="underline"
+              textDecorationColor="color-mix(in srgb, currentColor 40%, transparent)"
+              textUnderlineOffset="3px"
+              _hover={{ textDecorationColor: "currentColor" }}
               target="_blank"
               rel="noreferrer"
             >

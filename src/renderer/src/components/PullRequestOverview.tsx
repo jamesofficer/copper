@@ -14,6 +14,8 @@ import { useQuery } from "@tanstack/react-query";
 import { LuGitCommitHorizontal } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
+import CommentCard from "./CommentCard";
+import CommentComposer from "./CommentComposer";
 import Markdown from "./Markdown";
 import PrStateBadge from "./PrStateBadge";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
@@ -36,6 +38,12 @@ export default function PullRequestOverview({ pr }: Props) {
     queryKey: ["pullRequest", pr.repo, pr.number],
     queryFn: () => window.api.getPullRequest(pr.repo, pr.number),
   });
+
+  const commentsQuery = useQuery({
+    queryKey: ["pullRequestComments", pr.repo, pr.number],
+    queryFn: () => window.api.listPullRequestComments(pr.repo, pr.number),
+  });
+  const comments = commentsQuery.data;
 
   if (detailQuery.isPending) {
     return (
@@ -174,6 +182,40 @@ export default function PullRequestOverview({ pr }: Props) {
             </Text>
           )}
         </Box>
+
+        {comments && (
+          <>
+            <Separator />
+            <Box>
+              <Heading
+                size="xs"
+                color="fg.muted"
+                textTransform="uppercase"
+                letterSpacing="wider"
+                mb="3"
+              >
+                Comments ({comments.length})
+              </Heading>
+              <VStack gap="3" alignItems="stretch">
+                {comments.map((comment) => (
+                  <CommentCard key={comment.id} comment={comment} />
+                ))}
+                <Box mt={comments.length > 0 ? "3" : "0"}>
+                  <Heading
+                    size="xs"
+                    color="fg.muted"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    mb="3"
+                  >
+                    Add a comment
+                  </Heading>
+                  <CommentComposer pr={pr} />
+                </Box>
+              </VStack>
+            </Box>
+          </>
+        )}
 
         <Separator />
 

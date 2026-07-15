@@ -3,8 +3,10 @@ import type { IpcApi } from "../../shared/ipc";
 import { askQuestion, getChatHistory } from "../agent/session";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
+  addPullRequestComment,
   getPullRequest,
   listCommitFiles,
+  listPullRequestComments,
   listPullRequestCommits,
   listPullRequestFiles,
   listReviewRequests,
@@ -35,6 +37,10 @@ const handlers: IpcApi = {
   listPullRequestCommits: (repo, prNumber) =>
     listPullRequestCommits(repo, prNumber),
   listCommitFiles: (repo, commitSha) => listCommitFiles(repo, commitSha),
+  listPullRequestComments: (repo, prNumber) =>
+    listPullRequestComments(repo, prNumber),
+  addPullRequestComment: (repo, prNumber, body) =>
+    addPullRequestComment(repo, prNumber, body),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   analyzePullRequest: (repo, prNumber) => analyzePullRequest(repo, prNumber),
   askQuestion: (repo, prNumber, question) =>

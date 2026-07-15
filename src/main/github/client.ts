@@ -1,6 +1,7 @@
 import type {
   FileStatus,
   PullRequest,
+  PullRequestComment,
   PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
@@ -339,6 +340,67 @@ export async function listCommitFiles(
   }
 
   return files.map(toPullRequestFile);
+}
+
+interface GitHubIssueComment {
+  id: number;
+  body: string | null;
+  user: { login: string } | null;
+  created_at: string;
+}
+
+// Conversation comments on the PR (GitHub's issue comments), oldest first.
+// Inline review comments on diff lines are a separate endpoint.
+export async function listPullRequestComments(
+  repo: string,
+  prNumber: number,
+): Promise<PullRequestComment[]> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const comments: GitHubIssueComment[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const batch = await githubFetch<GitHubIssueComment[]>(
+      token,
+      `/repos/${repo}/issues/${prNumber}/comments?per_page=100&page=${page}`,
+    );
+    comments.push(...batch);
+    if (batch.length < 100) break;
+  }
+
+  return comments.map(toPullRequestComment);
+}
+
+function toPullRequestComment(comment: GitHubIssueComment): PullRequestComment {
+  return {
+    id: comment.id,
+    author: comment.user?.login ?? "unknown",
+    body: comment.body ?? "",
+    createdAt: comment.created_at,
+  };
+}
+
+export async function addPullRequestComment(
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<PullRequestComment> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to comment.");
+  }
+
+  const comment = await githubFetch<GitHubIssueComment>(
+    token,
+    `/repos/${repo}/issues/${prNumber}/comments`,
+    { method: "POST", body: { body } },
+  );
+
+  return toPullRequestComment(comment);
 }
 
 const reviewEvents: Record<ReviewVerdict, string> = {

@@ -1,5 +1,11 @@
 import { Button, Flex, Heading, HStack, Tabs, Text } from "@chakra-ui/react";
-import { LuArrowLeft, LuFileDiff, LuInfo, LuSparkles } from "react-icons/lu";
+import {
+  LuArrowLeft,
+  LuExternalLink,
+  LuFileDiff,
+  LuInfo,
+  LuSparkles,
+} from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import ChangesView from "../components/ChangesView";
 import PullRequestOverview from "../components/PullRequestOverview";
@@ -31,6 +37,11 @@ export default function Review({ pr, onBack }: Props) {
         <Text fontFamily="mono" fontSize="sm" color="fg.muted" flex="1">
           {pr.repo}#{pr.number}
         </Text>
+        <Button asChild variant="outline" size="xs">
+          <a href={pr.url} target="_blank" rel="noreferrer">
+            <LuExternalLink /> Open in GitHub
+          </a>
+        </Button>
         <SubmitReviewDialog pr={pr} />
       </HStack>
 

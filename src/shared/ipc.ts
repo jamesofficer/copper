@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   KeyTestResult,
   PullRequest,
+  PullRequestComment,
   PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
@@ -30,6 +31,15 @@ export interface IpcApi {
     prNumber: number,
   ): Promise<PullRequestCommit[]>;
   listCommitFiles(repo: string, commitSha: string): Promise<PullRequestFile[]>;
+  listPullRequestComments(
+    repo: string,
+    prNumber: number,
+  ): Promise<PullRequestComment[]>;
+  addPullRequestComment(
+    repo: string,
+    prNumber: number,
+    body: string,
+  ): Promise<PullRequestComment>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
   analyzePullRequest(repo: string, prNumber: number): Promise<AnalysisResult>;
   askQuestion(
@@ -75,6 +85,8 @@ export const ipcChannels = [
   "listPullRequestFiles",
   "listPullRequestCommits",
   "listCommitFiles",
+  "listPullRequestComments",
+  "addPullRequestComment",
   "getAnalysis",
   "analyzePullRequest",
   "askQuestion",

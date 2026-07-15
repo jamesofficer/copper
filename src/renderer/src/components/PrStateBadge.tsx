@@ -27,7 +27,7 @@ function meta({ state, draft, merged }: Omit<Props, "size">) {
   if (draft) {
     return { label: "Draft", palette: "gray", icon: <LuGitPullRequestDraft /> };
   }
-  return { label: "Open", palette: "green", icon: <LuGitPullRequest /> };
+  return { label: "Open", palette: "blue", icon: <LuGitPullRequest /> };
 }
 
 export default function PrStateBadge({ size, ...stateProps }: Props) {
