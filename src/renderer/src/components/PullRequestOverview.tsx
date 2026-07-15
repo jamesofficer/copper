@@ -17,6 +17,7 @@ import { scrollbar } from "../lib/scrollbar";
 import Markdown from "./Markdown";
 import PrStateBadge from "./PrStateBadge";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
+import UserAvatar from "./UserAvatar";
 
 interface Props {
   pr: PullRequest;
@@ -91,7 +92,10 @@ export default function PullRequestOverview({ pr }: Props) {
           >
             <Text>#{detail.number}</Text>
             <Text>·</Text>
-            <Text color="fg">{detail.author}</Text>
+            <HStack gap="1.5">
+              <UserAvatar username={detail.author} />
+              <Text color="fg">{detail.author}</Text>
+            </HStack>
             <Text>wants to merge into</Text>
             <Badge variant="outline">{detail.baseRef}</Badge>
             <Text>from</Text>
@@ -143,6 +147,7 @@ export default function PullRequestOverview({ pr }: Props) {
             <Text color="fg.muted">Reviewers</Text>
             {detail.reviewers.map((reviewer) => (
               <Badge key={reviewer} variant="subtle" fontFamily="mono">
+                <UserAvatar username={reviewer} boxSize="3.5" />
                 {reviewer}
               </Badge>
             ))}

@@ -3,6 +3,7 @@ import type { PullRequest, PullRequestDetail } from "../../../shared/types";
 import { timeAgo } from "../lib/recentPrs";
 import PrStateBadge from "./PrStateBadge";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
+import UserAvatar from "./UserAvatar";
 
 interface Props {
   pr: PullRequest;
@@ -69,7 +70,10 @@ export default function PullRequestCard({
             <Text>
               {showRepo ? `${pr.repo}#${pr.number}` : `#${pr.number}`}
             </Text>
-            <Text>{pr.author}</Text>
+            <HStack gap="1.5">
+              <UserAvatar username={pr.author} boxSize="3.5" />
+              <Text>{pr.author}</Text>
+            </HStack>
             {viewedAt ? (
               <Text>{timeAgo(viewedAt)}</Text>
             ) : (
