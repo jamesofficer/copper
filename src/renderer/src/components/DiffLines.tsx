@@ -2,6 +2,7 @@ import { Box, Flex, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 import type { PullRequestFile } from "../../../shared/types";
 import { type LineKind, languageForPath, parsePatch } from "../lib/diffParser";
+import { tokenColors } from "../lib/syntaxColors";
 
 interface Props {
   file: PullRequestFile;
@@ -14,23 +15,6 @@ const rowStyles: Record<LineKind, { bg: string; sign: string }> = {
   hunk: { bg: "bg.muted", sign: "" },
   meta: { bg: "transparent", sign: "" },
 };
-
-// github-dark token palette, applied to highlight.js output
-const tokenColors = {
-  "& .hljs-keyword, & .hljs-built_in": { color: "#ff7b72" },
-  "& .hljs-string, & .hljs-regexp, & .hljs-char.escape_": { color: "#a5d6ff" },
-  "& .hljs-comment, & .hljs-quote": { color: "#8b949e", fontStyle: "italic" },
-  "& .hljs-number, & .hljs-literal": { color: "#79c0ff" },
-  "& .hljs-title, & .hljs-title.function_, & .hljs-title.class_": {
-    color: "#d2a8ff",
-  },
-  "& .hljs-attr, & .hljs-attribute, & .hljs-variable, & .hljs-property": {
-    color: "#79c0ff",
-  },
-  "& .hljs-tag, & .hljs-name, & .hljs-selector-tag": { color: "#7ee787" },
-  "& .hljs-type, & .hljs-symbol, & .hljs-bullet": { color: "#ffa657" },
-  "& .hljs-meta": { color: "#8b949e" },
-} as const;
 
 function Gutter({ value }: { value: number | null }) {
   return (
@@ -58,10 +42,14 @@ export default function DiffLines({ file }: Props) {
   );
 
   return (
+    // minW=max-content: inside a scroll container a block element only gets
+    // the visible width, so short rows' backgrounds would stop there when
+    // scrolled right. Sizing this to the widest row lets every row fill it.
     <Box
       fontFamily="'JetBrains Mono', monospace"
       fontSize="14px"
       lineHeight="1.6"
+      minW="max-content"
       css={tokenColors}
     >
       {lines.map((line, index) => {
@@ -72,7 +60,6 @@ export default function DiffLines({ file }: Props) {
             key={index}
             bg={style.bg}
             color={line.kind === "hunk" ? "fg.muted" : "fg"}
-            minW="max-content"
           >
             {line.kind === "hunk" || line.kind === "meta" ? (
               <Text as="span" px="3" py="0.5" whiteSpace="pre">

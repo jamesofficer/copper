@@ -1,9 +1,16 @@
 import { Button, Flex, Heading, HStack, Tabs, Text } from "@chakra-ui/react";
-import { LuArrowLeft, LuFileDiff, LuInfo, LuSparkles } from "react-icons/lu";
+import {
+  LuArrowLeft,
+  LuExternalLink,
+  LuFileDiff,
+  LuInfo,
+  LuSparkles,
+} from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import ChangesView from "../components/ChangesView";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReviewPanel from "../components/ReviewPanel";
+import SubmitReviewDialog from "../components/SubmitReviewDialog";
 
 interface Props {
   pr: PullRequest;
@@ -13,16 +20,29 @@ interface Props {
 export default function Review({ pr, onBack }: Props) {
   return (
     <Flex direction="column" h="100vh">
-      <HStack gap="3" px="4" py="3" borderBottomWidth="1px" flexShrink="0">
-        <Button variant="ghost" size="sm" onClick={onBack}>
+      <HStack
+        gap="3"
+        px="4"
+        py="3"
+        borderBottomWidth="1px"
+        flexShrink="0"
+        align="center"
+      >
+        <Button variant="outline" size="xs" onClick={onBack}>
           <LuArrowLeft /> Back
         </Button>
-        <Heading size="md" truncate>
+        <Heading size="lg" truncate>
           {pr.title}
         </Heading>
-        <Text fontFamily="mono" fontSize="sm" color="fg.muted">
+        <Text fontFamily="mono" fontSize="sm" color="fg.muted" flex="1">
           {pr.repo}#{pr.number}
         </Text>
+        <Button asChild variant="outline" size="xs">
+          <a href={pr.url} target="_blank" rel="noreferrer">
+            <LuExternalLink /> Open in GitHub
+          </a>
+        </Button>
+        <SubmitReviewDialog pr={pr} />
       </HStack>
 
       <Tabs.Root

@@ -4,11 +4,17 @@ export interface Repository {
   slug: string | null;
 }
 
+// GitHub's review decision: each reviewer's latest submitted review counts,
+// and one "request changes" outranks any number of approvals.
+export type ReviewStatus = "approved" | "changes_requested" | "awaiting_review";
+
 export interface PullRequest {
   repo: string;
   number: number;
   title: string;
   author: string;
+  draft: boolean;
+  reviewStatus: ReviewStatus;
   headSha: string;
   url: string;
   additions: number;
@@ -30,6 +36,7 @@ export interface PullRequestDetail {
   state: "open" | "closed";
   draft: boolean;
   merged: boolean;
+  reviewStatus: ReviewStatus;
   baseRef: string;
   headRef: string;
   headSha: string;
@@ -42,6 +49,39 @@ export interface PullRequestDetail {
   createdAt: string;
   updatedAt: string;
   url: string;
+}
+
+// Mirrors GitHub's review events: comment, approve, or request changes.
+export type ReviewVerdict = "comment" | "approve" | "request_changes";
+
+// The voice the analysis text is written in. Changes only the wording of an
+// analysis, never what it reports.
+export const reviewPersonalities = [
+  "standard",
+  "technical",
+  "non_technical",
+  "simplified",
+  "grug",
+  "mentor",
+  "concise",
+] as const;
+
+export type ReviewPersonality = (typeof reviewPersonalities)[number];
+
+// A conversation comment on the PR itself (GitHub calls these issue
+// comments) — not an inline review comment on a diff line.
+export interface PullRequestComment {
+  id: number;
+  author: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface PullRequestCommit {
+  sha: string;
+  subject: string;
+  author: string;
+  date: string;
 }
 
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
@@ -80,6 +120,14 @@ export interface AnalysisClaim {
   anchors: DiffAnchor[];
 }
 
+// How serious a risk would be if it turns out to be real.
+export type RiskSeverity = "low" | "medium" | "high";
+
+export interface RiskClaim extends AnalysisClaim {
+  // Optional: analyses cached before severity classification existed lack it.
+  severity?: RiskSeverity;
+}
+
 export interface AnalysisUsage {
   inputTokens: number;
   outputTokens: number;
@@ -96,7 +144,7 @@ export interface AnalysisResult {
   usage?: AnalysisUsage;
   summary: string;
   groups: ChangeGroup[];
-  risks: AnalysisClaim[];
+  risks: RiskClaim[];
   behaviorChanges: AnalysisClaim[];
   outOfScope: string[];
 }

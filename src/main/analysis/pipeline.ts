@@ -7,6 +7,9 @@ import type {
   DiffAnchor,
   PullRequestDetail,
   PullRequestFile,
+  ReviewPersonality,
+  RiskClaim,
+  RiskSeverity,
 } from "../../shared/types";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { getSecret } from "../store/secrets";
@@ -14,7 +17,7 @@ import { getCachedAnalysis, setCachedAnalysis } from "./cache";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
-const MAX_OUTPUT_TOKENS = 8192;
+const MAX_OUTPUT_TOKENS = 16_384;
 
 // USD per million tokens for MODEL — update alongside it.
 const INPUT_USD_PER_MTOK = 5;
@@ -39,15 +42,68 @@ const MECHANICAL_PATTERNS = [
 const SYSTEM_PROMPT = `You are an expert code reviewer. Turn a pull request diff into a guided review: what changed, why, in what order to read it, and where the risk is.
 
 Rules:
-- summary: 2–4 plain-English sentences saying what this PR does and why — the description the author should have written. No hype, no hedging.
-- groups: split the diff into logical change groups, ordered as a reading guide — the group a reviewer should read first comes first. Every changed file appears in exactly one group. Risk levels: "attention" = new or changed logic the reviewer must think carefully about; "routine" = ordinary changes worth reading but unlikely to hide problems; "mechanical" = renames, lockfiles, generated code, formatting — skimmable. Within a group, list files in the order they should be read.
+- summary: 2–4 plain-English sentences saying what this PR does and why — the description the author should have written. No hype, no hedging. Prose only: never embed JSON or repeat the other fields' content inside it.
+- groups: split the diff into logical change groups, ordered as a reading guide — the group a reviewer should read first comes first. Every changed file appears in exactly one group. Use as many or as few groups as the change naturally splits into — don't merge unrelated changes to keep the list short. Risk levels: "attention" = new or changed logic the reviewer must think carefully about; "routine" = ordinary changes worth reading but unlikely to hide problems; "mechanical" = renames, lockfiles, generated code, formatting — skimmable. Within a group, list files in the order they should be read.
 - risks: concrete things that could break, each anchored to the exact file and line the claim is based on. Only risks visible in the diff — never invent generic concerns. Empty list if nothing stands out.
+- Every risk carries a severity: "high" = could plausibly break production, lose data, or open a security hole; "medium" = a real bug or regression is plausible and worth checking; "low" = unlikely to bite or low-impact if it does. Judge each risk on its own — don't grade on a curve to get a spread of severities.
 - behaviorChanges: what callers or users will experience differently after this merges, anchored the same way. Empty list if behavior is unchanged.
+- The list sizes must come from the diff, not from a sense of a tidy answer. A small clean PR may have zero risks; a large one may justify a dozen or more risks and behavior changes. List every one you actually see — never pad toward a count, never trim to keep a section short.
 - Every risk and behavior change carries a title: a very short label (3–6 words) naming it for a navigation list, alongside the full text.
 - outOfScope: related work this PR deliberately does NOT do — things a reviewer might expect but won't find. Short entries.
 - Anchors use line numbers in the NEW version of the file, derived from the @@ hunk headers. Use null for a whole-file claim.
+- Text fields render as GitHub-flavored markdown. Wrap every code identifier — function, hook, variable, type, prop, file, and branch names — in backticks (\`useUpdateTouchpointBlocks\`, \`src/api/blocks.ts\`) so it renders as code. Tag fenced code blocks with a language (\`\`\`ts, \`\`\`diff, …) so they get syntax highlighting.
 - Never claim anything the diff does not show. If a patch is truncated or omitted, say less rather than guessing.`;
 
+// Voice presets appended to the system prompt. They may only change the
+// wording of text fields — never what gets reported, the groups, anchors,
+// severities, or list sizes.
+const PERSONALITY_PROMPTS: Record<ReviewPersonality, string> = {
+  standard: "",
+  technical: `Write for a staff-level engineer who knows this stack deeply.
+- Name the exact functions, types, APIs, and mechanisms involved — "the useEffect cleanup", "the ETag header", not "some cleanup logic". Use precise domain vocabulary (idempotency, race condition, memoization) without defining it.
+- State implications, not narration. Never describe what a line obviously does; say what follows from it.
+- Quantify where the diff allows: complexity, allocations, payload sizes, round trips.
+- No analogies, no hand-holding, no softening. Density over accessibility.`,
+  non_technical: `Write for a smart reader who doesn't write code — a product manager or designer.
+- Lead every explanation with what the user or the business will notice: what works now that didn't, what could go wrong and what that would look like in the product.
+- No jargon at all. Describe code by its job, not its name: "the file that decides how an email looks in Outlook", not "the Image primitive". If a technical term is truly unavoidable, explain it in everyday words the first time.
+- Everyday analogies are welcome when they make a mechanism click.
+- Short paragraphs. If a detail only matters to programmers, leave it out.`,
+  simplified: `Write for a developer in their first week on the job.
+- Short sentences. One idea per sentence. Everyday words.
+- No engineering jargon. Say what happens, not what it's called: "the saved copy on the server" not "authoritative data", "the screen doesn't update to match" not "state doesn't reconcile", "runs at the same time and they trip over each other" not "race condition". Code identifiers in backticks are fine — abstract vocabulary is the problem, not names.
+- Assume they can program but don't know this codebase or its tricks. Briefly define anything specialised the first time it appears ("Outlook uses Word to draw emails — Word ignores a lot of normal HTML").
+- Prefer a concrete example over an abstract description. Show the before and after in plain terms.
+- No nested clauses, no rhetorical flourishes. If a sentence needs a comma, try splitting it.`,
+  grug: `Write in the voice of the grug-brained developer (grugbrain.dev). Style rules:
+- lowercase everywhere. drop articles and helper verbs: "complexity bad", "grug see big function, grug worry". present tense only.
+- grug always talks about himself in third person: "grug say", "grug like", "grug recommend". the reader is "you" or "young grug".
+- short declarative bursts. repetition for emphasis: "complexity very, very bad".
+- complexity is a living enemy: the "complexity demon". danger gets called out plain: "danger here!", "grug reach for club".
+- over-clever code comes from "big brain developers". money is "shiney rock". mild approval is "is fine" or "is good, actually". parenthetical asides for grumbles: "(sad but true)".
+- grug not know fancy words. no engineering jargon, ever — grug explain the idea in simple everyday words instead: "the real saved copy" not "authoritative data", "screen and server not agree" not "state doesn't reconcile", "two thing run same time, trip over each other" not "race condition". if grug tempted to use consultant word, grug stop and say what actually happen.
+- self-deprecating humour is good, but the humour never softens or hides a finding — grug spot every danger and say it plain.
+- technical facts stay exact: file names, function names, and line references keep their real spelling and casing (in backticks).`,
+  mentor: `Write like a patient senior engineer walking a colleague through the review.
+- For every finding: what it is, why it matters, and the general principle or named pattern behind it ("this is the classic time-of-check/time-of-use gap") so the lesson transfers to future reviews.
+- When the author did something well that's worth imitating, say so and explain why it works.
+- Where useful, add what to look for next time a change like this comes up.
+- Encouraging and direct, never condescending. Teach, don't lecture.`,
+  concise: `Be as brief as possible while staying grammatical.
+- One or two short sentences per point. Active voice.
+- No throat-clearing ("it's worth noting", "importantly"), no restating context the reader already has, no describing what the code makes obvious.
+- Cut words, never content: every finding is still listed, every anchor still explained.`,
+};
+
+function buildSystemPrompt(personality: ReviewPersonality): string {
+  const voice = PERSONALITY_PROMPTS[personality];
+  if (!voice) return SYSTEM_PROMPT;
+  return `${SYSTEM_PROMPT}\n\nVoice — applies only to the wording of text fields (summary, group stories, risk and behavior-change text, outOfScope). It never changes what you report or how the rules above are applied:\n${voice}`;
+}
+
+// The schemas follow the strict-mode subset of JSON Schema: every object sets
+// additionalProperties: false, lists all properties as required, and nullable
+// fields use anyOf instead of a type array.
 const anchorSchema = {
   type: "object",
   properties: {
@@ -56,12 +112,13 @@ const anchorSchema = {
       description: "File path exactly as it appears in the diff",
     },
     line: {
-      type: ["integer", "null"],
+      anyOf: [{ type: "integer" }, { type: "null" }],
       description:
         "Line number in the new version of the file, or null for a whole-file claim",
     },
   },
   required: ["path", "line"],
+  additionalProperties: false,
 };
 
 const claimSchema = {
@@ -75,11 +132,27 @@ const claimSchema = {
     anchors: { type: "array", items: anchorSchema },
   },
   required: ["title", "text", "anchors"],
+  additionalProperties: false,
+};
+
+const riskSchema = {
+  type: "object",
+  properties: {
+    ...claimSchema.properties,
+    severity: {
+      type: "string",
+      enum: ["low", "medium", "high"],
+      description: "How serious this risk would be if it turns out to be real",
+    },
+  },
+  required: [...claimSchema.required, "severity"],
+  additionalProperties: false,
 };
 
 const analysisTool = {
   name: "report_analysis",
   description: "Report the structured review analysis of the pull request.",
+  strict: true,
   input_schema: {
     type: "object",
     properties: {
@@ -102,13 +175,15 @@ const analysisTool = {
             files: { type: "array", items: { type: "string" } },
           },
           required: ["title", "story", "risk", "files"],
+          additionalProperties: false,
         },
       },
-      risks: { type: "array", items: claimSchema },
+      risks: { type: "array", items: riskSchema },
       behaviorChanges: { type: "array", items: claimSchema },
       outOfScope: { type: "array", items: { type: "string" } },
     },
     required: ["summary", "groups", "risks", "behaviorChanges", "outOfScope"],
+    additionalProperties: false,
   },
 };
 
@@ -121,6 +196,7 @@ interface RawClaim {
   title?: string;
   text?: string;
   anchors?: RawAnchor[];
+  severity?: string;
 }
 
 interface RawGroup {
@@ -130,12 +206,31 @@ interface RawGroup {
   files?: string[];
 }
 
+// The API guarantees the tool input is an object, but not that every nested
+// value matches the schema — the model sometimes returns a list field as a
+// JSON-encoded string. Treat everything as unknown and normalize.
 interface RawAnalysis {
-  summary?: string;
-  groups?: RawGroup[];
-  risks?: RawClaim[];
-  behaviorChanges?: RawClaim[];
-  outOfScope?: string[];
+  summary?: unknown;
+  groups?: unknown;
+  risks?: unknown;
+  behaviorChanges?: unknown;
+  outOfScope?: unknown;
+}
+
+function toList(value: unknown, field: string): unknown[] {
+  if (value == null) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Not JSON either; fall through to the error below.
+    }
+  }
+  throw new Error(
+    `The model returned a malformed analysis ("${field}" was not a list). Try again.`,
+  );
 }
 
 // Cheap lookup used by the renderer to decide between showing a cached
@@ -151,6 +246,8 @@ export async function getExistingAnalysis(
 export async function analyzePullRequest(
   repo: string,
   prNumber: number,
+  personality: ReviewPersonality = "standard",
+  force = false,
 ): Promise<AnalysisResult> {
   const apiKey = await getSecret("anthropic");
   if (!apiKey) {
@@ -160,13 +257,16 @@ export async function analyzePullRequest(
   }
 
   const detail = await getPullRequest(repo, prNumber);
-  const cached = await getCachedAnalysis(repo, prNumber, detail.headSha);
-  if (cached) return cached;
+  if (!force) {
+    const cached = await getCachedAnalysis(repo, prNumber, detail.headSha);
+    if (cached) return cached;
+  }
 
   const files = await listPullRequestFiles(repo, prNumber);
   const { raw, usage } = await requestAnalysis(
     apiKey,
     buildPullRequestContext(detail, files),
+    personality,
   );
   const result = toAnalysisResult(raw, detail, files, usage);
   await setCachedAnalysis(result);
@@ -235,18 +335,20 @@ export function buildPullRequestContext(
 async function requestAnalysis(
   apiKey: string,
   prompt: string,
+  personality: ReviewPersonality,
 ): Promise<{ raw: RawAnalysis; usage: AnalysisUsage | undefined }> {
   const res = await fetch(ANTHROPIC_API, {
     method: "POST",
     headers: {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      "anthropic-beta": "structured-outputs-2025-11-13",
       "content-type": "application/json",
     },
     body: JSON.stringify({
       model: MODEL,
       max_tokens: MAX_OUTPUT_TOKENS,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(personality),
       messages: [{ role: "user", content: prompt }],
       tools: [analysisTool],
       tool_choice: { type: "tool", name: "report_analysis" },
@@ -275,8 +377,14 @@ async function requestAnalysis(
 
   const message = (await res.json()) as {
     content: Array<{ type: string; input?: unknown }>;
+    stop_reason?: string;
     usage?: { input_tokens?: number; output_tokens?: number };
   };
+  if (message.stop_reason === "max_tokens") {
+    throw new Error(
+      "The analysis was cut off by the output limit. Try again — if it keeps happening, this PR may be too large to analyse in one pass.",
+    );
+  }
   const toolUse = message.content.find((block) => block.type === "tool_use");
   if (!toolUse?.input) {
     throw new Error("The model returned no analysis. Try again.");
@@ -335,16 +443,59 @@ function fallbackTitle(text: string): string {
 }
 
 function normalizeClaims(
-  claims: RawClaim[] | undefined,
+  value: unknown,
+  field: string,
   validPaths: Set<string>,
 ): AnalysisClaim[] {
-  return (claims ?? [])
+  return (toList(value, field) as RawClaim[])
     .filter((claim) => claim.text?.trim())
     .map((claim) => ({
       title: claim.title?.trim() || fallbackTitle(claim.text as string),
       text: (claim.text as string).trim(),
       anchors: normalizeAnchors(claim.anchors, validPaths),
     }));
+}
+
+const severityLevels: readonly string[] = ["low", "medium", "high"];
+
+function toSeverity(value: string | undefined): RiskSeverity {
+  return severityLevels.includes(value ?? "")
+    ? (value as RiskSeverity)
+    : "medium";
+}
+
+function normalizeRisks(value: unknown, validPaths: Set<string>): RiskClaim[] {
+  return (toList(value, "risks") as RawClaim[])
+    .filter((claim) => claim.text?.trim())
+    .map((claim) => ({
+      title: claim.title?.trim() || fallbackTitle(claim.text as string),
+      text: (claim.text as string).trim(),
+      anchors: normalizeAnchors(claim.anchors, validPaths),
+      severity: toSeverity(claim.severity),
+    }));
+}
+
+// The model occasionally leaks the groups JSON into the end of the summary
+// string. Split it off, and if the real groups field came back empty, keep
+// the leaked copy so the analysis isn't reduced to an "Everything else" bin.
+function splitLeakedGroups(summary: string): {
+  prose: string;
+  leaked: RawGroup[] | null;
+} {
+  const start = summary.indexOf('[{"');
+  if (start === -1) return { prose: summary, leaked: null };
+  try {
+    const parsed: unknown = JSON.parse(summary.slice(start).trim());
+    if (Array.isArray(parsed)) {
+      return {
+        prose: summary.slice(0, start).trim(),
+        leaked: parsed as RawGroup[],
+      };
+    }
+  } catch {
+    // Not valid JSON — treat it as legitimate prose and leave it alone.
+  }
+  return { prose: summary, leaked: null };
 }
 
 function toAnalysisResult(
@@ -356,7 +507,13 @@ function toAnalysisResult(
   const validPaths = new Set(files.map((file) => file.path));
   const seenIds = new Set<string>();
 
-  const groups: ChangeGroup[] = (raw.groups ?? [])
+  const { prose, leaked } = splitLeakedGroups(
+    typeof raw.summary === "string" ? raw.summary.trim() : "",
+  );
+  const groupList = toList(raw.groups, "groups") as RawGroup[];
+  const groupSource = groupList.length > 0 ? groupList : (leaked ?? []);
+
+  const groups: ChangeGroup[] = groupSource
     .map((group, index) => ({
       id: slugify(group.title ?? "", index, seenIds),
       title: group.title?.trim() || `Change ${index + 1}`,
@@ -389,12 +546,16 @@ function toAnalysisResult(
     model: MODEL,
     analyzedAt: new Date().toISOString(),
     usage,
-    summary: raw.summary?.trim() || "The analysis returned no summary.",
+    summary: prose || "The analysis returned no summary.",
     groups,
-    risks: normalizeClaims(raw.risks, validPaths),
-    behaviorChanges: normalizeClaims(raw.behaviorChanges, validPaths),
-    outOfScope: (raw.outOfScope ?? [])
-      .map((entry) => entry?.trim())
-      .filter((entry): entry is string => Boolean(entry)),
+    risks: normalizeRisks(raw.risks, validPaths),
+    behaviorChanges: normalizeClaims(
+      raw.behaviorChanges,
+      "behaviorChanges",
+      validPaths,
+    ),
+    outOfScope: toList(raw.outOfScope, "outOfScope")
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+      .filter((entry) => entry.length > 0),
   };
 }

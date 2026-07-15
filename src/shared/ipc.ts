@@ -3,9 +3,13 @@ import type {
   ChatMessage,
   KeyTestResult,
   PullRequest,
+  PullRequestComment,
+  PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
   Repository,
+  ReviewPersonality,
+  ReviewVerdict,
   SecretProvider,
   SecretsStatus,
 } from "./types";
@@ -16,18 +20,46 @@ export interface IpcApi {
   removeRepository(path: string): Promise<Repository[]>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
   getPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
+  // Same data as getPullRequest but without the background repo warm-up —
+  // for bulk refreshes (e.g. the recently-viewed panel).
+  peekPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
   listPullRequestFiles(
     repo: string,
     prNumber: number,
   ): Promise<PullRequestFile[]>;
+  listPullRequestCommits(
+    repo: string,
+    prNumber: number,
+  ): Promise<PullRequestCommit[]>;
+  listCommitFiles(repo: string, commitSha: string): Promise<PullRequestFile[]>;
+  listPullRequestComments(
+    repo: string,
+    prNumber: number,
+  ): Promise<PullRequestComment[]>;
+  addPullRequestComment(
+    repo: string,
+    prNumber: number,
+    body: string,
+  ): Promise<PullRequestComment>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
-  analyzePullRequest(repo: string, prNumber: number): Promise<AnalysisResult>;
+  analyzePullRequest(
+    repo: string,
+    prNumber: number,
+    personality: ReviewPersonality,
+    force?: boolean,
+  ): Promise<AnalysisResult>;
   askQuestion(
     repo: string,
     prNumber: number,
     question: string,
   ): Promise<string>;
   getChatHistory(repo: string, prNumber: number): Promise<ChatMessage[]>;
+  submitReview(
+    repo: string,
+    prNumber: number,
+    verdict: ReviewVerdict,
+    body: string,
+  ): Promise<void>;
   getSecretsStatus(): Promise<SecretsStatus>;
   saveSecret(provider: SecretProvider, value: string): Promise<KeyTestResult>;
   clearSecret(provider: SecretProvider): Promise<SecretsStatus>;
@@ -55,11 +87,17 @@ export const ipcChannels = [
   "removeRepository",
   "listPullRequests",
   "getPullRequest",
+  "peekPullRequest",
   "listPullRequestFiles",
+  "listPullRequestCommits",
+  "listCommitFiles",
+  "listPullRequestComments",
+  "addPullRequestComment",
   "getAnalysis",
   "analyzePullRequest",
   "askQuestion",
   "getChatHistory",
+  "submitReview",
   "getSecretsStatus",
   "saveSecret",
   "clearSecret",

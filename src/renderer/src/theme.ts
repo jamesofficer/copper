@@ -1,10 +1,21 @@
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
+import { accentPalettes, defaultAccent } from "./lib/accent";
+
+// One rule per palette: whichever data-accent <html> carries wins. applyAccent
+// in lib/accent.ts sets the attribute; the default covers first paint.
+const accentRules = Object.fromEntries(
+  accentPalettes.map((palette) => [
+    `html[data-accent="${palette}"]`,
+    { colorPalette: palette },
+  ]),
+);
 
 const config = defineConfig({
   globalCss: {
     html: {
-      colorPalette: "purple",
+      colorPalette: defaultAccent,
     },
+    ...accentRules,
     body: {
       bg: "bg",
       color: "fg",

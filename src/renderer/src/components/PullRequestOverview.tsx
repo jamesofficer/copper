@@ -11,16 +11,15 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  LuGitCommitHorizontal,
-  LuGitMerge,
-  LuGitPullRequest,
-  LuGitPullRequestClosed,
-  LuGitPullRequestDraft,
-} from "react-icons/lu";
-import type { PullRequest, PullRequestDetail } from "../../../shared/types";
+import { LuGitCommitHorizontal } from "react-icons/lu";
+import type { PullRequest } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
+import CommentCard from "./CommentCard";
+import CommentComposer from "./CommentComposer";
 import Markdown from "./Markdown";
+import PrStateBadge from "./PrStateBadge";
+import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
+import UserAvatar from "./UserAvatar";
 
 interface Props {
   pr: PullRequest;
@@ -34,28 +33,17 @@ function formatDate(iso: string): string {
   });
 }
 
-function stateMeta(detail: PullRequestDetail) {
-  if (detail.merged) {
-    return { label: "Merged", palette: "purple", icon: <LuGitMerge /> };
-  }
-  if (detail.state === "closed") {
-    return {
-      label: "Closed",
-      palette: "red",
-      icon: <LuGitPullRequestClosed />,
-    };
-  }
-  if (detail.draft) {
-    return { label: "Draft", palette: "gray", icon: <LuGitPullRequestDraft /> };
-  }
-  return { label: "Open", palette: "green", icon: <LuGitPullRequest /> };
-}
-
 export default function PullRequestOverview({ pr }: Props) {
   const detailQuery = useQuery({
     queryKey: ["pullRequest", pr.repo, pr.number],
     queryFn: () => window.api.getPullRequest(pr.repo, pr.number),
   });
+
+  const commentsQuery = useQuery({
+    queryKey: ["pullRequestComments", pr.repo, pr.number],
+    queryFn: () => window.api.listPullRequestComments(pr.repo, pr.number),
+  });
+  const comments = commentsQuery.data;
 
   if (detailQuery.isPending) {
     return (
@@ -81,26 +69,27 @@ export default function PullRequestOverview({ pr }: Props) {
   }
 
   const detail = detailQuery.data;
-  const state = stateMeta(detail);
 
   return (
     <Box h="full" overflowY="auto" css={scrollbar}>
       <VStack gap="6" alignItems="stretch" maxW="3xl" mx="auto" px="8" py="8">
         <VStack gap="3" alignItems="stretch">
-          <HStack gap="3" alignItems="flex-start">
-            <Badge
-              colorPalette={state.palette}
-              variant="surface"
+          <HStack gap="1.5">
+            <PrStateBadge
+              state={detail.state}
+              draft={detail.draft}
+              merged={detail.merged}
               size="lg"
-              flexShrink="0"
-            >
-              {state.icon}
-              {state.label}
-            </Badge>
-            <Heading size="lg" lineHeight="1.3">
-              {detail.title}
-            </Heading>
+            />
+            {shouldShowReviewStatus(
+              detail.state,
+              detail.merged,
+              detail.reviewStatus,
+            ) && <ReviewStatusBadge status={detail.reviewStatus} size="lg" />}
           </HStack>
+          <Heading size="lg" lineHeight="1.3">
+            {detail.title}
+          </Heading>
 
           <HStack
             fontFamily="mono"
@@ -111,7 +100,10 @@ export default function PullRequestOverview({ pr }: Props) {
           >
             <Text>#{detail.number}</Text>
             <Text>·</Text>
-            <Text color="fg">{detail.author}</Text>
+            <HStack gap="1.5">
+              <UserAvatar username={detail.author} />
+              <Text color="fg">{detail.author}</Text>
+            </HStack>
             <Text>wants to merge into</Text>
             <Badge variant="outline">{detail.baseRef}</Badge>
             <Text>from</Text>
@@ -163,6 +155,7 @@ export default function PullRequestOverview({ pr }: Props) {
             <Text color="fg.muted">Reviewers</Text>
             {detail.reviewers.map((reviewer) => (
               <Badge key={reviewer} variant="subtle" fontFamily="mono">
+                <UserAvatar username={reviewer} boxSize="3.5" />
                 {reviewer}
               </Badge>
             ))}
@@ -189,6 +182,40 @@ export default function PullRequestOverview({ pr }: Props) {
             </Text>
           )}
         </Box>
+
+        {comments && (
+          <>
+            <Separator />
+            <Box>
+              <Heading
+                size="xs"
+                color="fg.muted"
+                textTransform="uppercase"
+                letterSpacing="wider"
+                mb="3"
+              >
+                Comments ({comments.length})
+              </Heading>
+              <VStack gap="3" alignItems="stretch">
+                {comments.map((comment) => (
+                  <CommentCard key={comment.id} comment={comment} />
+                ))}
+                <Box mt={comments.length > 0 ? "3" : "0"}>
+                  <Heading
+                    size="xs"
+                    color="fg.muted"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    mb="3"
+                  >
+                    Add a comment
+                  </Heading>
+                  <CommentComposer pr={pr} />
+                </Box>
+              </VStack>
+            </Box>
+          </>
+        )}
 
         <Separator />
 

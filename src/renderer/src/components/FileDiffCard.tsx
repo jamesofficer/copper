@@ -1,5 +1,5 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
-import { useState } from "react";
+import { Box, Flex, HStack, Text } from "@chakra-ui/react";
+import { useRef, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import type { PullRequestFile } from "../../../shared/types";
 import { statusMeta } from "../lib/fileStatus";
@@ -12,11 +12,45 @@ interface Props {
   id?: string;
 }
 
+const DEFAULT_MAX_HEIGHT = 360;
+const MIN_HEIGHT = 120;
+
 // A file's diff in a collapsible bordered card, for embedding inside the
-// Review tab's change groups.
+// Review tab's change groups. The body starts capped at DEFAULT_MAX_HEIGHT;
+// the grip bar underneath drags it taller (double-click resets).
 export default function FileDiffCard({ file, defaultOpen = true, id }: Props) {
   const [open, setOpen] = useState(defaultOpen);
+  const [height, setHeight] = useState<number | null>(null);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const drag = useRef<{
+    startY: number;
+    startHeight: number;
+    contentHeight: number;
+  } | null>(null);
   const meta = statusMeta[file.status];
+
+  function onResizeStart(event: React.PointerEvent<HTMLDivElement>) {
+    const body = bodyRef.current;
+    if (!body) return;
+    drag.current = {
+      startY: event.clientY,
+      startHeight: body.offsetHeight,
+      contentHeight: body.scrollHeight,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onResizeMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!drag.current) return;
+    const next = drag.current.startHeight + event.clientY - drag.current.startY;
+    // No point dragging past the content itself, or into uselessly small.
+    setHeight(Math.min(drag.current.contentHeight, Math.max(MIN_HEIGHT, next)));
+  }
+
+  function onResizeEnd(event: React.PointerEvent<HTMLDivElement>) {
+    drag.current = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  }
 
   return (
     <Box id={id} borderWidth="1px" rounded="md" overflow="hidden">
@@ -72,14 +106,34 @@ export default function FileDiffCard({ file, defaultOpen = true, id }: Props) {
 
       {open &&
         (file.patch ? (
-          <Box
-            maxH="360px"
-            overflow="auto"
-            borderTopWidth="1px"
-            css={scrollbar}
-          >
-            <DiffLines file={file} />
-          </Box>
+          <>
+            <Box
+              ref={bodyRef}
+              maxH={height === null ? `${DEFAULT_MAX_HEIGHT}px` : undefined}
+              h={height === null ? undefined : `${height}px`}
+              overflow="auto"
+              borderTopWidth="1px"
+              css={scrollbar}
+            >
+              <DiffLines file={file} />
+            </Box>
+            <Flex
+              justifyContent="center"
+              py="1"
+              cursor="row-resize"
+              borderTopWidth="1px"
+              bg="bg.subtle"
+              _hover={{ bg: "bg.muted" }}
+              touchAction="none"
+              onPointerDown={onResizeStart}
+              onPointerMove={onResizeMove}
+              onPointerUp={onResizeEnd}
+              onDoubleClick={() => setHeight(null)}
+              title="Drag to resize · double-click to reset"
+            >
+              <Box w="8" h="2px" rounded="full" bg="border.emphasized" />
+            </Flex>
+          </>
         ) : (
           <Text
             fontSize="xs"

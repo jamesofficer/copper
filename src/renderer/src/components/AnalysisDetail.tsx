@@ -1,6 +1,7 @@
 import {
   Badge,
   Box,
+  Button,
   Heading,
   HStack,
   Spinner,
@@ -9,6 +10,7 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import type { ReactNode } from "react";
+import { LuRefreshCw } from "react-icons/lu";
 import type {
   AnalysisClaim,
   AnalysisResult,
@@ -20,11 +22,14 @@ import type { AnalysisSelection } from "./AnalysisNav";
 import FileDiffCard from "./FileDiffCard";
 import Markdown from "./Markdown";
 import RiskBadge from "./RiskBadge";
+import RiskSeverityBadge from "./RiskSeverityBadge";
 
 interface Props {
   analysis: AnalysisResult;
   files: PullRequestFile[] | undefined;
   selection: AnalysisSelection;
+  onReanalyze(): void;
+  reanalyzing: boolean;
 }
 
 type FileMap = Map<string, PullRequestFile>;
@@ -114,12 +119,20 @@ function DiffCards({
   );
 }
 
-function SummaryPane({ analysis }: { analysis: AnalysisResult }) {
+function SummaryPane({
+  analysis,
+  onReanalyze,
+  reanalyzing,
+}: {
+  analysis: AnalysisResult;
+  onReanalyze(): void;
+  reanalyzing: boolean;
+}) {
   return (
     <VStack alignItems="stretch" gap="6" maxW="3xl">
       <VStack alignItems="stretch" gap="3">
         <SectionHeading>Summary</SectionHeading>
-        <Markdown>{analysis.summary}</Markdown>
+        <Markdown fontSize="md">{analysis.summary}</Markdown>
       </VStack>
 
       {analysis.outOfScope.length > 0 && (
@@ -127,7 +140,7 @@ function SummaryPane({ analysis }: { analysis: AnalysisResult }) {
           <SectionHeading>Not in this PR</SectionHeading>
           <VStack alignItems="stretch" gap="1.5">
             {analysis.outOfScope.map((entry) => (
-              <Text key={entry} fontSize="sm" color="fg.muted">
+              <Text key={entry} fontSize="md" color="fg.muted">
                 – {entry}
               </Text>
             ))}
@@ -135,10 +148,22 @@ function SummaryPane({ analysis }: { analysis: AnalysisResult }) {
         </VStack>
       )}
 
-      <Text fontSize="xs" color="fg.subtle" fontFamily="mono">
-        Analysed commit {analysis.headSha.slice(0, 7)} · {analysis.model}
-        {analysis.usage ? ` · ${formatCost(analysis.usage)}` : ""}
-      </Text>
+      <HStack gap="3">
+        <Text fontSize="xs" color="fg.subtle" fontFamily="mono">
+          Analysed commit {analysis.headSha.slice(0, 7)} · {analysis.model}
+          {analysis.usage ? ` · ${formatCost(analysis.usage)}` : ""}
+        </Text>
+        <Button
+          size="2xs"
+          variant="ghost"
+          color="fg.muted"
+          onClick={onReanalyze}
+          loading={reanalyzing}
+          loadingText="Re-analysing…"
+        >
+          <LuRefreshCw /> Re-analyse
+        </Button>
+      </HStack>
     </VStack>
   );
 }
@@ -151,10 +176,12 @@ function formatCost(usage: AnalysisUsage): string {
 
 function ClaimPane({
   claim,
+  badge,
   files,
   fileByPath,
 }: {
   claim: AnalysisClaim;
+  badge?: ReactNode;
   files: PullRequestFile[] | undefined;
   fileByPath: FileMap;
 }) {
@@ -162,8 +189,11 @@ function ClaimPane({
   return (
     <VStack alignItems="stretch" gap="4">
       <VStack alignItems="stretch" gap="4" maxW="3xl">
-        <Heading size="md">{claim.title}</Heading>
-        <Markdown>{claim.text}</Markdown>
+        <HStack gap="3" alignItems="baseline">
+          <Heading size="md">{claim.title}</Heading>
+          {badge}
+        </HStack>
+        <Markdown fontSize="md">{claim.text}</Markdown>
         <AnchorChips claim={claim} />
       </VStack>
       {paths.length > 0 && (
@@ -206,7 +236,7 @@ function GroupPane({
           <Heading size="md">{group.title}</Heading>
           <RiskBadge risk={group.risk} />
         </HStack>
-        {group.story && <Markdown>{group.story}</Markdown>}
+        {group.story && <Markdown fontSize="md">{group.story}</Markdown>}
       </VStack>
       {files ? (
         <DiffCards
@@ -221,7 +251,13 @@ function GroupPane({
   );
 }
 
-export default function AnalysisDetail({ analysis, files, selection }: Props) {
+export default function AnalysisDetail({
+  analysis,
+  files,
+  selection,
+  onReanalyze,
+  reanalyzing,
+}: Props) {
   const fileByPath: FileMap = new Map(
     (files ?? []).map((file) => [file.path, file] as const),
   );
@@ -231,7 +267,12 @@ export default function AnalysisDetail({ analysis, files, selection }: Props) {
       const claim = analysis.risks[selection.index];
       if (claim) {
         return (
-          <ClaimPane claim={claim} files={files} fileByPath={fileByPath} />
+          <ClaimPane
+            claim={claim}
+            badge={<RiskSeverityBadge severity={claim.severity} />}
+            files={files}
+            fileByPath={fileByPath}
+          />
         );
       }
     }
@@ -256,11 +297,18 @@ export default function AnalysisDetail({ analysis, files, selection }: Props) {
         );
       }
     }
-    return <SummaryPane analysis={analysis} />;
+    return (
+      <SummaryPane
+        analysis={analysis}
+        onReanalyze={onReanalyze}
+        reanalyzing={reanalyzing}
+      />
+    );
   }
 
   return (
-    <Box px="8" py="6">
+    // Extra bottom padding so scrollable content can overscroll past the end.
+    <Box px="8" pt="6" pb="80">
       {resolve()}
     </Box>
   );

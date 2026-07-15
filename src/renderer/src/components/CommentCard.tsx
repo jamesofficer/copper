@@ -1,0 +1,41 @@
+import { Box, HStack, Text } from "@chakra-ui/react";
+import type { PullRequestComment } from "../../../shared/types";
+import Markdown from "./Markdown";
+import UserAvatar from "./UserAvatar";
+
+interface Props {
+  comment: PullRequestComment;
+}
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+export default function CommentCard({ comment }: Props) {
+  return (
+    <Box borderWidth="1px" rounded="lg" overflow="hidden">
+      <HStack gap="2" px="4" py="2.5" bg="bg.subtle" borderBottomWidth="1px">
+        <UserAvatar username={comment.author} />
+        <Text fontSize="sm" fontWeight="medium">
+          {comment.author}
+        </Text>
+        <Text fontSize="xs" color="fg.subtle">
+          {formatDate(comment.createdAt)}
+        </Text>
+      </HStack>
+      <Box px="4" py="3">
+        {comment.body.trim() ? (
+          <Markdown>{comment.body}</Markdown>
+        ) : (
+          <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+            No comment text.
+          </Text>
+        )}
+      </Box>
+    </Box>
+  );
+}

@@ -3,6 +3,7 @@ import {
   Flex,
   Heading,
   HStack,
+  IconButton,
   Spinner,
   Text,
   Textarea,
@@ -10,12 +11,14 @@ import {
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
+import { LuPanelRightClose } from "react-icons/lu";
 import type { ChatMessage, PullRequest } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
 import Markdown from "./Markdown";
 
 interface Props {
   pr: PullRequest;
+  onCollapse(): void;
 }
 
 type UiMessage = ChatMessage & { id: string; failed?: boolean };
@@ -27,7 +30,7 @@ function cleanIpcError(message: string): string {
   );
 }
 
-export default function ChatPanel({ pr }: Props) {
+export default function ChatPanel({ pr, onCollapse }: Props) {
   // Persisted history from the main process is the base; `local` overlays it
   // once the user starts talking (it also holds streaming + failed messages).
   const [local, setLocal] = useState<UiMessage[] | null>(null);
@@ -119,17 +122,28 @@ export default function ChatPanel({ pr }: Props) {
 
   return (
     <Flex direction="column" h="full" minH="0">
-      <Heading
-        size="xs"
-        color="fg.muted"
-        textTransform="uppercase"
-        letterSpacing="wider"
-        px="4"
-        py="3"
-        flexShrink="0"
-      >
-        Ask
-      </Heading>
+      <HStack justifyContent="space-between" pr="2" flexShrink="0">
+        <Heading
+          size="xs"
+          color="fg.muted"
+          textTransform="uppercase"
+          letterSpacing="wider"
+          px="4"
+          py="3"
+        >
+          Ask
+        </Heading>
+        <IconButton
+          aria-label="Collapse chat"
+          title="Collapse chat"
+          size="2xs"
+          variant="ghost"
+          color="fg.muted"
+          onClick={onCollapse}
+        >
+          <LuPanelRightClose />
+        </IconButton>
+      </HStack>
 
       <VStack
         ref={scrollRef}

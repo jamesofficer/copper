@@ -1,4 +1,5 @@
 import { Button, Flex, Heading, HStack, Stack } from "@chakra-ui/react";
+import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuHistory } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
@@ -15,6 +16,17 @@ interface Props {
 
 export default function RecentPanel({ onSelect }: Props) {
   const [recent, setRecent] = useState(() => listRecentPullRequests());
+
+  // The stored snapshots go stale (a PR gets merged or approved after it was
+  // viewed), so fetch live detail for each and let it win over the snapshot.
+  // Same query key as the Overview tab, so the two share a cache entry;
+  // peekPullRequest skips the repo warm-up getPullRequest would trigger.
+  const detailQueries = useQueries({
+    queries: recent.map((pr) => ({
+      queryKey: ["pullRequest", pr.repo, pr.number],
+      queryFn: () => window.api.peekPullRequest(pr.repo, pr.number),
+    })),
+  });
 
   function clearRecent() {
     clearRecentPullRequests();
@@ -62,10 +74,11 @@ export default function RecentPanel({ onSelect }: Props) {
         pb="4"
         css={scrollbar}
       >
-        {recent.map((pr) => (
+        {recent.map((pr, index) => (
           <PullRequestCard
             key={`${pr.repo}#${pr.number}`}
             pr={pr}
+            detail={detailQueries[index]?.data}
             onSelect={onSelect}
             showRepo
             viewedAt={pr.viewedAt}
