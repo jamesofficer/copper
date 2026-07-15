@@ -132,7 +132,7 @@ function SummaryPane({
     <VStack alignItems="stretch" gap="6" maxW="3xl">
       <VStack alignItems="stretch" gap="3">
         <SectionHeading>Summary</SectionHeading>
-        <Markdown>{analysis.summary}</Markdown>
+        <Markdown fontSize="md">{analysis.summary}</Markdown>
       </VStack>
 
       {analysis.outOfScope.length > 0 && (
@@ -140,7 +140,7 @@ function SummaryPane({
           <SectionHeading>Not in this PR</SectionHeading>
           <VStack alignItems="stretch" gap="1.5">
             {analysis.outOfScope.map((entry) => (
-              <Text key={entry} fontSize="sm" color="fg.muted">
+              <Text key={entry} fontSize="md" color="fg.muted">
                 – {entry}
               </Text>
             ))}
@@ -193,7 +193,7 @@ function ClaimPane({
           <Heading size="md">{claim.title}</Heading>
           {badge}
         </HStack>
-        <Markdown>{claim.text}</Markdown>
+        <Markdown fontSize="md">{claim.text}</Markdown>
         <AnchorChips claim={claim} />
       </VStack>
       {paths.length > 0 && (
@@ -236,7 +236,7 @@ function GroupPane({
           <Heading size="md">{group.title}</Heading>
           <RiskBadge risk={group.risk} />
         </HStack>
-        {group.story && <Markdown>{group.story}</Markdown>}
+        {group.story && <Markdown fontSize="md">{group.story}</Markdown>}
       </VStack>
       {files ? (
         <DiffCards

@@ -9,6 +9,7 @@ import { tokenColors } from "../lib/syntaxColors";
 
 interface Props {
   children: string;
+  fontSize?: "sm" | "md";
 }
 
 // The extracted scrollbar styling, re-targeted at the horizontally scrolling
@@ -71,7 +72,6 @@ function Code({ className, children }: CodeProps) {
 // Prose styles for rendered markdown, tuned for the dark theme. Colors come
 // from Chakra CSS variables so they track the active palette.
 const prose = {
-  fontSize: "sm",
   lineHeight: "1.6",
   color: "var(--chakra-colors-fg)",
   wordBreak: "break-word",
@@ -158,9 +158,9 @@ const prose = {
   ...innerScrollbar,
 } as const;
 
-export default function Markdown({ children }: Props) {
+export default function Markdown({ children, fontSize = "sm" }: Props) {
   return (
-    <Box css={prose}>
+    <Box css={prose} fontSize={fontSize}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         // GitHub allows inline HTML in markdown (bots lean on it for links),
