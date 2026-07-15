@@ -6,8 +6,11 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { Toaster } from "./components/ui/toaster";
+import { applyAccent, getAccent } from "./lib/accent";
 import { persistOptions, queryClient } from "./lib/queryClient";
 import { system } from "./theme";
+
+applyAccent(getAccent());
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element #root not found");

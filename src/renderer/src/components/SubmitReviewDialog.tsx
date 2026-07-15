@@ -18,21 +18,25 @@ const verdictOptions: Array<{
   value: ReviewVerdict;
   label: string;
   description: string;
+  palette: string;
 }> = [
   {
     value: "comment",
     label: "Comment",
     description: "Submit general feedback without explicit approval.",
+    palette: "gray",
   },
   {
     value: "approve",
     label: "Approve",
     description: "Submit feedback and approve merging these changes.",
+    palette: "green",
   },
   {
     value: "request_changes",
     label: "Request changes",
     description: "Submit feedback suggesting changes.",
+    palette: "red",
   },
 ];
 
@@ -117,6 +121,7 @@ export default function SubmitReviewDialog({ pr }: Props) {
                       <RadioGroup.Item
                         key={option.value}
                         value={option.value}
+                        colorPalette={option.palette}
                         alignItems="flex-start"
                         cursor="pointer"
                       >
