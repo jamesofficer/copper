@@ -11,17 +11,12 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  LuGitCommitHorizontal,
-  LuGitMerge,
-  LuGitPullRequest,
-  LuGitPullRequestClosed,
-  LuGitPullRequestDraft,
-} from "react-icons/lu";
-import type { PullRequest, PullRequestDetail } from "../../../shared/types";
+import { LuGitCommitHorizontal } from "react-icons/lu";
+import type { PullRequest } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
 import Markdown from "./Markdown";
-import ReviewStatusBadge from "./ReviewStatusBadge";
+import PrStateBadge from "./PrStateBadge";
+import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
 
 interface Props {
   pr: PullRequest;
@@ -33,23 +28,6 @@ function formatDate(iso: string): string {
     month: "short",
     year: "numeric",
   });
-}
-
-function stateMeta(detail: PullRequestDetail) {
-  if (detail.merged) {
-    return { label: "Merged", palette: "purple", icon: <LuGitMerge /> };
-  }
-  if (detail.state === "closed") {
-    return {
-      label: "Closed",
-      palette: "red",
-      icon: <LuGitPullRequestClosed />,
-    };
-  }
-  if (detail.draft) {
-    return { label: "Draft", palette: "gray", icon: <LuGitPullRequestDraft /> };
-  }
-  return { label: "Open", palette: "green", icon: <LuGitPullRequest /> };
 }
 
 export default function PullRequestOverview({ pr }: Props) {
@@ -82,31 +60,27 @@ export default function PullRequestOverview({ pr }: Props) {
   }
 
   const detail = detailQuery.data;
-  const state = stateMeta(detail);
-  // "Awaiting review" is only meaningful while the PR is still open; a
-  // definitive verdict stays interesting even after merge/close.
-  const showReviewStatus =
-    (detail.state === "open" && !detail.merged) ||
-    detail.reviewStatus !== "awaiting_review";
 
   return (
     <Box h="full" overflowY="auto" css={scrollbar}>
       <VStack gap="6" alignItems="stretch" maxW="3xl" mx="auto" px="8" py="8">
         <VStack gap="3" alignItems="stretch">
-          <HStack gap="3" alignItems="flex-start">
-            <HStack gap="1.5" flexShrink="0">
-              <Badge colorPalette={state.palette} variant="surface" size="lg">
-                {state.icon}
-                {state.label}
-              </Badge>
-              {showReviewStatus && (
-                <ReviewStatusBadge status={detail.reviewStatus} size="lg" />
-              )}
-            </HStack>
-            <Heading size="lg" lineHeight="1.3">
-              {detail.title}
-            </Heading>
+          <HStack gap="1.5">
+            <PrStateBadge
+              state={detail.state}
+              draft={detail.draft}
+              merged={detail.merged}
+              size="lg"
+            />
+            {shouldShowReviewStatus(
+              detail.state,
+              detail.merged,
+              detail.reviewStatus,
+            ) && <ReviewStatusBadge status={detail.reviewStatus} size="lg" />}
           </HStack>
+          <Heading size="lg" lineHeight="1.3">
+            {detail.title}
+          </Heading>
 
           <HStack
             fontFamily="mono"

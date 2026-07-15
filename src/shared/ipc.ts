@@ -17,6 +17,9 @@ export interface IpcApi {
   removeRepository(path: string): Promise<Repository[]>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
   getPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
+  // Same data as getPullRequest but without the background repo warm-up —
+  // for bulk refreshes (e.g. the recently-viewed panel).
+  peekPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
   listPullRequestFiles(
     repo: string,
     prNumber: number,
@@ -62,6 +65,7 @@ export const ipcChannels = [
   "removeRepository",
   "listPullRequests",
   "getPullRequest",
+  "peekPullRequest",
   "listPullRequestFiles",
   "getAnalysis",
   "analyzePullRequest",

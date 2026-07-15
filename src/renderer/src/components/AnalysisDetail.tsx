@@ -20,6 +20,7 @@ import type { AnalysisSelection } from "./AnalysisNav";
 import FileDiffCard from "./FileDiffCard";
 import Markdown from "./Markdown";
 import RiskBadge from "./RiskBadge";
+import RiskSeverityBadge from "./RiskSeverityBadge";
 
 interface Props {
   analysis: AnalysisResult;
@@ -151,10 +152,12 @@ function formatCost(usage: AnalysisUsage): string {
 
 function ClaimPane({
   claim,
+  badge,
   files,
   fileByPath,
 }: {
   claim: AnalysisClaim;
+  badge?: ReactNode;
   files: PullRequestFile[] | undefined;
   fileByPath: FileMap;
 }) {
@@ -162,7 +165,10 @@ function ClaimPane({
   return (
     <VStack alignItems="stretch" gap="4">
       <VStack alignItems="stretch" gap="4" maxW="3xl">
-        <Heading size="md">{claim.title}</Heading>
+        <HStack gap="3" alignItems="baseline">
+          <Heading size="md">{claim.title}</Heading>
+          {badge}
+        </HStack>
         <Markdown>{claim.text}</Markdown>
         <AnchorChips claim={claim} />
       </VStack>
@@ -231,7 +237,12 @@ export default function AnalysisDetail({ analysis, files, selection }: Props) {
       const claim = analysis.risks[selection.index];
       if (claim) {
         return (
-          <ClaimPane claim={claim} files={files} fileByPath={fileByPath} />
+          <ClaimPane
+            claim={claim}
+            badge={<RiskSeverityBadge severity={claim.severity} />}
+            files={files}
+            fileByPath={fileByPath}
+          />
         );
       }
     }

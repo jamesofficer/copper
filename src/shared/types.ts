@@ -90,6 +90,14 @@ export interface AnalysisClaim {
   anchors: DiffAnchor[];
 }
 
+// How serious a risk would be if it turns out to be real.
+export type RiskSeverity = "low" | "medium" | "high";
+
+export interface RiskClaim extends AnalysisClaim {
+  // Optional: analyses cached before severity classification existed lack it.
+  severity?: RiskSeverity;
+}
+
 export interface AnalysisUsage {
   inputTokens: number;
   outputTokens: number;
@@ -106,7 +114,7 @@ export interface AnalysisResult {
   usage?: AnalysisUsage;
   summary: string;
   groups: ChangeGroup[];
-  risks: AnalysisClaim[];
+  risks: RiskClaim[];
   behaviorChanges: AnalysisClaim[];
   outOfScope: string[];
 }

@@ -2,6 +2,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LuScrollText } from "react-icons/lu";
 import type { AnalysisResult, ChangeGroupRisk } from "../../../shared/types";
+import { severityDotColor } from "./RiskSeverityBadge";
 
 export type AnalysisSelection =
   | { kind: "summary" }
@@ -168,7 +169,7 @@ export default function AnalysisNav({ analysis, selection, onSelect }: Props) {
               onClick={() => onSelect({ kind: "risk", index })}
             >
               <HStack gap="2" alignItems="flex-start">
-                <Dot color="orange.solid" />
+                <Dot color={severityDotColor(claim.severity)} />
                 <Text fontSize="xs" lineClamp={2}>
                   {claim.title}
                 </Text>

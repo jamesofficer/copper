@@ -7,6 +7,8 @@ import type {
   DiffAnchor,
   PullRequestDetail,
   PullRequestFile,
+  RiskClaim,
+  RiskSeverity,
 } from "../../shared/types";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { getSecret } from "../store/secrets";
@@ -42,6 +44,7 @@ Rules:
 - summary: 2–4 plain-English sentences saying what this PR does and why — the description the author should have written. No hype, no hedging.
 - groups: split the diff into logical change groups, ordered as a reading guide — the group a reviewer should read first comes first. Every changed file appears in exactly one group. Use as many or as few groups as the change naturally splits into — don't merge unrelated changes to keep the list short. Risk levels: "attention" = new or changed logic the reviewer must think carefully about; "routine" = ordinary changes worth reading but unlikely to hide problems; "mechanical" = renames, lockfiles, generated code, formatting — skimmable. Within a group, list files in the order they should be read.
 - risks: concrete things that could break, each anchored to the exact file and line the claim is based on. Only risks visible in the diff — never invent generic concerns. Empty list if nothing stands out.
+- Every risk carries a severity: "high" = could plausibly break production, lose data, or open a security hole; "medium" = a real bug or regression is plausible and worth checking; "low" = unlikely to bite or low-impact if it does. Judge each risk on its own — don't grade on a curve to get a spread of severities.
 - behaviorChanges: what callers or users will experience differently after this merges, anchored the same way. Empty list if behavior is unchanged.
 - The list sizes must come from the diff, not from a sense of a tidy answer. A small clean PR may have zero risks; a large one may justify a dozen or more risks and behavior changes. List every one you actually see — never pad toward a count, never trim to keep a section short.
 - Every risk and behavior change carries a title: a very short label (3–6 words) naming it for a navigation list, alongside the full text.
@@ -84,6 +87,20 @@ const claimSchema = {
   additionalProperties: false,
 };
 
+const riskSchema = {
+  type: "object",
+  properties: {
+    ...claimSchema.properties,
+    severity: {
+      type: "string",
+      enum: ["low", "medium", "high"],
+      description: "How serious this risk would be if it turns out to be real",
+    },
+  },
+  required: [...claimSchema.required, "severity"],
+  additionalProperties: false,
+};
+
 const analysisTool = {
   name: "report_analysis",
   description: "Report the structured review analysis of the pull request.",
@@ -113,7 +130,7 @@ const analysisTool = {
           additionalProperties: false,
         },
       },
-      risks: { type: "array", items: claimSchema },
+      risks: { type: "array", items: riskSchema },
       behaviorChanges: { type: "array", items: claimSchema },
       outOfScope: { type: "array", items: { type: "string" } },
     },
@@ -131,6 +148,7 @@ interface RawClaim {
   title?: string;
   text?: string;
   anchors?: RawAnchor[];
+  severity?: string;
 }
 
 interface RawGroup {
@@ -384,6 +402,25 @@ function normalizeClaims(
     }));
 }
 
+const severityLevels: readonly string[] = ["low", "medium", "high"];
+
+function toSeverity(value: string | undefined): RiskSeverity {
+  return severityLevels.includes(value ?? "")
+    ? (value as RiskSeverity)
+    : "medium";
+}
+
+function normalizeRisks(value: unknown, validPaths: Set<string>): RiskClaim[] {
+  return (toList(value, "risks") as RawClaim[])
+    .filter((claim) => claim.text?.trim())
+    .map((claim) => ({
+      title: claim.title?.trim() || fallbackTitle(claim.text as string),
+      text: (claim.text as string).trim(),
+      anchors: normalizeAnchors(claim.anchors, validPaths),
+      severity: toSeverity(claim.severity),
+    }));
+}
+
 function toAnalysisResult(
   raw: RawAnalysis,
   detail: PullRequestDetail,
@@ -430,7 +467,7 @@ function toAnalysisResult(
       (typeof raw.summary === "string" && raw.summary.trim()) ||
       "The analysis returned no summary.",
     groups,
-    risks: normalizeClaims(raw.risks, "risks", validPaths),
+    risks: normalizeRisks(raw.risks, validPaths),
     behaviorChanges: normalizeClaims(
       raw.behaviorChanges,
       "behaviorChanges",

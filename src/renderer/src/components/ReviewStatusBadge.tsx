@@ -24,6 +24,17 @@ const meta: Record<
   },
 };
 
+// "Awaiting review" is only meaningful while the PR is still open; a
+// definitive verdict stays interesting even after merge/close.
+export function shouldShowReviewStatus(
+  state: "open" | "closed",
+  merged: boolean,
+  status?: ReviewStatus,
+): boolean {
+  if (!status) return false;
+  return (state === "open" && !merged) || status !== "awaiting_review";
+}
+
 interface Props {
   status?: ReviewStatus;
   size?: "xs" | "sm" | "md" | "lg";

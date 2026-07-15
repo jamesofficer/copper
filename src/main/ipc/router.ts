@@ -27,6 +27,7 @@ const handlers: IpcApi = {
     void warmUpPullRequest(repo, prNumber, detail.headSha);
     return detail;
   },
+  peekPullRequest: (repo, prNumber) => getPullRequest(repo, prNumber),
   listPullRequestFiles: (repo, prNumber) =>
     listPullRequestFiles(repo, prNumber),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
