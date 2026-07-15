@@ -91,6 +91,7 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
     number: pull.number,
     title: pull.title,
     author: pull.user?.login ?? "unknown",
+    draft: pull.draft,
     headSha: pull.head.sha.slice(0, 7),
     url: pull.html_url,
     additions: pull.additions,

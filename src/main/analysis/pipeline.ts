@@ -14,7 +14,7 @@ import { getCachedAnalysis, setCachedAnalysis } from "./cache";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
-const MAX_OUTPUT_TOKENS = 8192;
+const MAX_OUTPUT_TOKENS = 16_384;
 
 // USD per million tokens for MODEL — update alongside it.
 const INPUT_USD_PER_MTOK = 5;
@@ -40,15 +40,19 @@ const SYSTEM_PROMPT = `You are an expert code reviewer. Turn a pull request diff
 
 Rules:
 - summary: 2–4 plain-English sentences saying what this PR does and why — the description the author should have written. No hype, no hedging.
-- groups: split the diff into logical change groups, ordered as a reading guide — the group a reviewer should read first comes first. Every changed file appears in exactly one group. Risk levels: "attention" = new or changed logic the reviewer must think carefully about; "routine" = ordinary changes worth reading but unlikely to hide problems; "mechanical" = renames, lockfiles, generated code, formatting — skimmable. Within a group, list files in the order they should be read.
+- groups: split the diff into logical change groups, ordered as a reading guide — the group a reviewer should read first comes first. Every changed file appears in exactly one group. Use as many or as few groups as the change naturally splits into — don't merge unrelated changes to keep the list short. Risk levels: "attention" = new or changed logic the reviewer must think carefully about; "routine" = ordinary changes worth reading but unlikely to hide problems; "mechanical" = renames, lockfiles, generated code, formatting — skimmable. Within a group, list files in the order they should be read.
 - risks: concrete things that could break, each anchored to the exact file and line the claim is based on. Only risks visible in the diff — never invent generic concerns. Empty list if nothing stands out.
 - behaviorChanges: what callers or users will experience differently after this merges, anchored the same way. Empty list if behavior is unchanged.
+- The list sizes must come from the diff, not from a sense of a tidy answer. A small clean PR may have zero risks; a large one may justify a dozen or more risks and behavior changes. List every one you actually see — never pad toward a count, never trim to keep a section short.
 - Every risk and behavior change carries a title: a very short label (3–6 words) naming it for a navigation list, alongside the full text.
 - outOfScope: related work this PR deliberately does NOT do — things a reviewer might expect but won't find. Short entries.
 - Anchors use line numbers in the NEW version of the file, derived from the @@ hunk headers. Use null for a whole-file claim.
 - Text fields render as GitHub-flavored markdown. Tag fenced code blocks with a language (\`\`\`ts, \`\`\`diff, …) so they get syntax highlighting.
 - Never claim anything the diff does not show. If a patch is truncated or omitted, say less rather than guessing.`;
 
+// The schemas follow the strict-mode subset of JSON Schema: every object sets
+// additionalProperties: false, lists all properties as required, and nullable
+// fields use anyOf instead of a type array.
 const anchorSchema = {
   type: "object",
   properties: {
@@ -57,12 +61,13 @@ const anchorSchema = {
       description: "File path exactly as it appears in the diff",
     },
     line: {
-      type: ["integer", "null"],
+      anyOf: [{ type: "integer" }, { type: "null" }],
       description:
         "Line number in the new version of the file, or null for a whole-file claim",
     },
   },
   required: ["path", "line"],
+  additionalProperties: false,
 };
 
 const claimSchema = {
@@ -76,11 +81,13 @@ const claimSchema = {
     anchors: { type: "array", items: anchorSchema },
   },
   required: ["title", "text", "anchors"],
+  additionalProperties: false,
 };
 
 const analysisTool = {
   name: "report_analysis",
   description: "Report the structured review analysis of the pull request.",
+  strict: true,
   input_schema: {
     type: "object",
     properties: {
@@ -103,6 +110,7 @@ const analysisTool = {
             files: { type: "array", items: { type: "string" } },
           },
           required: ["title", "story", "risk", "files"],
+          additionalProperties: false,
         },
       },
       risks: { type: "array", items: claimSchema },
@@ -110,6 +118,7 @@ const analysisTool = {
       outOfScope: { type: "array", items: { type: "string" } },
     },
     required: ["summary", "groups", "risks", "behaviorChanges", "outOfScope"],
+    additionalProperties: false,
   },
 };
 
@@ -131,12 +140,31 @@ interface RawGroup {
   files?: string[];
 }
 
+// The API guarantees the tool input is an object, but not that every nested
+// value matches the schema — the model sometimes returns a list field as a
+// JSON-encoded string. Treat everything as unknown and normalize.
 interface RawAnalysis {
-  summary?: string;
-  groups?: RawGroup[];
-  risks?: RawClaim[];
-  behaviorChanges?: RawClaim[];
-  outOfScope?: string[];
+  summary?: unknown;
+  groups?: unknown;
+  risks?: unknown;
+  behaviorChanges?: unknown;
+  outOfScope?: unknown;
+}
+
+function toList(value: unknown, field: string): unknown[] {
+  if (value == null) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // Not JSON either; fall through to the error below.
+    }
+  }
+  throw new Error(
+    `The model returned a malformed analysis ("${field}" was not a list). Try again.`,
+  );
 }
 
 // Cheap lookup used by the renderer to decide between showing a cached
@@ -242,6 +270,7 @@ async function requestAnalysis(
     headers: {
       "x-api-key": apiKey,
       "anthropic-version": "2023-06-01",
+      "anthropic-beta": "structured-outputs-2025-11-13",
       "content-type": "application/json",
     },
     body: JSON.stringify({
@@ -276,8 +305,14 @@ async function requestAnalysis(
 
   const message = (await res.json()) as {
     content: Array<{ type: string; input?: unknown }>;
+    stop_reason?: string;
     usage?: { input_tokens?: number; output_tokens?: number };
   };
+  if (message.stop_reason === "max_tokens") {
+    throw new Error(
+      "The analysis was cut off by the output limit. Try again — if it keeps happening, this PR may be too large to analyse in one pass.",
+    );
+  }
   const toolUse = message.content.find((block) => block.type === "tool_use");
   if (!toolUse?.input) {
     throw new Error("The model returned no analysis. Try again.");
@@ -336,10 +371,11 @@ function fallbackTitle(text: string): string {
 }
 
 function normalizeClaims(
-  claims: RawClaim[] | undefined,
+  value: unknown,
+  field: string,
   validPaths: Set<string>,
 ): AnalysisClaim[] {
-  return (claims ?? [])
+  return (toList(value, field) as RawClaim[])
     .filter((claim) => claim.text?.trim())
     .map((claim) => ({
       title: claim.title?.trim() || fallbackTitle(claim.text as string),
@@ -357,7 +393,7 @@ function toAnalysisResult(
   const validPaths = new Set(files.map((file) => file.path));
   const seenIds = new Set<string>();
 
-  const groups: ChangeGroup[] = (raw.groups ?? [])
+  const groups: ChangeGroup[] = (toList(raw.groups, "groups") as RawGroup[])
     .map((group, index) => ({
       id: slugify(group.title ?? "", index, seenIds),
       title: group.title?.trim() || `Change ${index + 1}`,
@@ -390,12 +426,18 @@ function toAnalysisResult(
     model: MODEL,
     analyzedAt: new Date().toISOString(),
     usage,
-    summary: raw.summary?.trim() || "The analysis returned no summary.",
+    summary:
+      (typeof raw.summary === "string" && raw.summary.trim()) ||
+      "The analysis returned no summary.",
     groups,
-    risks: normalizeClaims(raw.risks, validPaths),
-    behaviorChanges: normalizeClaims(raw.behaviorChanges, validPaths),
-    outOfScope: (raw.outOfScope ?? [])
-      .map((entry) => entry?.trim())
-      .filter((entry): entry is string => Boolean(entry)),
+    risks: normalizeClaims(raw.risks, "risks", validPaths),
+    behaviorChanges: normalizeClaims(
+      raw.behaviorChanges,
+      "behaviorChanges",
+      validPaths,
+    ),
+    outOfScope: toList(raw.outOfScope, "outOfScope")
+      .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+      .filter((entry) => entry.length > 0),
   };
 }

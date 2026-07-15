@@ -9,6 +9,7 @@ export interface PullRequest {
   number: number;
   title: string;
   author: string;
+  draft: boolean;
   headSha: string;
   url: string;
   additions: number;
