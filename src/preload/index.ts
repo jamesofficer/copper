@@ -16,6 +16,10 @@ const api: WindowApi = {
     ipcRenderer.invoke("peekPullRequest", repo, prNumber),
   listPullRequestFiles: (repo, prNumber) =>
     ipcRenderer.invoke("listPullRequestFiles", repo, prNumber),
+  listPullRequestCommits: (repo, prNumber) =>
+    ipcRenderer.invoke("listPullRequestCommits", repo, prNumber),
+  listCommitFiles: (repo, commitSha) =>
+    ipcRenderer.invoke("listCommitFiles", repo, commitSha),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),
   analyzePullRequest: (repo, prNumber) =>

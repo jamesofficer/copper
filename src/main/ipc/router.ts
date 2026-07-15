@@ -4,6 +4,8 @@ import { askQuestion, getChatHistory } from "../agent/session";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
   getPullRequest,
+  listCommitFiles,
+  listPullRequestCommits,
   listPullRequestFiles,
   listReviewRequests,
   submitReview,
@@ -30,6 +32,9 @@ const handlers: IpcApi = {
   peekPullRequest: (repo, prNumber) => getPullRequest(repo, prNumber),
   listPullRequestFiles: (repo, prNumber) =>
     listPullRequestFiles(repo, prNumber),
+  listPullRequestCommits: (repo, prNumber) =>
+    listPullRequestCommits(repo, prNumber),
+  listCommitFiles: (repo, commitSha) => listCommitFiles(repo, commitSha),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   analyzePullRequest: (repo, prNumber) => analyzePullRequest(repo, prNumber),
   askQuestion: (repo, prNumber, question) =>

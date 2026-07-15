@@ -1,6 +1,7 @@
 import type {
   FileStatus,
   PullRequest,
+  PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
   ReviewStatus,
@@ -239,6 +240,17 @@ function toFileStatus(status: string): FileStatus {
   }
 }
 
+function toPullRequestFile(file: GitHubFile): PullRequestFile {
+  return {
+    path: file.filename,
+    previousPath: file.previous_filename ?? null,
+    status: toFileStatus(file.status),
+    additions: file.additions,
+    deletions: file.deletions,
+    patch: file.patch ?? null,
+  };
+}
+
 export async function listPullRequestFiles(
   repo: string,
   prNumber: number,
@@ -261,14 +273,72 @@ export async function listPullRequestFiles(
     if (batch.length < 100) break;
   }
 
-  return files.map((file) => ({
-    path: file.filename,
-    previousPath: file.previous_filename ?? null,
-    status: toFileStatus(file.status),
-    additions: file.additions,
-    deletions: file.deletions,
-    patch: file.patch ?? null,
+  return files.map(toPullRequestFile);
+}
+
+interface GitHubCommitItem {
+  sha: string;
+  commit: {
+    message: string;
+    author: { name?: string; date?: string } | null;
+  };
+  author: { login: string } | null;
+}
+
+export async function listPullRequestCommits(
+  repo: string,
+  prNumber: number,
+): Promise<PullRequestCommit[]> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const commits: GitHubCommitItem[] = [];
+  // GitHub caps this endpoint at 250 commits (3 pages of 100).
+  for (let page = 1; page <= 3; page++) {
+    const batch = await githubFetch<GitHubCommitItem[]>(
+      token,
+      `/repos/${repo}/pulls/${prNumber}/commits?per_page=100&page=${page}`,
+    );
+    commits.push(...batch);
+    if (batch.length < 100) break;
+  }
+
+  return commits.map((item) => ({
+    sha: item.sha,
+    subject: item.commit.message.split("\n", 1)[0],
+    author: item.author?.login ?? item.commit.author?.name ?? "unknown",
+    date: item.commit.author?.date ?? "",
   }));
+}
+
+export async function listCommitFiles(
+  repo: string,
+  commitSha: string,
+): Promise<PullRequestFile[]> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const files: GitHubFile[] = [];
+  // The single-commit endpoint pages its `files` array like the PR files one.
+  for (let page = 1; page <= 30; page++) {
+    const commit = await githubFetch<{ files?: GitHubFile[] }>(
+      token,
+      `/repos/${repo}/commits/${commitSha}?per_page=100&page=${page}`,
+    );
+    const batch = commit.files ?? [];
+    files.push(...batch);
+    if (batch.length < 100) break;
+  }
+
+  return files.map(toPullRequestFile);
 }
 
 const reviewEvents: Record<ReviewVerdict, string> = {
