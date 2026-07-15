@@ -1,4 +1,12 @@
-import { Button, Flex, Heading, HStack, Tabs, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Flex,
+  Heading,
+  HStack,
+  Tabs,
+  Text,
+} from "@chakra-ui/react";
 import {
   LuArrowLeft,
   LuExternalLink,
@@ -8,6 +16,7 @@ import {
 } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import ChangesView from "../components/ChangesView";
+import DiffViewModeSelect from "../components/DiffViewModeSelect";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReviewPanel from "../components/ReviewPanel";
 import SubmitReviewDialog from "../components/SubmitReviewDialog";
@@ -52,7 +61,7 @@ export default function Review({ pr, onBack }: Props) {
         flex="1"
         minH="0"
       >
-        <Tabs.List flexShrink="0" px="4">
+        <Tabs.List flexShrink="0" px="4" alignItems="center">
           <Tabs.Trigger value="overview">
             <LuInfo /> Overview
           </Tabs.Trigger>
@@ -62,6 +71,9 @@ export default function Review({ pr, onBack }: Props) {
           <Tabs.Trigger value="review">
             <LuSparkles /> Review
           </Tabs.Trigger>
+          <Box ml="auto">
+            <DiffViewModeSelect />
+          </Box>
         </Tabs.List>
 
         <Tabs.Content value="overview" flex="1" minH="0" p="0">
