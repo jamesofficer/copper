@@ -1,6 +1,7 @@
 import { ipcMain } from "electron";
 import type { IpcApi } from "../../shared/ipc";
 import { askQuestion, getChatHistory } from "../agent/session";
+import { listAnalyzedPullRequests } from "../analysis/cache";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
   addPullRequestComment,
@@ -42,6 +43,7 @@ const handlers: IpcApi = {
   addPullRequestComment: (repo, prNumber, body) =>
     addPullRequestComment(repo, prNumber, body),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
+  listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
   analyzePullRequest: (repo, prNumber, personality, force) =>
     analyzePullRequest(repo, prNumber, personality, force),
   askQuestion: (repo, prNumber, question) =>

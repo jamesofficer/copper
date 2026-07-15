@@ -11,14 +11,28 @@ import {
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { LuPanelRightClose } from "react-icons/lu";
+import {
+  LuMessageCircleQuestion,
+  LuPanelRightClose,
+  LuX,
+} from "react-icons/lu";
 import type { ChatMessage, PullRequest } from "../../../shared/types";
+import {
+  type AskRequest,
+  buildQuestionWithContext,
+  parseQuestion,
+} from "../lib/askContext";
 import { scrollbar } from "../lib/scrollbar";
 import Markdown from "./Markdown";
 
 interface Props {
   pr: PullRequest;
   onCollapse(): void;
+  // Set by "Ask about this" on a claim. Without a question it attaches the
+  // claim to the composer as a chip; with one (a suggested question) it sends
+  // straight away. Owned by ReviewPanel so detail panes can set it.
+  askRequest: AskRequest | null;
+  onClearAskRequest(): void;
 }
 
 type UiMessage = ChatMessage & { id: string; failed?: boolean };
@@ -30,7 +44,12 @@ function cleanIpcError(message: string): string {
   );
 }
 
-export default function ChatPanel({ pr, onCollapse }: Props) {
+export default function ChatPanel({
+  pr,
+  onCollapse,
+  askRequest,
+  onClearAskRequest,
+}: Props) {
   // Persisted history from the main process is the base; `local` overlays it
   // once the user starts talking (it also holds streaming + failed messages).
   const [local, setLocal] = useState<UiMessage[] | null>(null);
@@ -38,7 +57,17 @@ export default function ChatPanel({ pr, onCollapse }: Props) {
   const [busy, setBusy] = useState(false);
   const streamingIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const handledRequestRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
+
+  const attachedContext = askRequest?.question
+    ? null
+    : (askRequest?.context ?? null);
+
+  useEffect(() => {
+    if (attachedContext) inputRef.current?.focus();
+  }, [attachedContext]);
 
   const historyQuery = useQuery({
     queryKey: ["chatHistory", pr.repo, pr.number],
@@ -75,22 +104,46 @@ export default function ChatPanel({ pr, onCollapse }: Props) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  async function ask() {
+  // A suggested question from the split button's menu — send it as soon as
+  // the chat is free (a streaming answer just queues it). The ref stops
+  // re-renders from sending the same request twice.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: send/onClearAskRequest are recreated every render
+  useEffect(() => {
+    if (!askRequest?.question || busy) return;
+    if (handledRequestRef.current === askRequest.id) return;
+    handledRequestRef.current = askRequest.id;
+    onClearAskRequest();
+    void send(
+      buildQuestionWithContext(askRequest.context, askRequest.question),
+    );
+  }, [askRequest, busy]);
+
+  function ask() {
     const trimmed = question.trim();
     if (!trimmed || busy) return;
+    const context = attachedContext;
     setQuestion("");
+    onClearAskRequest();
+    void send(context ? buildQuestionWithContext(context, trimmed) : trimmed);
+  }
+
+  async function send(fullQuestion: string) {
     setBusy(true);
 
     const answerId = crypto.randomUUID();
     streamingIdRef.current = answerId;
     setLocal([
       ...messages,
-      { id: crypto.randomUUID(), role: "user", content: trimmed },
+      { id: crypto.randomUUID(), role: "user", content: fullQuestion },
       { id: answerId, role: "assistant", content: "" },
     ]);
 
     try {
-      const answer = await window.api.askQuestion(pr.repo, pr.number, trimmed);
+      const answer = await window.api.askQuestion(
+        pr.repo,
+        pr.number,
+        fullQuestion,
+      );
       setLocal(
         (prev) =>
           prev?.map((message) =>
@@ -165,17 +218,7 @@ export default function ChatPanel({ pr, onCollapse }: Props) {
         ) : (
           messages.map((message) =>
             message.role === "user" ? (
-              <Box
-                key={message.id}
-                alignSelf="flex-end"
-                maxW="90%"
-                bg="bg.emphasized"
-                rounded="lg"
-                px="3"
-                py="2"
-              >
-                <Text fontSize="sm">{message.content}</Text>
-              </Box>
+              <UserBubble key={message.id} content={message.content} />
             ) : (
               <Box key={message.id}>
                 {message.failed ? (
@@ -197,16 +240,54 @@ export default function ChatPanel({ pr, onCollapse }: Props) {
       </VStack>
 
       <Box p="3" borderTopWidth="1px" flexShrink="0">
+        {attachedContext && (
+          <HStack
+            mb="2"
+            gap="1.5"
+            borderWidth="1px"
+            rounded="md"
+            px="2"
+            py="1"
+            bg="bg.subtle"
+            fontSize="xs"
+            color="fg.muted"
+          >
+            <LuMessageCircleQuestion size={12} />
+            <Text truncate title={attachedContext.title}>
+              About the {attachedContext.label}: {attachedContext.title}
+            </Text>
+            <IconButton
+              aria-label="Remove attached context"
+              size="2xs"
+              variant="ghost"
+              color="fg.muted"
+              ml="auto"
+              onClick={onClearAskRequest}
+            >
+              <LuX />
+            </IconButton>
+          </HStack>
+        )}
         <Textarea
+          ref={inputRef}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              void ask();
+              ask();
+            }
+            if (event.key === "Escape" && attachedContext) {
+              onClearAskRequest();
             }
           }}
-          placeholder={busy ? "Answering…" : "Ask about this PR…"}
+          placeholder={
+            busy
+              ? "Answering…"
+              : attachedContext
+                ? `Ask about this ${attachedContext.label}…`
+                : "Ask about this PR…"
+          }
           disabled={busy}
           size="sm"
           rows={1}
@@ -215,5 +296,31 @@ export default function ChatPanel({ pr, onCollapse }: Props) {
         />
       </Box>
     </Flex>
+  );
+}
+
+// User messages may carry an attached claim (see lib/askContext.ts) — show it
+// as a compact tag above the typed question instead of the raw context block.
+function UserBubble({ content }: { content: string }) {
+  const parsed = parseQuestion(content);
+  return (
+    <Box
+      alignSelf="flex-end"
+      maxW="90%"
+      bg="bg.emphasized"
+      rounded="lg"
+      px="3"
+      py="2"
+    >
+      {parsed.context && (
+        <HStack gap="1" fontSize="xs" color="fg.muted" mb="1">
+          <LuMessageCircleQuestion size={12} />
+          <Text truncate>
+            About the {parsed.context.label}: {parsed.context.title}
+          </Text>
+        </HStack>
+      )}
+      <Text fontSize="sm">{parsed.question}</Text>
+    </Box>
   );
 }

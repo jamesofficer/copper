@@ -16,6 +16,8 @@ interface Props {
   showRepo?: boolean;
   viewedAt?: string;
   maxW?: string;
+  // The PR's cached analysis is for an older commit than its current head.
+  analysisOutdated?: boolean;
 }
 
 export default function PullRequestCard({
@@ -25,6 +27,7 @@ export default function PullRequestCard({
   showRepo,
   viewedAt,
   maxW,
+  analysisOutdated,
 }: Props) {
   const title = detail?.title ?? pr.title;
   const draft = detail?.draft ?? pr.draft;
@@ -57,6 +60,11 @@ export default function PullRequestCard({
             <PrStateBadge state={state} draft={draft} merged={merged} />
             {shouldShowReviewStatus(state, merged, reviewStatus) && (
               <ReviewStatusBadge status={reviewStatus} />
+            )}
+            {analysisOutdated && (
+              <Badge colorPalette="orange" variant="surface">
+                Analysis outdated
+              </Badge>
             )}
           </HStack>
           <Text fontWeight="semibold" wordBreak="break-word">

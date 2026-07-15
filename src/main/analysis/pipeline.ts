@@ -13,7 +13,11 @@ import type {
 } from "../../shared/types";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { getSecret } from "../store/secrets";
-import { getCachedAnalysis, setCachedAnalysis } from "./cache";
+import {
+  getCachedAnalysis,
+  getLatestAnalysis,
+  setCachedAnalysis,
+} from "./cache";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-opus-4-8";
@@ -234,13 +238,17 @@ function toList(value: unknown, field: string): unknown[] {
 }
 
 // Cheap lookup used by the renderer to decide between showing a cached
-// analysis and the "Analyse PR" empty state. Never calls the model.
+// analysis and the "Analyse PR" empty state. Never calls the model. When the
+// branch has moved since the last analysis, the newest analysis of an older
+// commit is returned instead of nothing — the renderer compares its headSha
+// against the live PR and labels it outdated.
 export async function getExistingAnalysis(
   repo: string,
   prNumber: number,
 ): Promise<AnalysisResult | null> {
   const detail = await getPullRequest(repo, prNumber);
-  return (await getCachedAnalysis(repo, prNumber, detail.headSha)) ?? null;
+  const current = await getCachedAnalysis(repo, prNumber, detail.headSha);
+  return current ?? (await getLatestAnalysis(repo, prNumber)) ?? null;
 }
 
 export async function analyzePullRequest(

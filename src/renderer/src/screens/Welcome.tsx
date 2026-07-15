@@ -22,9 +22,11 @@ import {
   LuGitPullRequestArrow,
   LuHistory,
   LuSettings,
+  LuSparkles,
   LuTrash2,
 } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
+import AnalyzedPanel from "../components/AnalyzedPanel";
 import PullRequestCard from "../components/PullRequestCard";
 import RecentPanel from "../components/RecentPanel";
 import RepoSidebar from "../components/RepoSidebar";
@@ -157,6 +159,9 @@ export default function Welcome({ onSelect }: Props) {
             <Tabs.Trigger value="recent">
               <LuHistory /> Recently viewed
             </Tabs.Trigger>
+            <Tabs.Trigger value="analyzed">
+              <LuSparkles /> Analysed pull requests
+            </Tabs.Trigger>
             {tab === "recent" && recent.length > 0 && (
               <Button
                 ml="auto"
@@ -253,6 +258,10 @@ export default function Welcome({ onSelect }: Props) {
 
           <Tabs.Content value="recent" flex="1" minH="0" p="0">
             <RecentPanel recent={recent} onSelect={onSelect} />
+          </Tabs.Content>
+
+          <Tabs.Content value="analyzed" flex="1" minH="0" p="0">
+            <AnalyzedPanel onSelect={onSelect} />
           </Tabs.Content>
         </Tabs.Root>
       </Flex>

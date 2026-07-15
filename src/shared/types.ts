@@ -152,6 +152,15 @@ export interface AnalysisResult {
   outOfScope: string[];
 }
 
+// A pointer to a cached analysis — just enough to look up the PR it belongs
+// to. One entry per PR (the newest analysis wins), newest first.
+export interface AnalyzedPullRequest {
+  repo: string;
+  prNumber: number;
+  headSha: string;
+  analyzedAt: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;

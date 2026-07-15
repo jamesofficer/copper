@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { AnalysisResult } from "../../shared/types";
+import type { AnalysisResult, AnalyzedPullRequest } from "../../shared/types";
 
 // Disk-backed so paid analyses survive app restarts. TODO: move to SQLite
 // once more data needs persisting.
@@ -44,6 +44,46 @@ export async function getCachedAnalysis(
 ): Promise<AnalysisResult | undefined> {
   const store = await loadCache();
   return store.get(cacheKey(repo, prNumber, headSha));
+}
+
+// The newest analysis for a PR regardless of which commit it was run on —
+// used to surface a stale-but-useful analysis after the branch moves.
+export async function getLatestAnalysis(
+  repo: string,
+  prNumber: number,
+): Promise<AnalysisResult | undefined> {
+  const store = await loadCache();
+  let latest: AnalysisResult | undefined;
+  for (const result of store.values()) {
+    if (result.repo !== repo || result.prNumber !== prNumber) continue;
+    if (!latest || result.analyzedAt > latest.analyzedAt) latest = result;
+  }
+  return latest;
+}
+
+// The cache is keyed by head SHA, so a re-analysed PR has an entry per
+// analysed commit — collapse those to one entry per PR, newest first.
+export async function listAnalyzedPullRequests(): Promise<
+  AnalyzedPullRequest[]
+> {
+  const store = await loadCache();
+  const newestByPr = new Map<string, AnalysisResult>();
+  for (const result of store.values()) {
+    const key = `${result.repo}#${result.prNumber}`;
+    const existing = newestByPr.get(key);
+    if (!existing || result.analyzedAt > existing.analyzedAt) {
+      newestByPr.set(key, result);
+    }
+  }
+
+  return [...newestByPr.values()]
+    .sort((a, b) => b.analyzedAt.localeCompare(a.analyzedAt))
+    .map(({ repo, prNumber, headSha, analyzedAt }) => ({
+      repo,
+      prNumber,
+      headSha,
+      analyzedAt,
+    }));
 }
 
 export async function setCachedAnalysis(result: AnalysisResult): Promise<void> {

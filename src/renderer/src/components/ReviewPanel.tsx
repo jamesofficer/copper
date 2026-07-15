@@ -11,12 +11,18 @@ import {
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { LuPanelRightOpen, LuSparkles } from "react-icons/lu";
+import {
+  LuPanelRightOpen,
+  LuRefreshCw,
+  LuSparkles,
+  LuTriangleAlert,
+} from "react-icons/lu";
 import type {
   PullRequest,
   RiskClaim,
   RiskSeverity,
 } from "../../../shared/types";
+import type { AskContext, AskRequest } from "../lib/askContext";
 import { getReviewPersonality } from "../lib/reviewPersonality";
 import { scrollbar } from "../lib/scrollbar";
 import AnalysisDetail from "./AnalysisDetail";
@@ -61,11 +67,17 @@ export default function ReviewPanel({ pr }: Props) {
   const [chatCollapsed, setChatCollapsed] = useState(
     () => localStorage.getItem(CHAT_COLLAPSED_KEY) === "true",
   );
+  const [askRequest, setAskRequest] = useState<AskRequest | null>(null);
   const queryClient = useQueryClient();
 
   function collapseChat(collapsed: boolean) {
     setChatCollapsed(collapsed);
     localStorage.setItem(CHAT_COLLAPSED_KEY, String(collapsed));
+  }
+
+  function askAbout(context: AskContext, question?: string) {
+    setAskRequest({ id: crypto.randomUUID(), context, question });
+    if (chatCollapsed) collapseChat(false);
   }
 
   function startChatResize(event: React.PointerEvent) {
@@ -106,6 +118,17 @@ export default function ReviewPanel({ pr }: Props) {
     enabled: Boolean(analysis),
   });
 
+  // Live detail, to spot an analysis that's behind the PR's current commit.
+  // Shares its query key with the Overview tab and recents.
+  const detailQuery = useQuery({
+    queryKey: ["pullRequest", pr.repo, pr.number],
+    queryFn: () => window.api.peekPullRequest(pr.repo, pr.number),
+  });
+  const currentHeadSha = detailQuery.data?.headSha;
+  const analysisOutdated = Boolean(
+    analysis && currentHeadSha && analysis.headSha !== currentHeadSha,
+  );
+
   const analyzeMutation = useMutation({
     mutationFn: (force: boolean) =>
       window.api.analyzePullRequest(
@@ -116,6 +139,9 @@ export default function ReviewPanel({ pr }: Props) {
       ),
     onSuccess: (result) => {
       queryClient.setQueryData(["analysis", pr.repo, pr.number], result);
+      void queryClient.invalidateQueries({
+        queryKey: ["analyzedPullRequests"],
+      });
       setSelection({ kind: "summary" });
     },
   });
@@ -182,73 +208,112 @@ export default function ReviewPanel({ pr }: Props) {
   }
 
   return (
-    <Flex h="full" minH="0">
-      <Box
-        w="300px"
-        flexShrink="0"
-        borderRightWidth="1px"
-        overflowY="auto"
-        css={scrollbar}
-      >
-        <AnalysisNav
-          analysis={analysis}
-          selection={selection}
-          onSelect={setSelection}
-        />
-      </Box>
-
-      <Box flex="1" minW="0" overflowY="auto" css={scrollbar}>
-        <AnalysisDetail
-          analysis={analysis}
-          files={filesQuery.data}
-          selection={selection}
-          onReanalyze={() => analyzeMutation.mutate(true)}
-          reanalyzing={analyzeMutation.isPending}
-        />
-      </Box>
-
-      {chatCollapsed ? (
-        <Flex
-          as="button"
-          onClick={() => collapseChat(false)}
-          direction="column"
-          alignItems="center"
-          gap="3"
-          w="9"
-          py="3"
+    <Flex direction="column" h="full" minH="0">
+      {analysisOutdated && (
+        <HStack
+          gap="2"
+          px="4"
+          py="2"
+          borderBottomWidth="1px"
+          bg="bg.subtle"
           flexShrink="0"
-          borderLeftWidth="1px"
-          cursor="pointer"
-          color="fg.muted"
-          _hover={{ bg: "bg.subtle" }}
-          title="Expand chat"
         >
-          <LuPanelRightOpen size={14} />
-          <Text
-            fontSize="2xs"
-            fontWeight="semibold"
-            textTransform="uppercase"
-            letterSpacing="wider"
-            style={{ writingMode: "vertical-rl" }}
-          >
-            Ask
-          </Text>
-        </Flex>
-      ) : (
-        <Flex flexShrink="0" style={{ width: chatWidth }}>
-          <Box
-            w="1"
-            flexShrink="0"
-            cursor="col-resize"
-            onPointerDown={startChatResize}
-            _hover={{ bg: "border.emphasized" }}
-            transition="background 0.15s"
-          />
-          <Box flex="1" minW="0" borderLeftWidth="1px">
-            <ChatPanel pr={pr} onCollapse={() => collapseChat(true)} />
+          <Box color="orange.fg" flexShrink="0">
+            <LuTriangleAlert size={14} />
           </Box>
-        </Flex>
+          <Text fontSize="sm" color="fg.muted">
+            This analysis is from an older commit (
+            {analysis.headSha.slice(0, 7)}) — the PR has new commits since, so
+            line references may be off.
+          </Text>
+          <Button
+            size="2xs"
+            variant="outline"
+            ml="auto"
+            flexShrink="0"
+            onClick={() => analyzeMutation.mutate(true)}
+            loading={analyzeMutation.isPending}
+            loadingText="Re-analysing…"
+          >
+            <LuRefreshCw /> Re-analyse
+          </Button>
+        </HStack>
       )}
+
+      <Flex flex="1" minH="0">
+        <Box
+          w="300px"
+          flexShrink="0"
+          borderRightWidth="1px"
+          overflowY="auto"
+          css={scrollbar}
+        >
+          <AnalysisNav
+            analysis={analysis}
+            selection={selection}
+            onSelect={setSelection}
+          />
+        </Box>
+
+        <Box flex="1" minW="0" overflowY="auto" css={scrollbar}>
+          <AnalysisDetail
+            analysis={analysis}
+            files={filesQuery.data}
+            selection={selection}
+            onReanalyze={() => analyzeMutation.mutate(true)}
+            reanalyzing={analyzeMutation.isPending}
+            onAskAbout={askAbout}
+          />
+        </Box>
+
+        {chatCollapsed ? (
+          <Flex
+            as="button"
+            onClick={() => collapseChat(false)}
+            direction="column"
+            alignItems="center"
+            gap="3"
+            w="9"
+            py="3"
+            flexShrink="0"
+            borderLeftWidth="1px"
+            cursor="pointer"
+            color="fg.muted"
+            _hover={{ bg: "bg.subtle" }}
+            title="Expand chat"
+          >
+            <LuPanelRightOpen size={14} />
+            <Text
+              fontSize="2xs"
+              fontWeight="semibold"
+              textTransform="uppercase"
+              letterSpacing="wider"
+              style={{ writingMode: "vertical-rl" }}
+            >
+              Ask
+            </Text>
+          </Flex>
+        ) : (
+          <Flex flexShrink="0" style={{ width: chatWidth }}>
+            <Box
+              w="1"
+              flexShrink="0"
+              cursor="col-resize"
+              onPointerDown={startChatResize}
+              _hover={{ bg: "border.emphasized" }}
+              transition="background 0.15s"
+            />
+            <Box flex="1" minW="0" borderLeftWidth="1px">
+              <ChatPanel
+                pr={pr}
+                onCollapse={() => collapseChat(true)}
+                askRequest={askRequest}
+                onClearAskRequest={() => setAskRequest(null)}
+              />
+            </Box>
+          </Flex>
+        )}
+      </Flex>
     </Flex>
   );
 }

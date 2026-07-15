@@ -2,15 +2,23 @@ import {
   Badge,
   Box,
   Button,
+  Group,
   Heading,
   HStack,
+  IconButton,
+  Menu,
+  Portal,
   Spinner,
   Text,
   VStack,
   Wrap,
 } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { LuRefreshCw } from "react-icons/lu";
+import {
+  LuChevronDown,
+  LuMessageCircleQuestion,
+  LuRefreshCw,
+} from "react-icons/lu";
 import type {
   AnalysisClaim,
   AnalysisResult,
@@ -18,6 +26,11 @@ import type {
   ChangeGroup,
   PullRequestFile,
 } from "../../../shared/types";
+import {
+  type AskContext,
+  claimAskContext,
+  suggestedQuestions,
+} from "../lib/askContext";
 import type { AnalysisSelection } from "./AnalysisNav";
 import FileDiffCard from "./FileDiffCard";
 import Markdown from "./Markdown";
@@ -30,6 +43,7 @@ interface Props {
   selection: AnalysisSelection;
   onReanalyze(): void;
   reanalyzing: boolean;
+  onAskAbout(context: AskContext, question?: string): void;
 }
 
 type FileMap = Map<string, PullRequestFile>;
@@ -176,14 +190,18 @@ function formatCost(usage: AnalysisUsage): string {
 
 function ClaimPane({
   claim,
+  label,
   badge,
   files,
   fileByPath,
+  onAskAbout,
 }: {
   claim: AnalysisClaim;
+  label: AskContext["label"];
   badge?: ReactNode;
   files: PullRequestFile[] | undefined;
   fileByPath: FileMap;
+  onAskAbout(context: AskContext, question?: string): void;
 }) {
   const paths = [...new Set(claim.anchors.map((anchor) => anchor.path))];
   return (
@@ -195,6 +213,44 @@ function ClaimPane({
         </HStack>
         <Markdown fontSize="md">{claim.text}</Markdown>
         <AnchorChips claim={claim} />
+        <Box>
+          <Group attached>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => onAskAbout(claimAskContext(label, claim))}
+            >
+              <LuMessageCircleQuestion /> Ask about this
+            </Button>
+            <Menu.Root
+              positioning={{ placement: "bottom-start" }}
+              onSelect={(details) =>
+                onAskAbout(claimAskContext(label, claim), details.value)
+              }
+            >
+              <Menu.Trigger asChild>
+                <IconButton
+                  aria-label="Suggested questions"
+                  size="xs"
+                  variant="outline"
+                >
+                  <LuChevronDown />
+                </IconButton>
+              </Menu.Trigger>
+              <Portal>
+                <Menu.Positioner>
+                  <Menu.Content>
+                    {suggestedQuestions[label].map((suggestion) => (
+                      <Menu.Item key={suggestion} value={suggestion}>
+                        {suggestion}
+                      </Menu.Item>
+                    ))}
+                  </Menu.Content>
+                </Menu.Positioner>
+              </Portal>
+            </Menu.Root>
+          </Group>
+        </Box>
       </VStack>
       {paths.length > 0 && (
         <>
@@ -257,6 +313,7 @@ export default function AnalysisDetail({
   selection,
   onReanalyze,
   reanalyzing,
+  onAskAbout,
 }: Props) {
   const fileByPath: FileMap = new Map(
     (files ?? []).map((file) => [file.path, file] as const),
@@ -269,9 +326,11 @@ export default function AnalysisDetail({
         return (
           <ClaimPane
             claim={claim}
+            label="risk"
             badge={<RiskSeverityBadge severity={claim.severity} />}
             files={files}
             fileByPath={fileByPath}
+            onAskAbout={onAskAbout}
           />
         );
       }
@@ -280,7 +339,13 @@ export default function AnalysisDetail({
       const claim = analysis.behaviorChanges[selection.index];
       if (claim) {
         return (
-          <ClaimPane claim={claim} files={files} fileByPath={fileByPath} />
+          <ClaimPane
+            claim={claim}
+            label="behavior change"
+            files={files}
+            fileByPath={fileByPath}
+            onAskAbout={onAskAbout}
+          />
         );
       }
     }

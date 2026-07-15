@@ -1,5 +1,6 @@
 import type {
   AnalysisResult,
+  AnalyzedPullRequest,
   ChatMessage,
   KeyTestResult,
   PullRequest,
@@ -42,6 +43,7 @@ export interface IpcApi {
     body: string,
   ): Promise<PullRequestComment>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
+  listAnalyzedPullRequests(): Promise<AnalyzedPullRequest[]>;
   analyzePullRequest(
     repo: string,
     prNumber: number,
@@ -94,6 +96,7 @@ export const ipcChannels = [
   "listPullRequestComments",
   "addPullRequestComment",
   "getAnalysis",
+  "listAnalyzedPullRequests",
   "analyzePullRequest",
   "askQuestion",
   "getChatHistory",
