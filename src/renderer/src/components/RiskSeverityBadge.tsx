@@ -2,9 +2,9 @@ import { Badge } from "@chakra-ui/react";
 import type { RiskSeverity } from "../../../shared/types";
 
 const severityMeta: Record<RiskSeverity, { label: string; palette: string }> = {
-  high: { label: "High risk", palette: "red" },
-  medium: { label: "Medium risk", palette: "orange" },
-  low: { label: "Low risk", palette: "yellow" },
+  high: { label: "High", palette: "red" },
+  medium: { label: "Medium", palette: "orange" },
+  low: { label: "Low", palette: "yellow" },
 };
 
 // Nav-list dot colours, matching the chip palettes. Undefined severity
