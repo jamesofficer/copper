@@ -12,6 +12,7 @@ import {
   listRepositories,
   removeRepository,
 } from "../repo/local";
+import { warmUpPullRequest } from "../repo/workspace";
 import { clearKey, getKeyStatus, saveKey } from "../settings/keys";
 
 const handlers: IpcApi = {
@@ -19,7 +20,12 @@ const handlers: IpcApi = {
   addRepository: () => addRepository(),
   removeRepository: (path) => removeRepository(path),
   listPullRequests: (repo) => listReviewRequests(repo),
-  getPullRequest: (repo, prNumber) => getPullRequest(repo, prNumber),
+  getPullRequest: async (repo, prNumber) => {
+    const detail = await getPullRequest(repo, prNumber);
+    // Best-effort background clone/fetch so repo context is ready for the chat.
+    void warmUpPullRequest(repo, prNumber, detail.headSha);
+    return detail;
+  },
   listPullRequestFiles: (repo, prNumber) =>
     listPullRequestFiles(repo, prNumber),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),

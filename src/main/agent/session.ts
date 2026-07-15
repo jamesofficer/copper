@@ -13,6 +13,7 @@ import { getCachedAnalysis } from "../analysis/cache";
 import { buildPullRequestContext } from "../analysis/pipeline";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { getSecret } from "../store/secrets";
+import { chatTools, runTool, type ToolContext } from "./tools";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const CHAT_MODEL = "claude-sonnet-5";
@@ -21,23 +22,24 @@ const MAX_OUTPUT_TOKENS = 4096;
 const MAX_HISTORY = 20;
 // Messages kept on disk per PR.
 const MAX_STORED = 100;
+// Tool-use rounds per question before the model is forced to answer.
+const MAX_ITERATIONS = 8;
 
 const configDir = join(homedir(), ".pr-reviewer");
 const chatsPath = join(configDir, "chats.json");
 
 const SYSTEM_PROMPT = `You are a code-review assistant inside a PR review app. The reviewer is reading a pull request and asks you questions about it.
 
-You can see: the PR's metadata and description, the full diff (some patches may be truncated or omitted), and — if present — a prior analysis of the PR (summary, change groups, risks). You cannot see the rest of the repository, run code, or browse. If a question needs context beyond the diff (e.g. "who else calls this function?"), say so plainly instead of guessing.
+You can see the PR's metadata and description, the full diff (some patches may be truncated or omitted), and — if present — a prior analysis of the PR (summary, change groups, risks). You also have tools that read the repository at the exact commit under review: read_file, list_files, grep_repo, and git_log. Use them whenever a question needs context beyond the diff — find callers, read surrounding code, check a file's history — instead of guessing. Prefer a few targeted calls over many broad ones. If a tool fails (the workspace can be unavailable), answer from the diff and say what you couldn't verify.
 
-Answer in GitHub-flavored markdown. Be direct and concise — short paragraphs, code references like \`path/to/file.ts:120\` when pointing at the diff. Never invent code or behavior the diff does not show.`;
+Answer in GitHub-flavored markdown. Be direct and concise — short paragraphs, code references like \`path/to/file.ts:120\`. Never claim code or behavior you haven't seen in the diff or through the tools.`;
 
 interface Session {
   headSha: string;
   context: string;
 }
 
-// One context per PR, alive for the app run. Rebuilt if the PR gets new
-// commits; TODO: repo-context tools (read_file, grep_repo, git_log) later.
+// One context per PR, alive for the app run. Rebuilt if the PR gets new commits.
 const sessions = new Map<string, Session>();
 
 // Chat histories are disk-backed so conversations survive restarts.
@@ -100,7 +102,7 @@ function buildContext(
 }
 
 async function getSession(repo: string, prNumber: number): Promise<Session> {
-  const key = `${repo}#${prNumber}`;
+  const key = chatKey(repo, prNumber);
   const detail = await getPullRequest(repo, prNumber);
   const existing = sessions.get(key);
   if (existing && existing.headSha === detail.headSha) return existing;
@@ -121,19 +123,71 @@ function sendChunk(chunk: ChatChunk): void {
   }
 }
 
+interface TextBlock {
+  type: "text";
+  text: string;
+  cache_control?: { type: "ephemeral" };
+}
+
+interface ToolUseBlock {
+  type: "tool_use";
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+interface ToolResultBlock {
+  type: "tool_result";
+  tool_use_id: string;
+  content: string;
+  is_error?: boolean;
+  cache_control?: { type: "ephemeral" };
+}
+
+type ContentBlock = TextBlock | ToolUseBlock | ToolResultBlock;
+
+interface ApiMessage {
+  role: "user" | "assistant";
+  content: string | ContentBlock[];
+}
+
 interface StreamEvent {
   type: string;
-  delta?: { type: string; text?: string };
+  index?: number;
+  content_block?: { type: string; id?: string; name?: string };
+  delta?: {
+    type: string;
+    text?: string;
+    partial_json?: string;
+    stop_reason?: string | null;
+  };
   error?: { message?: string };
 }
 
-async function streamAnswer(
+interface TurnResult {
+  text: string;
+  toolUses: ToolUseBlock[];
+  stopReason: string | null;
+}
+
+function parseToolInput(json: string): Record<string, unknown> {
+  try {
+    const parsed: unknown = JSON.parse(json || "{}");
+    return typeof parsed === "object" && parsed !== null
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+// One streamed request: text deltas go to onText as they arrive; any tool
+// calls the model makes are collected and returned with the stop reason.
+async function streamTurn(
   apiKey: string,
-  context: string,
-  history: ChatMessage[],
-  question: string,
+  body: Record<string, unknown>,
   onText: (text: string) => void,
-): Promise<string> {
+): Promise<TurnResult> {
   const res = await fetch(ANTHROPIC_API, {
     method: "POST",
     headers: {
@@ -141,25 +195,7 @@ async function streamAnswer(
       "anthropic-version": "2023-06-01",
       "content-type": "application/json",
     },
-    body: JSON.stringify({
-      model: CHAT_MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      stream: true,
-      system: [
-        { type: "text", text: SYSTEM_PROMPT },
-        // The big diff block is identical across questions — cache it so
-        // follow-ups don't re-pay for the whole context.
-        {
-          type: "text",
-          text: context,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [
-        ...history.slice(-MAX_HISTORY),
-        { role: "user", content: question },
-      ],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (res.status === 401) {
@@ -170,8 +206,8 @@ async function streamAnswer(
   if (!res.ok) {
     let detail = "";
     try {
-      const body = (await res.json()) as { error?: { message?: string } };
-      detail = body.error?.message ?? "";
+      const errorBody = (await res.json()) as { error?: { message?: string } };
+      detail = errorBody.error?.message ?? "";
     } catch {
       // Non-JSON error body; fall back to the status code.
     }
@@ -188,7 +224,12 @@ async function streamAnswer(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  let answer = "";
+  let text = "";
+  let stopReason: string | null = null;
+  const pendingTools = new Map<
+    number,
+    { id: string; name: string; json: string }
+  >();
 
   while (true) {
     const { done, value } = await reader.read();
@@ -200,21 +241,63 @@ async function streamAnswer(
     for (const line of lines) {
       if (!line.startsWith("data: ")) continue;
       const event = JSON.parse(line.slice(6)) as StreamEvent;
+
       if (event.type === "error") {
         throw new Error(event.error?.message ?? "The answer stream failed.");
       }
       if (
-        event.type === "content_block_delta" &&
-        event.delta?.type === "text_delta" &&
-        event.delta.text
+        event.type === "content_block_start" &&
+        event.content_block?.type === "tool_use" &&
+        event.index !== undefined
       ) {
-        answer += event.delta.text;
-        onText(event.delta.text);
+        pendingTools.set(event.index, {
+          id: event.content_block.id ?? "",
+          name: event.content_block.name ?? "",
+          json: "",
+        });
+      }
+      if (event.type === "content_block_delta" && event.delta) {
+        if (event.delta.type === "text_delta" && event.delta.text) {
+          text += event.delta.text;
+          onText(event.delta.text);
+        }
+        if (
+          event.delta.type === "input_json_delta" &&
+          event.index !== undefined
+        ) {
+          const pending = pendingTools.get(event.index);
+          if (pending) pending.json += event.delta.partial_json ?? "";
+        }
+      }
+      if (event.type === "message_delta" && event.delta?.stop_reason) {
+        stopReason = event.delta.stop_reason;
       }
     }
   }
 
-  return answer;
+  const toolUses: ToolUseBlock[] = [...pendingTools.values()].map((tool) => ({
+    type: "tool_use",
+    id: tool.id,
+    name: tool.name,
+    input: parseToolInput(tool.json),
+  }));
+  return { text, toolUses, stopReason };
+}
+
+// Keep a single cache breakpoint on the newest tool results, so each loop
+// iteration re-reads the growing conversation from Anthropic's prompt cache
+// instead of re-paying for all of it.
+function moveCacheBreakpoint(messages: ApiMessage[]): void {
+  let last: TextBlock | ToolResultBlock | null = null;
+  for (const message of messages) {
+    if (!Array.isArray(message.content)) continue;
+    for (const block of message.content) {
+      if (block.type === "tool_use") continue;
+      if (block.cache_control) delete block.cache_control;
+      last = block;
+    }
+  }
+  if (last) last.cache_control = { type: "ephemeral" };
 }
 
 export async function askQuestion(
@@ -232,22 +315,88 @@ export async function askQuestion(
   const session = await getSession(repo, prNumber);
   const store = await loadHistories();
   const history = store.get(chatKey(repo, prNumber)) ?? [];
+  const ctx: ToolContext = { repo, prNumber, headSha: session.headSha };
 
-  const answer = await streamAnswer(
-    apiKey,
-    session.context,
-    history,
-    question,
-    (text) => sendChunk({ repo, prNumber, text }),
-  );
+  // Stored history is plain text (tool activity is not replayed across
+  // questions); within this question the full tool conversation is kept.
+  const messages: ApiMessage[] = [
+    ...history
+      .slice(-MAX_HISTORY)
+      .map((message): ApiMessage => ({ ...message })),
+    { role: "user", content: question },
+  ];
 
+  const system = [
+    { type: "text", text: SYSTEM_PROMPT },
+    // The big diff block is identical across questions — cache it so
+    // follow-ups don't re-pay for the whole context.
+    {
+      type: "text",
+      text: session.context,
+      cache_control: { type: "ephemeral" },
+    },
+  ];
+
+  let answer = "";
+  for (let iteration = 0; iteration < MAX_ITERATIONS; iteration++) {
+    // Final round goes out without tools so the model must answer in text.
+    const useTools = iteration < MAX_ITERATIONS - 1;
+    const turn = await streamTurn(
+      apiKey,
+      {
+        model: CHAT_MODEL,
+        max_tokens: MAX_OUTPUT_TOKENS,
+        stream: true,
+        system,
+        tools: useTools ? chatTools : undefined,
+        messages,
+      },
+      (text) => sendChunk({ repo, prNumber, text }),
+    );
+
+    if (turn.text) answer += (answer ? "\n\n" : "") + turn.text;
+    if (turn.stopReason !== "tool_use" || turn.toolUses.length === 0) break;
+
+    const assistantContent: ContentBlock[] = [
+      ...(turn.text ? [{ type: "text", text: turn.text } as TextBlock] : []),
+      ...turn.toolUses,
+    ];
+    messages.push({ role: "assistant", content: assistantContent });
+
+    const results: ToolResultBlock[] = [];
+    for (const use of turn.toolUses) {
+      try {
+        results.push({
+          type: "tool_result",
+          tool_use_id: use.id,
+          content: await runTool(ctx, use.name, use.input),
+        });
+      } catch (cause) {
+        results.push({
+          type: "tool_result",
+          tool_use_id: use.id,
+          content:
+            cause instanceof Error ? cause.message : "The tool call failed.",
+          is_error: true,
+        });
+      }
+    }
+    messages.push({ role: "user", content: results });
+    moveCacheBreakpoint(messages);
+
+    // Visual break in the streamed bubble between pre-tool and post-tool text.
+    if (turn.text) sendChunk({ repo, prNumber, text: "\n\n" });
+  }
+
+  const finalAnswer =
+    answer || "I couldn't produce an answer — please try asking again.";
   const updated = [
     ...history,
     { role: "user" as const, content: question },
-    { role: "assistant" as const, content: answer },
+    { role: "assistant" as const, content: finalAnswer },
   ].slice(-MAX_STORED);
   store.set(chatKey(repo, prNumber), updated);
   await saveHistories(store);
 
-  return answer;
+  return finalAnswer;
 }
