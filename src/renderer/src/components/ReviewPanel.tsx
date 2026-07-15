@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuSparkles } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
+import { getReviewPersonality } from "../lib/reviewPersonality";
 import { scrollbar } from "../lib/scrollbar";
 import AnalysisDetail from "./AnalysisDetail";
 import AnalysisNav, { type AnalysisSelection } from "./AnalysisNav";
@@ -73,7 +74,8 @@ export default function ReviewPanel({ pr }: Props) {
   });
 
   const analyzeMutation = useMutation({
-    mutationFn: () => window.api.analyzePullRequest(pr.repo, pr.number),
+    mutationFn: () =>
+      window.api.analyzePullRequest(pr.repo, pr.number, getReviewPersonality()),
     onSuccess: (result) => {
       queryClient.setQueryData(["analysis", pr.repo, pr.number], result);
       setSelection({ kind: "summary" });

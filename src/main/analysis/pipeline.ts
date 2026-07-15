@@ -7,6 +7,7 @@ import type {
   DiffAnchor,
   PullRequestDetail,
   PullRequestFile,
+  ReviewPersonality,
   RiskClaim,
   RiskSeverity,
 } from "../../shared/types";
@@ -52,6 +53,30 @@ Rules:
 - Anchors use line numbers in the NEW version of the file, derived from the @@ hunk headers. Use null for a whole-file claim.
 - Text fields render as GitHub-flavored markdown. Tag fenced code blocks with a language (\`\`\`ts, \`\`\`diff, …) so they get syntax highlighting.
 - Never claim anything the diff does not show. If a patch is truncated or omitted, say less rather than guessing.`;
+
+// Voice presets appended to the system prompt. They may only change the
+// wording of text fields — never what gets reported, the groups, anchors,
+// severities, or list sizes.
+const PERSONALITY_PROMPTS: Record<ReviewPersonality, string> = {
+  standard: "",
+  technical:
+    "Write for a staff-level engineer who knows this stack deeply. Use precise technical vocabulary, name the exact APIs, data structures, and algorithms involved, and skip explanations of standard concepts. Density over accessibility.",
+  non_technical:
+    "Write for a non-engineer, like a product manager. Explain what each change means for the product and its users. Avoid jargon entirely; when a technical term is unavoidable, explain it in everyday words the first time it appears.",
+  simplified:
+    "Use short sentences and everyday words, the way you'd explain things to a developer in their first week. One idea per sentence. Prefer concrete examples over abstract descriptions.",
+  grug: 'Write in the voice of the grug-brained developer (grugbrain.dev): simple caveman speak, lowercase, third person — "grug see big function, grug worry", "complexity very, very bad". The humour must never soften or hide a finding: grug still spot every danger and say it plain.',
+  mentor:
+    "Write like a patient senior engineer mentoring the reviewer. For each observation, explain why it matters and name the underlying pattern or principle, so the reviewer learns something they can reuse on future reviews.",
+  concise:
+    "Be as brief as possible. Short declarative sentences, no filler, no restating what the code makes obvious. Cut words, never content — every finding is still listed.",
+};
+
+function buildSystemPrompt(personality: ReviewPersonality): string {
+  const voice = PERSONALITY_PROMPTS[personality];
+  if (!voice) return SYSTEM_PROMPT;
+  return `${SYSTEM_PROMPT}\n\nVoice — applies only to the wording of text fields (summary, group stories, risk and behavior-change text, outOfScope). It never changes what you report or how the rules above are applied:\n${voice}`;
+}
 
 // The schemas follow the strict-mode subset of JSON Schema: every object sets
 // additionalProperties: false, lists all properties as required, and nullable
@@ -198,6 +223,7 @@ export async function getExistingAnalysis(
 export async function analyzePullRequest(
   repo: string,
   prNumber: number,
+  personality: ReviewPersonality = "standard",
 ): Promise<AnalysisResult> {
   const apiKey = await getSecret("anthropic");
   if (!apiKey) {
@@ -214,6 +240,7 @@ export async function analyzePullRequest(
   const { raw, usage } = await requestAnalysis(
     apiKey,
     buildPullRequestContext(detail, files),
+    personality,
   );
   const result = toAnalysisResult(raw, detail, files, usage);
   await setCachedAnalysis(result);
@@ -282,6 +309,7 @@ export function buildPullRequestContext(
 async function requestAnalysis(
   apiKey: string,
   prompt: string,
+  personality: ReviewPersonality,
 ): Promise<{ raw: RawAnalysis; usage: AnalysisUsage | undefined }> {
   const res = await fetch(ANTHROPIC_API, {
     method: "POST",
@@ -294,7 +322,7 @@ async function requestAnalysis(
     body: JSON.stringify({
       model: MODEL,
       max_tokens: MAX_OUTPUT_TOKENS,
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(personality),
       messages: [{ role: "user", content: prompt }],
       tools: [analysisTool],
       tool_choice: { type: "tool", name: "report_analysis" },

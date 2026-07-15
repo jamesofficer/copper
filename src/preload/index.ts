@@ -26,8 +26,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("addPullRequestComment", repo, prNumber, body),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),
-  analyzePullRequest: (repo, prNumber) =>
-    ipcRenderer.invoke("analyzePullRequest", repo, prNumber),
+  analyzePullRequest: (repo, prNumber, personality) =>
+    ipcRenderer.invoke("analyzePullRequest", repo, prNumber, personality),
   askQuestion: (repo, prNumber, question) =>
     ipcRenderer.invoke("askQuestion", repo, prNumber, question),
   getChatHistory: (repo, prNumber) =>

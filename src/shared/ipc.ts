@@ -8,6 +8,7 @@ import type {
   PullRequestDetail,
   PullRequestFile,
   Repository,
+  ReviewPersonality,
   ReviewVerdict,
   SecretProvider,
   SecretsStatus,
@@ -41,7 +42,11 @@ export interface IpcApi {
     body: string,
   ): Promise<PullRequestComment>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
-  analyzePullRequest(repo: string, prNumber: number): Promise<AnalysisResult>;
+  analyzePullRequest(
+    repo: string,
+    prNumber: number,
+    personality: ReviewPersonality,
+  ): Promise<AnalysisResult>;
   askQuestion(
     repo: string,
     prNumber: number,

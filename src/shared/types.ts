@@ -54,6 +54,20 @@ export interface PullRequestDetail {
 // Mirrors GitHub's review events: comment, approve, or request changes.
 export type ReviewVerdict = "comment" | "approve" | "request_changes";
 
+// The voice the analysis text is written in. Changes only the wording of an
+// analysis, never what it reports.
+export const reviewPersonalities = [
+  "standard",
+  "technical",
+  "non_technical",
+  "simplified",
+  "grug",
+  "mentor",
+  "concise",
+] as const;
+
+export type ReviewPersonality = (typeof reviewPersonalities)[number];
+
 // A conversation comment on the PR itself (GitHub calls these issue
 // comments) — not an inline review comment on a diff line.
 export interface PullRequestComment {
