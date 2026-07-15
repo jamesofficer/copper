@@ -3,6 +3,7 @@ import type {
   PullRequest,
   PullRequestDetail,
   PullRequestFile,
+  ReviewVerdict,
 } from "../../shared/types";
 import { getGitHubToken } from "./auth";
 
@@ -33,14 +34,21 @@ interface GitHubPullDetail extends GitHubPullSummary {
   updated_at: string;
 }
 
-async function githubFetch<T>(token: string, path: string): Promise<T> {
+async function githubFetch<T>(
+  token: string,
+  path: string,
+  init?: { method: string; body: unknown },
+): Promise<T> {
   const res = await fetch(`${API}${path}`, {
+    method: init?.method ?? "GET",
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
       "User-Agent": "pr-reviewer",
       "X-GitHub-Api-Version": "2022-11-28",
+      ...(init ? { "Content-Type": "application/json" } : {}),
     },
+    body: init ? JSON.stringify(init.body) : undefined,
   });
 
   if (res.status === 401) {
@@ -52,10 +60,33 @@ async function githubFetch<T>(token: string, path: string): Promise<T> {
     );
   }
   if (!res.ok) {
-    throw new Error(`GitHub returned status ${res.status}.`);
+    const detail = await githubErrorDetail(res);
+    throw new Error(
+      detail ? `GitHub: ${detail}` : `GitHub returned status ${res.status}.`,
+    );
   }
 
   return res.json() as Promise<T>;
+}
+
+// GitHub's error bodies put the useful text in `message`, and validation
+// failures (422) often carry the real reason in `errors` instead — e.g.
+// "Can not approve your own pull request".
+async function githubErrorDetail(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as {
+      message?: string;
+      errors?: Array<string | { message?: string }>;
+    };
+    const errors = (body.errors ?? [])
+      .map((error) =>
+        typeof error === "string" ? error : (error.message ?? ""),
+      )
+      .filter(Boolean);
+    return errors.join(" ") || body.message || "";
+  } catch {
+    return "";
+  }
 }
 
 export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
@@ -197,4 +228,30 @@ export async function listPullRequestFiles(
     deletions: file.deletions,
     patch: file.patch ?? null,
   }));
+}
+
+const reviewEvents: Record<ReviewVerdict, string> = {
+  comment: "COMMENT",
+  approve: "APPROVE",
+  request_changes: "REQUEST_CHANGES",
+};
+
+export async function submitReview(
+  repo: string,
+  prNumber: number,
+  verdict: ReviewVerdict,
+  body: string,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to submit reviews.");
+  }
+
+  await githubFetch(token, `/repos/${repo}/pulls/${prNumber}/reviews`, {
+    method: "POST",
+    body: {
+      event: reviewEvents[verdict],
+      ...(body ? { body } : {}),
+    },
+  });
 }

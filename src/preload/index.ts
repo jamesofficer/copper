@@ -22,6 +22,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("askQuestion", repo, prNumber, question),
   getChatHistory: (repo, prNumber) =>
     ipcRenderer.invoke("getChatHistory", repo, prNumber),
+  submitReview: (repo, prNumber, verdict, body) =>
+    ipcRenderer.invoke("submitReview", repo, prNumber, verdict, body),
   getSecretsStatus: () => ipcRenderer.invoke("getSecretsStatus"),
   saveSecret: (provider, value) =>
     ipcRenderer.invoke("saveSecret", provider, value),

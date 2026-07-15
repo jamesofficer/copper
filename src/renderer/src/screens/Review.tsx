@@ -4,6 +4,7 @@ import type { PullRequest } from "../../../shared/types";
 import ChangesView from "../components/ChangesView";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReviewPanel from "../components/ReviewPanel";
+import SubmitReviewDialog from "../components/SubmitReviewDialog";
 
 interface Props {
   pr: PullRequest;
@@ -13,16 +14,24 @@ interface Props {
 export default function Review({ pr, onBack }: Props) {
   return (
     <Flex direction="column" h="100vh">
-      <HStack gap="3" px="4" py="3" borderBottomWidth="1px" flexShrink="0">
-        <Button variant="ghost" size="sm" onClick={onBack}>
+      <HStack
+        gap="3"
+        px="4"
+        py="3"
+        borderBottomWidth="1px"
+        flexShrink="0"
+        align="center"
+      >
+        <Button variant="outline" size="xs" onClick={onBack}>
           <LuArrowLeft /> Back
         </Button>
-        <Heading size="md" truncate>
+        <Heading size="lg" truncate>
           {pr.title}
         </Heading>
-        <Text fontFamily="mono" fontSize="sm" color="fg.muted">
+        <Text fontFamily="mono" fontSize="sm" color="fg.muted" flex="1">
           {pr.repo}#{pr.number}
         </Text>
+        <SubmitReviewDialog pr={pr} />
       </HStack>
 
       <Tabs.Root

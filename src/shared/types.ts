@@ -45,6 +45,9 @@ export interface PullRequestDetail {
   url: string;
 }
 
+// Mirrors GitHub's review events: comment, approve, or request changes.
+export type ReviewVerdict = "comment" | "approve" | "request_changes";
+
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 
 export interface PullRequestFile {

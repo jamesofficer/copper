@@ -6,6 +6,7 @@ import type {
   PullRequestDetail,
   PullRequestFile,
   Repository,
+  ReviewVerdict,
   SecretProvider,
   SecretsStatus,
 } from "./types";
@@ -28,6 +29,12 @@ export interface IpcApi {
     question: string,
   ): Promise<string>;
   getChatHistory(repo: string, prNumber: number): Promise<ChatMessage[]>;
+  submitReview(
+    repo: string,
+    prNumber: number,
+    verdict: ReviewVerdict,
+    body: string,
+  ): Promise<void>;
   getSecretsStatus(): Promise<SecretsStatus>;
   saveSecret(provider: SecretProvider, value: string): Promise<KeyTestResult>;
   clearSecret(provider: SecretProvider): Promise<SecretsStatus>;
@@ -60,6 +67,7 @@ export const ipcChannels = [
   "analyzePullRequest",
   "askQuestion",
   "getChatHistory",
+  "submitReview",
   "getSecretsStatus",
   "saveSecret",
   "clearSecret",

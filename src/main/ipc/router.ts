@@ -6,6 +6,7 @@ import {
   getPullRequest,
   listPullRequestFiles,
   listReviewRequests,
+  submitReview,
 } from "../github/client";
 import {
   addRepository,
@@ -33,6 +34,8 @@ const handlers: IpcApi = {
   askQuestion: (repo, prNumber, question) =>
     askQuestion(repo, prNumber, question),
   getChatHistory: (repo, prNumber) => getChatHistory(repo, prNumber),
+  submitReview: (repo, prNumber, verdict, body) =>
+    submitReview(repo, prNumber, verdict, body),
   getSecretsStatus: () => getKeyStatus(),
   saveSecret: (provider, value) => saveKey(provider, value),
   clearSecret: (provider) => clearKey(provider),
