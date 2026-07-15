@@ -7,10 +7,12 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { Toaster } from "./components/ui/toaster";
 import { applyAccent, getAccent } from "./lib/accent";
+import { applyColorMode, getColorMode } from "./lib/colorMode";
 import { persistOptions, queryClient } from "./lib/queryClient";
 import { system } from "./theme";
 
 applyAccent(getAccent());
+applyColorMode(getColorMode());
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element #root not found");
