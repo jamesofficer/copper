@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { LuSparkles } from "react-icons/lu";
+import { LuPanelRightOpen, LuSparkles } from "react-icons/lu";
 import type {
   PullRequest,
   RiskClaim,
@@ -28,6 +28,7 @@ interface Props {
 }
 
 const CHAT_WIDTH_KEY = "chatPanelWidth";
+const CHAT_COLLAPSED_KEY = "chatPanelCollapsed";
 const CHAT_MIN_WIDTH = 280;
 const CHAT_MAX_WIDTH = 640;
 
@@ -57,7 +58,15 @@ export default function ReviewPanel({ pr }: Props) {
     kind: "summary",
   });
   const [chatWidth, setChatWidth] = useState(storedChatWidth);
+  const [chatCollapsed, setChatCollapsed] = useState(
+    () => localStorage.getItem(CHAT_COLLAPSED_KEY) === "true",
+  );
   const queryClient = useQueryClient();
+
+  function collapseChat(collapsed: boolean) {
+    setChatCollapsed(collapsed);
+    localStorage.setItem(CHAT_COLLAPSED_KEY, String(collapsed));
+  }
 
   function startChatResize(event: React.PointerEvent) {
     event.preventDefault();
@@ -198,19 +207,48 @@ export default function ReviewPanel({ pr }: Props) {
         />
       </Box>
 
-      <Flex flexShrink="0" style={{ width: chatWidth }}>
-        <Box
-          w="1"
+      {chatCollapsed ? (
+        <Flex
+          as="button"
+          onClick={() => collapseChat(false)}
+          direction="column"
+          alignItems="center"
+          gap="3"
+          w="9"
+          py="3"
           flexShrink="0"
-          cursor="col-resize"
-          onPointerDown={startChatResize}
-          _hover={{ bg: "border.emphasized" }}
-          transition="background 0.15s"
-        />
-        <Box flex="1" minW="0" borderLeftWidth="1px">
-          <ChatPanel pr={pr} />
-        </Box>
-      </Flex>
+          borderLeftWidth="1px"
+          cursor="pointer"
+          color="fg.muted"
+          _hover={{ bg: "bg.subtle" }}
+          title="Expand chat"
+        >
+          <LuPanelRightOpen size={14} />
+          <Text
+            fontSize="2xs"
+            fontWeight="semibold"
+            textTransform="uppercase"
+            letterSpacing="wider"
+            style={{ writingMode: "vertical-rl" }}
+          >
+            Ask
+          </Text>
+        </Flex>
+      ) : (
+        <Flex flexShrink="0" style={{ width: chatWidth }}>
+          <Box
+            w="1"
+            flexShrink="0"
+            cursor="col-resize"
+            onPointerDown={startChatResize}
+            _hover={{ bg: "border.emphasized" }}
+            transition="background 0.15s"
+          />
+          <Box flex="1" minW="0" borderLeftWidth="1px">
+            <ChatPanel pr={pr} onCollapse={() => collapseChat(true)} />
+          </Box>
+        </Flex>
+      )}
     </Flex>
   );
 }
