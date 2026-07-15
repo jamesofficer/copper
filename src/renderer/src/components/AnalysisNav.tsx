@@ -101,28 +101,29 @@ export default function AnalysisNav({ analysis, selection, onSelect }: Props) {
       </NavItem>
 
       <VStack alignItems="stretch" gap="1">
-        <SectionLabel>Risks ({analysis.risks.length})</SectionLabel>
-        {analysis.risks.length === 0 ? (
-          <Text fontSize="xs" color="fg.muted" px="2" py="1">
-            Nothing stood out.
-          </Text>
-        ) : (
-          analysis.risks.map((claim, index) => (
-            <NavItem
-              // biome-ignore lint/suspicious/noArrayIndexKey: claims have no stable id
-              key={index}
-              selected={sameSelection(selection, { kind: "risk", index })}
-              onClick={() => onSelect({ kind: "risk", index })}
-            >
-              <HStack gap="2" alignItems="flex-start">
-                <Dot color="orange.solid" />
-                <Text fontSize="xs" lineClamp={2}>
-                  {claim.title}
-                </Text>
-              </HStack>
-            </NavItem>
-          ))
-        )}
+        <SectionLabel>Reading guide ({analysis.groups.length})</SectionLabel>
+        {analysis.groups.map((group, index) => (
+          <NavItem
+            key={group.id}
+            selected={sameSelection(selection, { kind: "group", id: group.id })}
+            onClick={() => onSelect({ kind: "group", id: group.id })}
+          >
+            <HStack gap="2" alignItems="flex-start">
+              <Text
+                fontFamily="mono"
+                fontSize="xs"
+                color="fg.subtle"
+                flexShrink="0"
+              >
+                {index + 1}
+              </Text>
+              <Text fontSize="xs" flex="1" lineClamp={2}>
+                {group.title}
+              </Text>
+              <Dot color={riskDotColor[group.risk]} />
+            </HStack>
+          </NavItem>
+        ))}
       </VStack>
 
       <VStack alignItems="stretch" gap="1">
@@ -153,29 +154,28 @@ export default function AnalysisNav({ analysis, selection, onSelect }: Props) {
       </VStack>
 
       <VStack alignItems="stretch" gap="1">
-        <SectionLabel>Reading guide ({analysis.groups.length})</SectionLabel>
-        {analysis.groups.map((group, index) => (
-          <NavItem
-            key={group.id}
-            selected={sameSelection(selection, { kind: "group", id: group.id })}
-            onClick={() => onSelect({ kind: "group", id: group.id })}
-          >
-            <HStack gap="2" alignItems="flex-start">
-              <Text
-                fontFamily="mono"
-                fontSize="xs"
-                color="fg.subtle"
-                flexShrink="0"
-              >
-                {index + 1}
-              </Text>
-              <Text fontSize="xs" flex="1" lineClamp={2}>
-                {group.title}
-              </Text>
-              <Dot color={riskDotColor[group.risk]} />
-            </HStack>
-          </NavItem>
-        ))}
+        <SectionLabel>Risks ({analysis.risks.length})</SectionLabel>
+        {analysis.risks.length === 0 ? (
+          <Text fontSize="xs" color="fg.muted" px="2" py="1">
+            Nothing stood out.
+          </Text>
+        ) : (
+          analysis.risks.map((claim, index) => (
+            <NavItem
+              // biome-ignore lint/suspicious/noArrayIndexKey: claims have no stable id
+              key={index}
+              selected={sameSelection(selection, { kind: "risk", index })}
+              onClick={() => onSelect({ kind: "risk", index })}
+            >
+              <HStack gap="2" alignItems="flex-start">
+                <Dot color="orange.solid" />
+                <Text fontSize="xs" lineClamp={2}>
+                  {claim.title}
+                </Text>
+              </HStack>
+            </NavItem>
+          ))
+        )}
       </VStack>
     </VStack>
   );
