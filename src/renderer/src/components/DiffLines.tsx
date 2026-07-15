@@ -42,10 +42,14 @@ export default function DiffLines({ file }: Props) {
   );
 
   return (
+    // minW=max-content: inside a scroll container a block element only gets
+    // the visible width, so short rows' backgrounds would stop there when
+    // scrolled right. Sizing this to the widest row lets every row fill it.
     <Box
       fontFamily="'JetBrains Mono', monospace"
       fontSize="14px"
       lineHeight="1.6"
+      minW="max-content"
       css={tokenColors}
     >
       {lines.map((line, index) => {
@@ -56,7 +60,6 @@ export default function DiffLines({ file }: Props) {
             key={index}
             bg={style.bg}
             color={line.kind === "hunk" ? "fg.muted" : "fg"}
-            minW="max-content"
           >
             {line.kind === "hunk" || line.kind === "meta" ? (
               <Text as="span" px="3" py="0.5" whiteSpace="pre">
