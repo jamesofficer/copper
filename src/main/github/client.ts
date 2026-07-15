@@ -33,6 +33,8 @@ interface GitHubPullDetail extends GitHubPullSummary {
   deletions: number;
   changed_files: number;
   commits: number;
+  comments: number;
+  review_comments: number;
   created_at: string;
   updated_at: string;
 }
@@ -170,6 +172,7 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
     additions: pull.additions,
     deletions: pull.deletions,
     changedFiles: pull.changed_files,
+    comments: pull.comments + pull.review_comments,
   }));
 }
 
@@ -213,6 +216,7 @@ export async function getPullRequest(
     deletions: pull.deletions,
     changedFiles: pull.changed_files,
     commits: pull.commits,
+    comments: pull.comments + pull.review_comments,
     createdAt: pull.created_at,
     updatedAt: pull.updated_at,
     url: pull.html_url,

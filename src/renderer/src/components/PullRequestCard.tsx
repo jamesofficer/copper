@@ -1,4 +1,5 @@
 import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { LuMessageSquare } from "react-icons/lu";
 import type { PullRequest, PullRequestDetail } from "../../../shared/types";
 import { timeAgo } from "../lib/recentPrs";
 import PrStateBadge from "./PrStateBadge";
@@ -31,6 +32,7 @@ export default function PullRequestCard({
   const additions = detail?.additions ?? pr.additions;
   const deletions = detail?.deletions ?? pr.deletions;
   const changedFiles = detail?.changedFiles ?? pr.changedFiles;
+  const comments = detail?.comments ?? pr.comments;
   // The snapshot only ever holds open PRs, so without fresh detail assume open.
   const state = detail?.state ?? "open";
   const merged = detail?.merged ?? false;
@@ -78,6 +80,12 @@ export default function PullRequestCard({
               <Text>{timeAgo(viewedAt)}</Text>
             ) : (
               <Text>{changedFiles} files</Text>
+            )}
+            {comments > 0 && (
+              <HStack gap="1">
+                <LuMessageSquare size={12} />
+                <Text>{comments}</Text>
+              </HStack>
             )}
           </HStack>
         </VStack>

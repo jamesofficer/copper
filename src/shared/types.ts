@@ -20,6 +20,8 @@ export interface PullRequest {
   additions: number;
   deletions: number;
   changedFiles: number;
+  // Conversation + inline review comments combined.
+  comments: number;
 }
 
 export interface PullRequestLabel {
@@ -46,6 +48,7 @@ export interface PullRequestDetail {
   deletions: number;
   changedFiles: number;
   commits: number;
+  comments: number;
   createdAt: string;
   updatedAt: string;
   url: string;
