@@ -59,6 +59,7 @@ export interface IpcApi {
     question: string,
   ): Promise<string>;
   getChatHistory(repo: string, prNumber: number): Promise<ChatMessage[]>;
+  clearChat(repo: string, prNumber: number): Promise<void>;
   submitReview(
     repo: string,
     prNumber: number,
@@ -106,6 +107,7 @@ export const ipcChannels = [
   "analyzePullRequest",
   "askQuestion",
   "getChatHistory",
+  "clearChat",
   "submitReview",
   "getLlmStatus",
   "setLlmProvider",

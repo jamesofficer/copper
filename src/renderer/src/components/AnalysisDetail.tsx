@@ -14,11 +14,7 @@ import {
   Wrap,
 } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import {
-  LuChevronDown,
-  LuMessageCircleQuestion,
-  LuRefreshCw,
-} from "react-icons/lu";
+import { LuChevronDown, LuMessageCircleQuestion } from "react-icons/lu";
 import type {
   AnalysisClaim,
   AnalysisResult,
@@ -41,8 +37,6 @@ interface Props {
   analysis: AnalysisResult;
   files: PullRequestFile[] | undefined;
   selection: AnalysisSelection;
-  onReanalyze(): void;
-  reanalyzing: boolean;
   onAskAbout(context: AskContext, question?: string): void;
 }
 
@@ -133,15 +127,7 @@ function DiffCards({
   );
 }
 
-function SummaryPane({
-  analysis,
-  onReanalyze,
-  reanalyzing,
-}: {
-  analysis: AnalysisResult;
-  onReanalyze(): void;
-  reanalyzing: boolean;
-}) {
+function SummaryPane({ analysis }: { analysis: AnalysisResult }) {
   return (
     <VStack alignItems="stretch" gap="6" maxW="3xl">
       <VStack alignItems="stretch" gap="3">
@@ -162,22 +148,10 @@ function SummaryPane({
         </VStack>
       )}
 
-      <HStack gap="3">
-        <Text fontSize="xs" color="fg.subtle" fontFamily="mono">
-          Analysed commit {analysis.headSha.slice(0, 7)} · {analysis.model}
-          {analysis.usage ? ` · ${formatCost(analysis.usage)}` : ""}
-        </Text>
-        <Button
-          size="2xs"
-          variant="ghost"
-          color="fg.muted"
-          onClick={onReanalyze}
-          loading={reanalyzing}
-          loadingText="Re-analysing…"
-        >
-          <LuRefreshCw /> Re-analyse
-        </Button>
-      </HStack>
+      <Text fontSize="xs" color="fg.subtle" fontFamily="mono">
+        Analysed commit {analysis.headSha.slice(0, 7)} · {analysis.model}
+        {analysis.usage ? ` · ${formatCost(analysis.usage)}` : ""}
+      </Text>
     </VStack>
   );
 }
@@ -314,8 +288,6 @@ export default function AnalysisDetail({
   analysis,
   files,
   selection,
-  onReanalyze,
-  reanalyzing,
   onAskAbout,
 }: Props) {
   const fileByPath: FileMap = new Map(
@@ -365,13 +337,7 @@ export default function AnalysisDetail({
         );
       }
     }
-    return (
-      <SummaryPane
-        analysis={analysis}
-        onReanalyze={onReanalyze}
-        reanalyzing={reanalyzing}
-      />
-    );
+    return <SummaryPane analysis={analysis} />;
   }
 
   return (

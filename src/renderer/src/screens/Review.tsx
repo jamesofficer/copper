@@ -18,6 +18,7 @@ import type { PullRequest } from "../../../shared/types";
 import ChangesView from "../components/ChangesView";
 import DiffViewModeSelect from "../components/DiffViewModeSelect";
 import PullRequestOverview from "../components/PullRequestOverview";
+import ReanalyzeButton from "../components/ReanalyzeButton";
 import ReviewPanel from "../components/ReviewPanel";
 import SubmitReviewDialog from "../components/SubmitReviewDialog";
 
@@ -51,6 +52,7 @@ export default function Review({ pr, onBack }: Props) {
             <LuExternalLink /> Open in GitHub
           </a>
         </Button>
+        <ReanalyzeButton pr={pr} />
         <SubmitReviewDialog pr={pr} />
       </HStack>
 

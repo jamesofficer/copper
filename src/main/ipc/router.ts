@@ -1,6 +1,6 @@
 import { ipcMain } from "electron";
 import type { IpcApi } from "../../shared/ipc";
-import { askQuestion, getChatHistory } from "../agent/session";
+import { askQuestion, clearChat, getChatHistory } from "../agent/session";
 import { listAnalyzedPullRequests } from "../analysis/cache";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
@@ -50,6 +50,7 @@ const handlers: IpcApi = {
   askQuestion: (repo, prNumber, question) =>
     askQuestion(repo, prNumber, question),
   getChatHistory: (repo, prNumber) => getChatHistory(repo, prNumber),
+  clearChat: (repo, prNumber) => clearChat(repo, prNumber),
   submitReview: (repo, prNumber, verdict, body) =>
     submitReview(repo, prNumber, verdict, body),
   getLlmStatus: () => getLlmStatus(),

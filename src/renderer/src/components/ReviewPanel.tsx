@@ -9,14 +9,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
 import {
-  LuPanelRightOpen,
-  LuRefreshCw,
-  LuSparkles,
-  LuTriangleAlert,
-} from "react-icons/lu";
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { LuPanelRightOpen, LuSparkles, LuTriangleAlert } from "react-icons/lu";
 import type {
   PullRequest,
   RiskClaim,
@@ -28,6 +28,7 @@ import { scrollbar } from "../lib/scrollbar";
 import AnalysisDetail from "./AnalysisDetail";
 import AnalysisNav, { type AnalysisSelection } from "./AnalysisNav";
 import ChatPanel from "./ChatPanel";
+import ReanalyzeButton from "./ReanalyzeButton";
 
 interface Props {
   pr: PullRequest;
@@ -135,21 +136,26 @@ export default function ReviewPanel({ pr }: Props) {
   );
 
   const analyzeMutation = useMutation({
-    mutationFn: (force: boolean) =>
-      window.api.analyzePullRequest(
-        pr.repo,
-        pr.number,
-        getReviewPersonality(),
-        force,
-      ),
+    mutationKey: ["analyzePr", pr.repo, pr.number],
+    mutationFn: () =>
+      window.api.analyzePullRequest(pr.repo, pr.number, getReviewPersonality()),
     onSuccess: (result) => {
       queryClient.setQueryData(["analysis", pr.repo, pr.number], result);
       void queryClient.invalidateQueries({
         queryKey: ["analyzedPullRequests"],
       });
-      setSelection({ kind: "summary" });
     },
   });
+
+  // Covers both this button and the header's Re-analyse, which share the key.
+  const analyzing =
+    useIsMutating({ mutationKey: ["analyzePr", pr.repo, pr.number] }) > 0;
+
+  // A new analysis replaces the old items; start reading from the summary.
+  const analyzedAt = analysis?.analyzedAt;
+  useEffect(() => {
+    if (analyzedAt) setSelection({ kind: "summary" });
+  }, [analyzedAt]);
 
   if (analysisQuery.isPending) {
     return (
@@ -188,15 +194,15 @@ export default function ReviewPanel({ pr }: Props) {
             claim tied to the code it came from.
           </Text>
           <Button
-            onClick={() => analyzeMutation.mutate(false)}
-            loading={analyzeMutation.isPending}
+            onClick={() => analyzeMutation.mutate()}
+            loading={analyzing}
             loadingText="Analysing…"
           >
             <LuSparkles />
             Analyse PR
           </Button>
           <Text fontSize="xs" color="fg.subtle">
-            {analyzeMutation.isPending
+            {analyzing
               ? "This can take a minute on large PRs."
               : llmQuery.data?.effective === "claude-code"
                 ? "Runs on your Claude plan through Claude Code. Results are cached per commit."
@@ -233,17 +239,9 @@ export default function ReviewPanel({ pr }: Props) {
             {analysis.headSha.slice(0, 7)}) — the PR has new commits since, so
             line references may be off.
           </Text>
-          <Button
-            size="2xs"
-            variant="outline"
-            ml="auto"
-            flexShrink="0"
-            onClick={() => analyzeMutation.mutate(true)}
-            loading={analyzeMutation.isPending}
-            loadingText="Re-analysing…"
-          >
-            <LuRefreshCw /> Re-analyse
-          </Button>
+          <Box ml="auto" flexShrink="0">
+            <ReanalyzeButton pr={pr} size="2xs" />
+          </Box>
         </HStack>
       )}
 
@@ -267,8 +265,6 @@ export default function ReviewPanel({ pr }: Props) {
             analysis={analysis}
             files={filesQuery.data}
             selection={selection}
-            onReanalyze={() => analyzeMutation.mutate(true)}
-            reanalyzing={analyzeMutation.isPending}
             onAskAbout={askAbout}
           />
         </Box>

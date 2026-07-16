@@ -40,6 +40,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("askQuestion", repo, prNumber, question),
   getChatHistory: (repo, prNumber) =>
     ipcRenderer.invoke("getChatHistory", repo, prNumber),
+  clearChat: (repo, prNumber) =>
+    ipcRenderer.invoke("clearChat", repo, prNumber),
   submitReview: (repo, prNumber, verdict, body) =>
     ipcRenderer.invoke("submitReview", repo, prNumber, verdict, body),
   getLlmStatus: () => ipcRenderer.invoke("getLlmStatus"),

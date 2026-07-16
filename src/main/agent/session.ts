@@ -80,6 +80,15 @@ export async function getChatHistory(
   return store.get(chatKey(repo, prNumber)) ?? [];
 }
 
+export async function clearChat(repo: string, prNumber: number): Promise<void> {
+  const store = await loadHistories();
+  store.delete(chatKey(repo, prNumber));
+  await saveHistories(store);
+  // Drop the cached context too, so the next question rebuilds it around the
+  // fresh analysis.
+  sessions.delete(chatKey(repo, prNumber));
+}
+
 function buildContext(
   detail: PullRequestDetail,
   files: PullRequestFile[],
