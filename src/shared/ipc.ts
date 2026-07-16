@@ -3,6 +3,8 @@ import type {
   AnalyzedPullRequest,
   ChatMessage,
   KeyTestResult,
+  LlmProviderChoice,
+  LlmStatus,
   PullRequest,
   PullRequestComment,
   PullRequestCommit,
@@ -62,6 +64,8 @@ export interface IpcApi {
     verdict: ReviewVerdict,
     body: string,
   ): Promise<void>;
+  getLlmStatus(): Promise<LlmStatus>;
+  setLlmProvider(choice: LlmProviderChoice): Promise<LlmStatus>;
   getSecretsStatus(): Promise<SecretsStatus>;
   saveSecret(provider: SecretProvider, value: string): Promise<KeyTestResult>;
   clearSecret(provider: SecretProvider): Promise<SecretsStatus>;
@@ -101,6 +105,8 @@ export const ipcChannels = [
   "askQuestion",
   "getChatHistory",
   "submitReview",
+  "getLlmStatus",
+  "setLlmProvider",
   "getSecretsStatus",
   "saveSecret",
   "clearSecret",

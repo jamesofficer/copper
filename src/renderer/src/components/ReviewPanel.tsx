@@ -124,6 +124,11 @@ export default function ReviewPanel({ pr }: Props) {
     queryKey: ["pullRequest", pr.repo, pr.number],
     queryFn: () => window.api.peekPullRequest(pr.repo, pr.number),
   });
+
+  const llmQuery = useQuery({
+    queryKey: ["llmStatus"],
+    queryFn: () => window.api.getLlmStatus(),
+  });
   const currentHeadSha = detailQuery.data?.headSha;
   const analysisOutdated = Boolean(
     analysis && currentHeadSha && analysis.headSha !== currentHeadSha,
@@ -193,7 +198,9 @@ export default function ReviewPanel({ pr }: Props) {
           <Text fontSize="xs" color="fg.subtle">
             {analyzeMutation.isPending
               ? "This can take a minute on large PRs."
-              : "Uses your Claude API key. Results are cached per commit."}
+              : llmQuery.data?.effective === "claude-code"
+                ? "Runs on your Claude plan through Claude Code. Results are cached per commit."
+                : "Uses your Claude API key. Results are cached per commit."}
           </Text>
           {analyzeMutation.isError && (
             <Text fontSize="sm" color="fg.error">

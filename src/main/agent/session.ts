@@ -12,6 +12,8 @@ import type {
 import { getCachedAnalysis } from "../analysis/cache";
 import { buildPullRequestContext } from "../analysis/pipeline";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
+import { runChatQuery } from "../llm/claudeCode";
+import { getEffectiveLlmProvider } from "../llm/settings";
 import { getSecret } from "../store/secrets";
 import { chatTools, runTool, type ToolContext } from "./tools";
 
@@ -305,17 +307,79 @@ export async function askQuestion(
   prNumber: number,
   question: string,
 ): Promise<string> {
-  const apiKey = await getSecret("anthropic");
-  if (!apiKey) {
-    throw new Error(
-      "Connect a Claude API key in settings to use the review chat.",
-    );
-  }
-
   const session = await getSession(repo, prNumber);
   const store = await loadHistories();
   const history = store.get(chatKey(repo, prNumber)) ?? [];
   const ctx: ToolContext = { repo, prNumber, headSha: session.headSha };
+  const provider = await getEffectiveLlmProvider();
+
+  const answer =
+    provider === "claude-code"
+      ? await askViaClaudeCode(repo, prNumber, session, ctx, history, question)
+      : await askViaApi(repo, prNumber, session, ctx, history, question);
+
+  const finalAnswer =
+    answer || "I couldn't produce an answer — please try asking again.";
+  const updated = [
+    ...history,
+    { role: "user" as const, content: question },
+    { role: "assistant" as const, content: finalAnswer },
+  ].slice(-MAX_STORED);
+  store.set(chatKey(repo, prNumber), updated);
+  await saveHistories(store);
+
+  return finalAnswer;
+}
+
+// Claude Code queries are single-shot, so earlier turns ride along as text in
+// the prompt instead of as separate API messages.
+function renderHistory(history: ChatMessage[]): string {
+  return history
+    .map(
+      (message) =>
+        `${message.role === "user" ? "Reviewer" : "Assistant"}: ${message.content}`,
+    )
+    .join("\n\n");
+}
+
+async function askViaClaudeCode(
+  repo: string,
+  prNumber: number,
+  session: Session,
+  ctx: ToolContext,
+  history: ChatMessage[],
+  question: string,
+): Promise<string> {
+  const recent = history.slice(-MAX_HISTORY);
+  const prompt =
+    recent.length > 0
+      ? `Earlier conversation between the reviewer and you:\n\n${renderHistory(recent)}\n\n---\n\nThe reviewer's new question:\n${question}`
+      : question;
+
+  return runChatQuery({
+    model: CHAT_MODEL,
+    systemPrompt: `${SYSTEM_PROMPT}\n\n${session.context}`,
+    prompt,
+    toolContext: ctx,
+    maxTurns: MAX_ITERATIONS,
+    onText: (text) => sendChunk({ repo, prNumber, text }),
+  });
+}
+
+async function askViaApi(
+  repo: string,
+  prNumber: number,
+  session: Session,
+  ctx: ToolContext,
+  history: ChatMessage[],
+  question: string,
+): Promise<string> {
+  const apiKey = await getSecret("anthropic");
+  if (!apiKey) {
+    throw new Error(
+      "Connect a Claude API key in settings to use the review chat, or switch Claude access to Claude Code.",
+    );
+  }
 
   // Stored history is plain text (tool activity is not replayed across
   // questions); within this question the full tool conversation is kept.
@@ -388,15 +452,5 @@ export async function askQuestion(
     if (turn.text) sendChunk({ repo, prNumber, text: "\n\n" });
   }
 
-  const finalAnswer =
-    answer || "I couldn't produce an answer — please try asking again.";
-  const updated = [
-    ...history,
-    { role: "user" as const, content: question },
-    { role: "assistant" as const, content: finalAnswer },
-  ].slice(-MAX_STORED);
-  store.set(chatKey(repo, prNumber), updated);
-  await saveHistories(store);
-
-  return finalAnswer;
+  return answer;
 }

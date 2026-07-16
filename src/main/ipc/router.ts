@@ -13,6 +13,7 @@ import {
   listReviewRequests,
   submitReview,
 } from "../github/client";
+import { getLlmStatus, setLlmProvider } from "../llm/settings";
 import {
   addRepository,
   listRepositories,
@@ -51,6 +52,8 @@ const handlers: IpcApi = {
   getChatHistory: (repo, prNumber) => getChatHistory(repo, prNumber),
   submitReview: (repo, prNumber, verdict, body) =>
     submitReview(repo, prNumber, verdict, body),
+  getLlmStatus: () => getLlmStatus(),
+  setLlmProvider: (choice) => setLlmProvider(choice),
   getSecretsStatus: () => getKeyStatus(),
   saveSecret: (provider, value) => saveKey(provider, value),
   clearSecret: (provider) => clearKey(provider),

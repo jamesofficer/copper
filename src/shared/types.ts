@@ -134,7 +134,8 @@ export interface RiskClaim extends AnalysisClaim {
 export interface AnalysisUsage {
   inputTokens: number;
   outputTokens: number;
-  costUsd: number;
+  // Absent when the analysis ran on a Claude plan — there's no per-token price.
+  costUsd?: number;
 }
 
 export interface AnalysisResult {
@@ -164,6 +165,26 @@ export interface AnalyzedPullRequest {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+// How the app talks to Claude: through the local Claude Code login (bills to
+// the user's Claude plan) or directly with an API key (bills per token).
+export type LlmProvider = "claude-code" | "api-key";
+
+// "auto" prefers Claude Code when it's logged in, else falls back to the key.
+export type LlmProviderChoice = "auto" | LlmProvider;
+
+export interface ClaudeCodeStatus {
+  available: boolean;
+  // The logged-in account's email, when Claude Code exposes it.
+  account: string | null;
+}
+
+export interface LlmStatus {
+  choice: LlmProviderChoice;
+  effective: LlmProvider;
+  claudeCode: ClaudeCodeStatus;
+  apiKeyConfigured: boolean;
 }
 
 export type SecretProvider = "anthropic" | "github";

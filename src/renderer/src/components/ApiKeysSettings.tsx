@@ -4,12 +4,14 @@ import {
   Field,
   HStack,
   Input,
+  Separator,
   Stack,
   Text,
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { KeyTestResult, SecretProvider } from "../../../shared/types";
+import LlmProviderSettings from "./LlmProviderSettings";
 
 interface Props {
   open: boolean;
@@ -26,7 +28,7 @@ const PROVIDERS: ProviderConfig[] = [
   {
     id: "anthropic",
     label: "Claude API key",
-    help: "Powers PR summaries and the Q&A agent. Create one at console.anthropic.com.",
+    help: "Used when Claude access is set to API key. Create one at console.anthropic.com.",
     placeholder: "sk-ant-…",
   },
   {
@@ -61,6 +63,9 @@ export default function ApiKeysSettings({ open }: Props) {
     if (provider === "github") {
       await queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
     }
+    if (provider === "anthropic") {
+      await queryClient.invalidateQueries({ queryKey: ["llmStatus"] });
+    }
   }
 
   async function save(provider: SecretProvider) {
@@ -84,6 +89,8 @@ export default function ApiKeysSettings({ open }: Props) {
 
   return (
     <Stack gap="7">
+      <LlmProviderSettings />
+      <Separator />
       {PROVIDERS.map((provider) => {
         const configured = status?.[provider.id] ?? false;
         const result = results[provider.id];

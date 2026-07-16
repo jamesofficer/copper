@@ -1,40 +1,39 @@
 import { Alert, Button } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
-import type { SecretProvider } from "../../../shared/types";
 
 interface Props {
   onOpenSettings(): void;
 }
-
-const secretLabels: Record<SecretProvider, string> = {
-  anthropic: "Claude API key",
-  github: "GitHub token",
-};
 
 export default function SetupBanner({ onOpenSettings }: Props) {
   const { data: secrets } = useQuery({
     queryKey: ["secretsStatus"],
     queryFn: () => window.api.getSecretsStatus(),
   });
+  const { data: llm } = useQuery({
+    queryKey: ["llmStatus"],
+    queryFn: () => window.api.getLlmStatus(),
+  });
 
-  const missingSecrets = secrets
-    ? (Object.keys(secretLabels) as SecretProvider[]).filter(
-        (provider) => !secrets[provider],
-      )
-    : [];
+  if (!secrets || !llm) return null;
 
-  if (missingSecrets.length === 0) return null;
+  const missing: string[] = [];
+  // Claude Code covers the Claude side without a key.
+  if (llm.effective === "api-key" && !secrets.anthropic) {
+    missing.push("Claude API key");
+  }
+  if (!secrets.github) missing.push("GitHub token");
 
-  const missingList = missingSecrets
-    .map((provider) => secretLabels[provider])
-    .join(" and ");
+  if (missing.length === 0) return null;
+
+  const missingList = missing.join(" and ");
 
   return (
     <Alert.Root status="warning" rounded="lg" w="full">
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Title>
-          {missingSecrets.length === 2
+          {missing.length === 2
             ? "Connect your API keys"
             : `Add your ${missingList}`}
         </Alert.Title>

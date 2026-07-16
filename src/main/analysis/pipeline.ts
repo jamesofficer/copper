@@ -12,6 +12,8 @@ import type {
   RiskSeverity,
 } from "../../shared/types";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
+import { runStructuredQuery } from "../llm/claudeCode";
+import { getEffectiveLlmProvider } from "../llm/settings";
 import { getSecret } from "../store/secrets";
 import {
   getCachedAnalysis,
@@ -257,13 +259,6 @@ export async function analyzePullRequest(
   personality: ReviewPersonality = "standard",
   force = false,
 ): Promise<AnalysisResult> {
-  const apiKey = await getSecret("anthropic");
-  if (!apiKey) {
-    throw new Error(
-      "Connect a Claude API key in settings to analyse pull requests.",
-    );
-  }
-
   const detail = await getPullRequest(repo, prNumber);
   if (!force) {
     const cached = await getCachedAnalysis(repo, prNumber, detail.headSha);
@@ -271,14 +266,46 @@ export async function analyzePullRequest(
   }
 
   const files = await listPullRequestFiles(repo, prNumber);
-  const { raw, usage } = await requestAnalysis(
-    apiKey,
-    buildPullRequestContext(detail, files),
-    personality,
-  );
+  const context = buildPullRequestContext(detail, files);
+  const provider = await getEffectiveLlmProvider();
+  const { raw, usage } =
+    provider === "claude-code"
+      ? await requestAnalysisViaClaudeCode(context, personality)
+      : await requestAnalysisViaApi(context, personality);
   const result = toAnalysisResult(raw, detail, files, usage);
   await setCachedAnalysis(result);
   return result;
+}
+
+async function requestAnalysisViaApi(
+  prompt: string,
+  personality: ReviewPersonality,
+): Promise<{ raw: RawAnalysis; usage: AnalysisUsage | undefined }> {
+  const apiKey = await getSecret("anthropic");
+  if (!apiKey) {
+    throw new Error(
+      "Connect a Claude API key in settings to analyse pull requests, or switch Claude access to Claude Code.",
+    );
+  }
+  return requestAnalysis(apiKey, prompt, personality);
+}
+
+// Same analysis through the local Claude Code login — the SDK enforces the
+// JSON schema itself. No costUsd: usage comes out of the user's plan.
+async function requestAnalysisViaClaudeCode(
+  prompt: string,
+  personality: ReviewPersonality,
+): Promise<{ raw: RawAnalysis; usage: AnalysisUsage }> {
+  const { output, usage } = await runStructuredQuery({
+    model: MODEL,
+    systemPrompt: buildSystemPrompt(personality),
+    prompt,
+    schema: analysisTool.input_schema,
+  });
+  return {
+    raw: output as RawAnalysis,
+    usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
+  };
 }
 
 function isMechanical(path: string): boolean {

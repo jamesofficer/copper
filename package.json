@@ -15,6 +15,7 @@
     "check": "biome check --write ."
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.211",
     "@chakra-ui/react": "^3.36.0",
     "@emotion/react": "^11.14.0",
     "@fontsource/jetbrains-mono": "^5.2.8",
@@ -28,7 +29,8 @@
     "react-markdown": "^10.1.0",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.3",

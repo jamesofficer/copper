@@ -183,9 +183,12 @@ function SummaryPane({
 }
 
 function formatCost(usage: AnalysisUsage): string {
+  const tokens = `${usage.inputTokens.toLocaleString()} in, ${usage.outputTokens.toLocaleString()} out`;
+  // No per-token price when the analysis ran on a Claude plan.
+  if (usage.costUsd === undefined) return `plan usage (${tokens})`;
   const cost =
     usage.costUsd < 0.01 ? "<$0.01" : `~$${usage.costUsd.toFixed(2)}`;
-  return `${cost} (${usage.inputTokens.toLocaleString()} in, ${usage.outputTokens.toLocaleString()} out)`;
+  return `${cost} (${tokens})`;
 }
 
 function ClaimPane({

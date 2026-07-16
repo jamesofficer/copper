@@ -39,7 +39,7 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                     <LuSparkles /> Review
                   </Tabs.Trigger>
                   <Tabs.Trigger value="keys" justifyContent="flex-start">
-                    <LuKeyRound /> API keys
+                    <LuKeyRound /> Connections
                   </Tabs.Trigger>
                 </Tabs.List>
                 <Tabs.Content value="appearance" pl="6" py="0" flex="1">
