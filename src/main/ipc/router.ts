@@ -13,7 +13,7 @@ import {
   listReviewRequests,
   submitReview,
 } from "../github/client";
-import { getLlmStatus, setLlmProvider } from "../llm/settings";
+import { getLlmStatus, setLlmModel, setLlmProvider } from "../llm/settings";
 import {
   addRepository,
   listRepositories,
@@ -54,6 +54,7 @@ const handlers: IpcApi = {
     submitReview(repo, prNumber, verdict, body),
   getLlmStatus: () => getLlmStatus(),
   setLlmProvider: (choice) => setLlmProvider(choice),
+  setLlmModel: (task, model) => setLlmModel(task, model),
   getSecretsStatus: () => getKeyStatus(),
   saveSecret: (provider, value) => saveKey(provider, value),
   clearSecret: (provider) => clearKey(provider),

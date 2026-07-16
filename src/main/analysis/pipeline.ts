@@ -13,7 +13,7 @@ import type {
 } from "../../shared/types";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { runStructuredQuery } from "../llm/claudeCode";
-import { getEffectiveLlmProvider } from "../llm/settings";
+import { getEffectiveLlmProvider, getLlmModel } from "../llm/settings";
 import { getSecret } from "../store/secrets";
 import {
   getCachedAnalysis,
@@ -22,12 +22,16 @@ import {
 } from "./cache";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const MODEL = "claude-opus-4-8";
 const MAX_OUTPUT_TOKENS = 16_384;
 
-// USD per million tokens for MODEL — update alongside it.
-const INPUT_USD_PER_MTOK = 5;
-const OUTPUT_USD_PER_MTOK = 25;
+// USD per million tokens by model id — update alongside the model catalog in
+// shared/models.ts. Unknown models get no cost estimate rather than a wrong one.
+const PRICING: Record<string, { input: number; output: number }> = {
+  "claude-fable-5": { input: 10, output: 50 },
+  "claude-opus-4-8": { input: 5, output: 25 },
+  "claude-sonnet-5": { input: 3, output: 15 },
+  "claude-haiku-4-5-20251001": { input: 1, output: 5 },
+};
 
 // Huge PRs get their patches truncated so the prompt stays a sane size; the
 // model still sees every file's name, status, and line counts.
@@ -268,16 +272,18 @@ export async function analyzePullRequest(
   const files = await listPullRequestFiles(repo, prNumber);
   const context = buildPullRequestContext(detail, files);
   const provider = await getEffectiveLlmProvider();
+  const model = await getLlmModel("analysis");
   const { raw, usage } =
     provider === "claude-code"
-      ? await requestAnalysisViaClaudeCode(context, personality)
-      : await requestAnalysisViaApi(context, personality);
-  const result = toAnalysisResult(raw, detail, files, usage);
+      ? await requestAnalysisViaClaudeCode(model, context, personality)
+      : await requestAnalysisViaApi(model, context, personality);
+  const result = toAnalysisResult(raw, detail, files, model, usage);
   await setCachedAnalysis(result);
   return result;
 }
 
 async function requestAnalysisViaApi(
+  model: string,
   prompt: string,
   personality: ReviewPersonality,
 ): Promise<{ raw: RawAnalysis; usage: AnalysisUsage | undefined }> {
@@ -287,17 +293,18 @@ async function requestAnalysisViaApi(
       "Connect a Claude API key in settings to analyse pull requests, or switch Claude access to Claude Code.",
     );
   }
-  return requestAnalysis(apiKey, prompt, personality);
+  return requestAnalysis(apiKey, model, prompt, personality);
 }
 
 // Same analysis through the local Claude Code login — the SDK enforces the
 // JSON schema itself. No costUsd: usage comes out of the user's plan.
 async function requestAnalysisViaClaudeCode(
+  model: string,
   prompt: string,
   personality: ReviewPersonality,
 ): Promise<{ raw: RawAnalysis; usage: AnalysisUsage }> {
   const { output, usage } = await runStructuredQuery({
-    model: MODEL,
+    model,
     systemPrompt: buildSystemPrompt(personality),
     prompt,
     schema: analysisTool.input_schema,
@@ -369,6 +376,7 @@ export function buildPullRequestContext(
 
 async function requestAnalysis(
   apiKey: string,
+  model: string,
   prompt: string,
   personality: ReviewPersonality,
 ): Promise<{ raw: RawAnalysis; usage: AnalysisUsage | undefined }> {
@@ -381,7 +389,7 @@ async function requestAnalysis(
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       max_tokens: MAX_OUTPUT_TOKENS,
       system: buildSystemPrompt(personality),
       messages: [{ role: "user", content: prompt }],
@@ -427,14 +435,15 @@ async function requestAnalysis(
 
   const inputTokens = message.usage?.input_tokens ?? 0;
   const outputTokens = message.usage?.output_tokens ?? 0;
+  const pricing = PRICING[model];
   const usage: AnalysisUsage | undefined = message.usage
     ? {
         inputTokens,
         outputTokens,
-        costUsd:
-          (inputTokens * INPUT_USD_PER_MTOK +
-            outputTokens * OUTPUT_USD_PER_MTOK) /
-          1_000_000,
+        costUsd: pricing
+          ? (inputTokens * pricing.input + outputTokens * pricing.output) /
+            1_000_000
+          : undefined,
       }
     : undefined;
 
@@ -537,6 +546,7 @@ function toAnalysisResult(
   raw: RawAnalysis,
   detail: PullRequestDetail,
   files: PullRequestFile[],
+  model: string,
   usage: AnalysisUsage | undefined,
 ): AnalysisResult {
   const validPaths = new Set(files.map((file) => file.path));
@@ -578,7 +588,7 @@ function toAnalysisResult(
     repo: detail.repo,
     prNumber: detail.number,
     headSha: detail.headSha,
-    model: MODEL,
+    model,
     analyzedAt: new Date().toISOString(),
     usage,
     summary: prose || "The analysis returned no summary.",

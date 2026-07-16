@@ -44,6 +44,7 @@ const api: WindowApi = {
     ipcRenderer.invoke("submitReview", repo, prNumber, verdict, body),
   getLlmStatus: () => ipcRenderer.invoke("getLlmStatus"),
   setLlmProvider: (choice) => ipcRenderer.invoke("setLlmProvider", choice),
+  setLlmModel: (task, model) => ipcRenderer.invoke("setLlmModel", task, model),
   getSecretsStatus: () => ipcRenderer.invoke("getSecretsStatus"),
   saveSecret: (provider, value) =>
     ipcRenderer.invoke("saveSecret", provider, value),

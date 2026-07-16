@@ -13,12 +13,11 @@ import { getCachedAnalysis } from "../analysis/cache";
 import { buildPullRequestContext } from "../analysis/pipeline";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { runChatQuery } from "../llm/claudeCode";
-import { getEffectiveLlmProvider } from "../llm/settings";
+import { getEffectiveLlmProvider, getLlmModel } from "../llm/settings";
 import { getSecret } from "../store/secrets";
 import { chatTools, runTool, type ToolContext } from "./tools";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
-const CHAT_MODEL = "claude-sonnet-5";
 const MAX_OUTPUT_TOKENS = 4096;
 // Messages sent to the model as context; older ones stay stored and visible.
 const MAX_HISTORY = 20;
@@ -312,11 +311,20 @@ export async function askQuestion(
   const history = store.get(chatKey(repo, prNumber)) ?? [];
   const ctx: ToolContext = { repo, prNumber, headSha: session.headSha };
   const provider = await getEffectiveLlmProvider();
+  const model = await getLlmModel("chat");
 
   const answer =
     provider === "claude-code"
-      ? await askViaClaudeCode(repo, prNumber, session, ctx, history, question)
-      : await askViaApi(repo, prNumber, session, ctx, history, question);
+      ? await askViaClaudeCode(
+          model,
+          repo,
+          prNumber,
+          session,
+          ctx,
+          history,
+          question,
+        )
+      : await askViaApi(model, repo, prNumber, session, ctx, history, question);
 
   const finalAnswer =
     answer || "I couldn't produce an answer — please try asking again.";
@@ -343,6 +351,7 @@ function renderHistory(history: ChatMessage[]): string {
 }
 
 async function askViaClaudeCode(
+  model: string,
   repo: string,
   prNumber: number,
   session: Session,
@@ -357,7 +366,7 @@ async function askViaClaudeCode(
       : question;
 
   return runChatQuery({
-    model: CHAT_MODEL,
+    model,
     systemPrompt: `${SYSTEM_PROMPT}\n\n${session.context}`,
     prompt,
     toolContext: ctx,
@@ -367,6 +376,7 @@ async function askViaClaudeCode(
 }
 
 async function askViaApi(
+  model: string,
   repo: string,
   prNumber: number,
   session: Session,
@@ -408,7 +418,7 @@ async function askViaApi(
     const turn = await streamTurn(
       apiKey,
       {
-        model: CHAT_MODEL,
+        model,
         max_tokens: MAX_OUTPUT_TOKENS,
         stream: true,
         system,

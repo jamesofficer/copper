@@ -180,11 +180,15 @@ export interface ClaudeCodeStatus {
   account: string | null;
 }
 
+// The two model-driven features, each with its own model setting.
+export type LlmTask = "analysis" | "chat";
+
 export interface LlmStatus {
   choice: LlmProviderChoice;
   effective: LlmProvider;
   claudeCode: ClaudeCodeStatus;
   apiKeyConfigured: boolean;
+  models: Record<LlmTask, string>;
 }
 
 export type SecretProvider = "anthropic" | "github";

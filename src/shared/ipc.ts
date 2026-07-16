@@ -5,6 +5,7 @@ import type {
   KeyTestResult,
   LlmProviderChoice,
   LlmStatus,
+  LlmTask,
   PullRequest,
   PullRequestComment,
   PullRequestCommit,
@@ -66,6 +67,7 @@ export interface IpcApi {
   ): Promise<void>;
   getLlmStatus(): Promise<LlmStatus>;
   setLlmProvider(choice: LlmProviderChoice): Promise<LlmStatus>;
+  setLlmModel(task: LlmTask, model: string): Promise<LlmStatus>;
   getSecretsStatus(): Promise<SecretsStatus>;
   saveSecret(provider: SecretProvider, value: string): Promise<KeyTestResult>;
   clearSecret(provider: SecretProvider): Promise<SecretsStatus>;
@@ -107,6 +109,7 @@ export const ipcChannels = [
   "submitReview",
   "getLlmStatus",
   "setLlmProvider",
+  "setLlmModel",
   "getSecretsStatus",
   "saveSecret",
   "clearSecret",

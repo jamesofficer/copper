@@ -1,7 +1,8 @@
 import { Button, CloseButton, Dialog, Portal, Tabs } from "@chakra-ui/react";
-import { LuKeyRound, LuPalette, LuSparkles } from "react-icons/lu";
+import { LuBrain, LuKeyRound, LuPalette, LuSparkles } from "react-icons/lu";
 import ApiKeysSettings from "./ApiKeysSettings";
 import AppearanceSettings from "./AppearanceSettings";
+import ModelSettings from "./ModelSettings";
 import ReviewSettings from "./ReviewSettings";
 
 interface Props {
@@ -38,6 +39,9 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                   <Tabs.Trigger value="review" justifyContent="flex-start">
                     <LuSparkles /> Review
                   </Tabs.Trigger>
+                  <Tabs.Trigger value="models" justifyContent="flex-start">
+                    <LuBrain /> Models
+                  </Tabs.Trigger>
                   <Tabs.Trigger value="keys" justifyContent="flex-start">
                     <LuKeyRound /> Connections
                   </Tabs.Trigger>
@@ -47,6 +51,9 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                 </Tabs.Content>
                 <Tabs.Content value="review" pl="6" py="0" flex="1">
                   <ReviewSettings />
+                </Tabs.Content>
+                <Tabs.Content value="models" pl="6" py="0" flex="1">
+                  <ModelSettings />
                 </Tabs.Content>
                 <Tabs.Content value="keys" pl="6" py="0" flex="1">
                   <ApiKeysSettings open={open} />

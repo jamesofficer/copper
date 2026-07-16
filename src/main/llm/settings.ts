@@ -1,11 +1,13 @@
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { DEFAULT_MODELS, isKnownModel } from "../../shared/models";
 import type {
   ClaudeCodeStatus,
   LlmProvider,
   LlmProviderChoice,
   LlmStatus,
+  LlmTask,
 } from "../../shared/types";
 import { getSecret } from "../store/secrets";
 
@@ -14,6 +16,7 @@ const settingsPath = join(configDir, "settings.json");
 
 interface AppSettings {
   llmProvider?: LlmProviderChoice;
+  models?: Partial<Record<LlmTask, string>>;
 }
 
 async function readSettings(): Promise<AppSettings> {
@@ -56,6 +59,16 @@ export async function getClaudeCodeStatus(): Promise<ClaudeCodeStatus> {
   }
 }
 
+// Stored ids that are no longer in the catalog fall back to the default.
+function resolveModels(settings: AppSettings): Record<LlmTask, string> {
+  const models = { ...DEFAULT_MODELS };
+  for (const task of Object.keys(models) as LlmTask[]) {
+    const stored = settings.models?.[task];
+    if (stored && isKnownModel(stored)) models[task] = stored;
+  }
+  return models;
+}
+
 export async function getLlmStatus(): Promise<LlmStatus> {
   const settings = await readSettings();
   const choice = settings.llmProvider ?? "auto";
@@ -67,7 +80,13 @@ export async function getLlmStatus(): Promise<LlmStatus> {
         ? "claude-code"
         : "api-key"
       : choice;
-  return { choice, effective, claudeCode, apiKeyConfigured };
+  return {
+    choice,
+    effective,
+    claudeCode,
+    apiKeyConfigured,
+    models: resolveModels(settings),
+  };
 }
 
 export async function setLlmProvider(
@@ -77,6 +96,23 @@ export async function setLlmProvider(
   settings.llmProvider = choice;
   await writeSettings(settings);
   return getLlmStatus();
+}
+
+export async function setLlmModel(
+  task: LlmTask,
+  model: string,
+): Promise<LlmStatus> {
+  if (!isKnownModel(model)) {
+    throw new Error(`Unknown model: ${model}`);
+  }
+  const settings = await readSettings();
+  settings.models = { ...settings.models, [task]: model };
+  await writeSettings(settings);
+  return getLlmStatus();
+}
+
+export async function getLlmModel(task: LlmTask): Promise<string> {
+  return resolveModels(await readSettings())[task];
 }
 
 export async function getEffectiveLlmProvider(): Promise<LlmProvider> {
