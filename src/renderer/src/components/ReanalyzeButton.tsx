@@ -1,10 +1,31 @@
-import { Button, CloseButton, Dialog, Portal, Text } from "@chakra-ui/react";
+import {
+  Button,
+  CloseButton,
+  createListCollection,
+  Dialog,
+  Field,
+  Portal,
+  Select,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuRefreshCw } from "react-icons/lu";
-import type { PullRequest } from "../../../shared/types";
-import { getReviewPersonality } from "../lib/reviewPersonality";
+import type { PullRequest, ReviewPersonality } from "../../../shared/types";
+import {
+  getReviewPersonality,
+  personalityOptions,
+} from "../lib/reviewPersonality";
 import { toaster } from "./ui/toaster";
+
+const personalityCollection = createListCollection({
+  items: personalityOptions.map((option) => ({
+    label: option.label,
+    value: option.value,
+    description: option.description,
+  })),
+});
 
 interface Props {
   pr: PullRequest;
@@ -16,6 +37,8 @@ interface Props {
 export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [personality, setPersonality] =
+    useState<ReviewPersonality>(getReviewPersonality);
 
   const { data: analysis } = useQuery({
     queryKey: ["analysis", pr.repo, pr.number],
@@ -29,7 +52,7 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
       return window.api.analyzePullRequest(
         pr.repo,
         pr.number,
-        getReviewPersonality(),
+        personality,
         true,
       );
     },
@@ -65,7 +88,12 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
     <Dialog.Root
       role="alertdialog"
       open={open}
-      onOpenChange={(event) => setOpen(event.open)}
+      onOpenChange={(event) => {
+        setOpen(event.open);
+        // Start each confirmation from the global setting, not a leftover
+        // override from a previous run.
+        if (event.open) setPersonality(getReviewPersonality());
+      }}
       size="sm"
       lazyMount
       unmountOnExit
@@ -91,11 +119,54 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
               <CloseButton size="sm" />
             </Dialog.CloseTrigger>
             <Dialog.Body>
-              <Text fontSize="sm" color="fg.muted">
-                This runs a fresh analysis of the current commit and clears the
-                review chat. The existing summary and conversation will be
-                replaced.
-              </Text>
+              <VStack alignItems="stretch" gap="4">
+                <Text fontSize="sm" color="fg.muted">
+                  This runs a fresh analysis of the current commit and clears
+                  the review chat. The existing summary and conversation will be
+                  replaced.
+                </Text>
+                <Field.Root>
+                  <Field.Label>Personality</Field.Label>
+                  <Select.Root
+                    collection={personalityCollection}
+                    value={[personality]}
+                    onValueChange={(details) => {
+                      const value = details.value[0];
+                      if (value) setPersonality(value as ReviewPersonality);
+                    }}
+                    size="sm"
+                  >
+                    <Select.HiddenSelect />
+                    <Select.Control>
+                      <Select.Trigger cursor="pointer">
+                        <Select.ValueText />
+                      </Select.Trigger>
+                      <Select.IndicatorGroup>
+                        <Select.Indicator />
+                      </Select.IndicatorGroup>
+                    </Select.Control>
+                    <Select.Positioner>
+                      <Select.Content>
+                        {personalityCollection.items.map((item) => (
+                          <Select.Item item={item} key={item.value}>
+                            <VStack gap="0" alignItems="flex-start">
+                              <Text>{item.label}</Text>
+                              <Text fontSize="xs" color="fg.muted">
+                                {item.description}
+                              </Text>
+                            </VStack>
+                            <Select.ItemIndicator />
+                          </Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select.Positioner>
+                  </Select.Root>
+                  <Field.HelperText>
+                    Just for this analysis — your default in Settings → Review
+                    stays as it is.
+                  </Field.HelperText>
+                </Field.Root>
+              </VStack>
             </Dialog.Body>
             <Dialog.Footer gap="2">
               <Button
