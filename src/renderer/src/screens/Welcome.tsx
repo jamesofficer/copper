@@ -22,6 +22,7 @@ import type { PullRequest, Repository } from "../../../shared/types";
 import AnalyzedPanel from "../components/AnalyzedPanel";
 import HomeSidebar from "../components/HomeSidebar";
 import PullRequestCard from "../components/PullRequestCard";
+import PullRequestPreview from "../components/PullRequestPreview";
 import SettingsDialog from "../components/SettingsDialog";
 import SetupBanner from "../components/SetupBanner";
 import { toaster } from "../components/ui/toaster";
@@ -41,6 +42,9 @@ export default function Welcome({ onSelect }: Props) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState("open");
   const [recent, setRecent] = useState(() => listRecentPullRequests());
+  // Clicking a PR anywhere on this screen previews its Overview in a right
+  // panel; the panel's "View PR" button opens the full review screen.
+  const [preview, setPreview] = useState<PullRequest | null>(null);
 
   function clearRecent() {
     clearRecentPullRequests();
@@ -110,7 +114,7 @@ export default function Welcome({ onSelect }: Props) {
         onRemoveRepo={(path) => void removeRepository(path)}
         recent={recent}
         onClearRecent={clearRecent}
-        onSelectPullRequest={onSelect}
+        onSelectPullRequest={setPreview}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
@@ -202,7 +206,11 @@ export default function Welcome({ onSelect }: Props) {
                       <PullRequestCard
                         key={`${pr.repo}#${pr.number}`}
                         pr={pr}
-                        onSelect={onSelect}
+                        onSelect={setPreview}
+                        selected={
+                          preview?.repo === pr.repo &&
+                          preview?.number === pr.number
+                        }
                         maxW="2xl"
                       />
                     ))
@@ -213,9 +221,17 @@ export default function Welcome({ onSelect }: Props) {
         </Tabs.Content>
 
         <Tabs.Content value="analyzed" flex="1" minH="0" p="0">
-          <AnalyzedPanel onSelect={onSelect} />
+          <AnalyzedPanel onSelect={setPreview} />
         </Tabs.Content>
       </Tabs.Root>
+
+      {preview && (
+        <PullRequestPreview
+          pr={preview}
+          onView={onSelect}
+          onClose={() => setPreview(null)}
+        />
+      )}
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Flex>

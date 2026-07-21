@@ -13,6 +13,8 @@ interface Props {
   // here win over the snapshot.
   detail?: PullRequestDetail;
   onSelect(pr: PullRequest): void;
+  // Highlight the card while its PR is open in the preview panel.
+  selected?: boolean;
   showRepo?: boolean;
   viewedAt?: string;
   maxW?: string;
@@ -24,6 +26,7 @@ export default function PullRequestCard({
   pr,
   detail,
   onSelect,
+  selected,
   showRepo,
   viewedAt,
   maxW,
@@ -52,6 +55,8 @@ export default function PullRequestCard({
       py="4"
       cursor="pointer"
       transition="backgrounds"
+      bg={selected ? "bg.subtle" : undefined}
+      borderColor={selected ? "colorPalette.muted" : undefined}
       _hover={{ bg: "bg.subtle", borderColor: "colorPalette.muted" }}
     >
       <HStack justifyContent="space-between" gap="4" alignItems="flex-start">

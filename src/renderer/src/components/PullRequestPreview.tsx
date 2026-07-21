@@ -1,0 +1,53 @@
+import { Box, Button, Flex, HStack, IconButton, Text } from "@chakra-ui/react";
+import { LuArrowRight, LuX } from "react-icons/lu";
+import type { PullRequest } from "../../../shared/types";
+import PullRequestOverview from "./PullRequestOverview";
+
+interface Props {
+  pr: PullRequest;
+  // Leave the preview and open the PR's full review screen.
+  onView(pr: PullRequest): void;
+  onClose(): void;
+}
+
+// The right-hand panel on the home screen: a quick look at a PR's Overview
+// without leaving the PR lists.
+export default function PullRequestPreview({ pr, onView, onClose }: Props) {
+  return (
+    <Flex
+      direction="column"
+      w="45%"
+      minW="md"
+      flexShrink="0"
+      minH="0"
+      borderLeftWidth="1px"
+    >
+      <HStack gap="3" px="4" py="2" borderBottomWidth="1px" flexShrink="0">
+        <Text
+          fontFamily="mono"
+          fontSize="sm"
+          color="fg.muted"
+          truncate
+          flex="1"
+        >
+          {pr.repo}#{pr.number}
+        </Text>
+        <Button size="xs" onClick={() => onView(pr)}>
+          View PR <LuArrowRight />
+        </Button>
+        <IconButton
+          aria-label="Close preview"
+          size="xs"
+          variant="ghost"
+          color="fg.muted"
+          onClick={onClose}
+        >
+          <LuX />
+        </IconButton>
+      </HStack>
+      <Box flex="1" minH="0">
+        <PullRequestOverview pr={pr} />
+      </Box>
+    </Flex>
+  );
+}
