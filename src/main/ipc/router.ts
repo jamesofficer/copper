@@ -13,6 +13,7 @@ import {
   listPullRequestReviews,
   listReviewRequestedPullRequests,
   listReviewRequests,
+  mergePullRequest,
   submitReview,
 } from "../github/client";
 import { getLlmStatus, setLlmModel, setLlmProvider } from "../llm/settings";
@@ -58,6 +59,8 @@ const handlers: IpcApi = {
   clearChat: (repo, prNumber) => clearChat(repo, prNumber),
   submitReview: (repo, prNumber, verdict, body) =>
     submitReview(repo, prNumber, verdict, body),
+  mergePullRequest: (repo, prNumber, method) =>
+    mergePullRequest(repo, prNumber, method),
   getLlmStatus: () => getLlmStatus(),
   setLlmProvider: (choice) => setLlmProvider(choice),
   setLlmModel: (task, model) => setLlmModel(task, model),

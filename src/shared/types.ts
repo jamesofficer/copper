@@ -38,6 +38,10 @@ export interface PullRequestDetail {
   state: "open" | "closed";
   draft: boolean;
   merged: boolean;
+  // GitHub computes this asynchronously; it's null until the check finishes.
+  mergeable: boolean | null;
+  // GitHub's mergeable_state, e.g. "clean", "dirty" (conflicts), "blocked".
+  mergeableState: string;
   reviewStatus: ReviewStatus;
   baseRef: string;
   headRef: string;
@@ -53,6 +57,9 @@ export interface PullRequestDetail {
   updatedAt: string;
   url: string;
 }
+
+// How GitHub combines the PR's commits when merging.
+export type MergeMethod = "merge" | "squash" | "rebase";
 
 // Mirrors GitHub's review events: comment, approve, or request changes.
 export type ReviewVerdict = "comment" | "approve" | "request_changes";

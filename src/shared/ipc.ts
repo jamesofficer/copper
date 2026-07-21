@@ -6,6 +6,7 @@ import type {
   LlmProviderChoice,
   LlmStatus,
   LlmTask,
+  MergeMethod,
   PullRequest,
   PullRequestComment,
   PullRequestCommit,
@@ -73,6 +74,11 @@ export interface IpcApi {
     verdict: ReviewVerdict,
     body: string,
   ): Promise<void>;
+  mergePullRequest(
+    repo: string,
+    prNumber: number,
+    method: MergeMethod,
+  ): Promise<void>;
   getLlmStatus(): Promise<LlmStatus>;
   setLlmProvider(choice: LlmProviderChoice): Promise<LlmStatus>;
   setLlmModel(task: LlmTask, model: string): Promise<LlmStatus>;
@@ -118,6 +124,7 @@ export const ipcChannels = [
   "getChatHistory",
   "clearChat",
   "submitReview",
+  "mergePullRequest",
   "getLlmStatus",
   "setLlmProvider",
   "setLlmModel",

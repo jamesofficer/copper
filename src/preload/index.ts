@@ -48,6 +48,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("clearChat", repo, prNumber),
   submitReview: (repo, prNumber, verdict, body) =>
     ipcRenderer.invoke("submitReview", repo, prNumber, verdict, body),
+  mergePullRequest: (repo, prNumber, method) =>
+    ipcRenderer.invoke("mergePullRequest", repo, prNumber, method),
   getLlmStatus: () => ipcRenderer.invoke("getLlmStatus"),
   setLlmProvider: (choice) => ipcRenderer.invoke("setLlmProvider", choice),
   setLlmModel: (task, model) => ipcRenderer.invoke("setLlmModel", task, model),
