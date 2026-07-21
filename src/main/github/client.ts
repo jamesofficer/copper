@@ -1,12 +1,14 @@
 import type {
   FileStatus,
   MergeMethod,
+  NewReviewComment,
   PullRequest,
   PullRequestComment,
   PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
   PullRequestReview,
+  ReviewComment,
   ReviewState,
   ReviewStatus,
   ReviewVerdict,
@@ -507,6 +509,109 @@ export async function addPullRequestComment(
   );
 
   return toPullRequestComment(comment);
+}
+
+interface GitHubReviewComment {
+  id: number;
+  body: string | null;
+  user: { login: string } | null;
+  created_at: string;
+  path: string;
+  line: number | null;
+  start_line: number | null;
+  side: "LEFT" | "RIGHT";
+  in_reply_to_id?: number;
+}
+
+function toReviewComment(comment: GitHubReviewComment): ReviewComment {
+  return {
+    id: comment.id,
+    author: comment.user?.login ?? "unknown",
+    body: comment.body ?? "",
+    createdAt: comment.created_at,
+    path: comment.path,
+    line: comment.line,
+    startLine: comment.start_line,
+    side: comment.side,
+    inReplyTo: comment.in_reply_to_id ?? null,
+  };
+}
+
+// Inline review comments on the PR's diff, oldest first.
+export async function listReviewComments(
+  repo: string,
+  prNumber: number,
+): Promise<ReviewComment[]> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const comments: GitHubReviewComment[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const batch = await githubFetch<GitHubReviewComment[]>(
+      token,
+      `/repos/${repo}/pulls/${prNumber}/comments?per_page=100&page=${page}`,
+    );
+    comments.push(...batch);
+    if (batch.length < 100) break;
+  }
+
+  return comments.map(toReviewComment);
+}
+
+export async function addReviewComment(
+  repo: string,
+  prNumber: number,
+  comment: NewReviewComment,
+): Promise<ReviewComment> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to comment.");
+  }
+
+  const created = await githubFetch<GitHubReviewComment>(
+    token,
+    `/repos/${repo}/pulls/${prNumber}/comments`,
+    {
+      method: "POST",
+      body: {
+        body: comment.body,
+        commit_id: comment.commitId,
+        path: comment.path,
+        line: comment.line,
+        side: comment.side,
+        // GitHub rejects start_line unless it's strictly before line.
+        ...(comment.startLine !== null && comment.startLine < comment.line
+          ? { start_line: comment.startLine, start_side: comment.side }
+          : {}),
+      },
+    },
+  );
+
+  return toReviewComment(created);
+}
+
+export async function replyToReviewComment(
+  repo: string,
+  prNumber: number,
+  commentId: number,
+  body: string,
+): Promise<ReviewComment> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to comment.");
+  }
+
+  const created = await githubFetch<GitHubReviewComment>(
+    token,
+    `/repos/${repo}/pulls/${prNumber}/comments/${commentId}/replies`,
+    { method: "POST", body: { body } },
+  );
+
+  return toReviewComment(created);
 }
 
 const reviewEvents: Record<ReviewVerdict, string> = {

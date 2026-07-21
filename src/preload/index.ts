@@ -28,6 +28,12 @@ const api: WindowApi = {
     ipcRenderer.invoke("listPullRequestReviews", repo, prNumber),
   addPullRequestComment: (repo, prNumber, body) =>
     ipcRenderer.invoke("addPullRequestComment", repo, prNumber, body),
+  listReviewComments: (repo, prNumber) =>
+    ipcRenderer.invoke("listReviewComments", repo, prNumber),
+  addReviewComment: (repo, prNumber, comment) =>
+    ipcRenderer.invoke("addReviewComment", repo, prNumber, comment),
+  replyToReviewComment: (repo, prNumber, commentId, body) =>
+    ipcRenderer.invoke("replyToReviewComment", repo, prNumber, commentId, body),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),
   listAnalyzedPullRequests: () =>

@@ -103,6 +103,38 @@ export interface PullRequestComment {
   createdAt: string;
 }
 
+// Which side of the diff an inline comment anchors to: LEFT = the old file
+// (deleted lines), RIGHT = the new file (added and context lines).
+export type DiffSide = "LEFT" | "RIGHT";
+
+// An inline review comment on a diff line (GitHub's PR review comments API)
+// — distinct from PullRequestComment, which lives in the conversation.
+export interface ReviewComment {
+  id: number;
+  author: string;
+  body: string;
+  createdAt: string;
+  path: string;
+  // Line numbers in the PR's current diff. null = outdated: the code the
+  // comment pointed at has changed since it was written.
+  line: number | null;
+  startLine: number | null;
+  side: DiffSide;
+  inReplyTo: number | null;
+}
+
+// What the composer sends when opening a new inline comment thread.
+export interface NewReviewComment {
+  // The head commit the rendered diff belongs to (GitHub's commit_id).
+  commitId: string;
+  path: string;
+  side: DiffSide;
+  line: number;
+  // Set when the comment covers a range ending at `line`.
+  startLine: number | null;
+  body: string;
+}
+
 export interface PullRequestCommit {
   sha: string;
   subject: string;

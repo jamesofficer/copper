@@ -9,9 +9,10 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
+import { buildReviewThreads } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import CommitList from "./CommitList";
 import DiffView from "./DiffView";
@@ -44,6 +45,36 @@ export default function ChangesView({ pr }: Props) {
   const files = filesQuery.data;
   const selectedFile =
     files?.find((file) => file.path === selectedPath) ?? files?.[0] ?? null;
+
+  // Same key as the Overview tab's query — needed for the full head SHA
+  // (the summary prop's headSha is truncated for display).
+  const detailQuery = useQuery({
+    queryKey: ["pullRequest", pr.repo, pr.number],
+    queryFn: () => window.api.getPullRequest(pr.repo, pr.number),
+  });
+
+  const reviewCommentsQuery = useQuery({
+    queryKey: ["reviewComments", pr.repo, pr.number],
+    queryFn: () => window.api.listReviewComments(pr.repo, pr.number),
+  });
+  const threadsByPath = useMemo(
+    () => buildReviewThreads(reviewCommentsQuery.data ?? []),
+    [reviewCommentsQuery.data],
+  );
+
+  // Inline commenting only works against the full changelist — a single
+  // commit's diff numbers lines differently than the PR diff GitHub anchors
+  // comments to.
+  const headSha = detailQuery.data?.headSha;
+  const commenting =
+    selectedCommit === null && headSha && selectedFile
+      ? {
+          repo: pr.repo,
+          prNumber: pr.number,
+          commitId: headSha,
+          threads: threadsByPath.get(selectedFile.path) ?? [],
+        }
+      : undefined;
 
   return (
     <Flex h="full" minH="0">
@@ -132,7 +163,7 @@ export default function ChangesView({ pr }: Props) {
 
       <Box flex="1" minH="0" minW="0">
         {selectedFile ? (
-          <DiffView file={selectedFile} />
+          <DiffView file={selectedFile} commenting={commenting} />
         ) : (
           <Center h="full" p="4">
             <Text color="fg.muted" fontSize="sm">

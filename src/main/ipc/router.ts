@@ -5,15 +5,18 @@ import { listAnalyzedPullRequests } from "../analysis/cache";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
   addPullRequestComment,
+  addReviewComment,
   getPullRequest,
   listCommitFiles,
   listPullRequestComments,
   listPullRequestCommits,
   listPullRequestFiles,
   listPullRequestReviews,
+  listReviewComments,
   listReviewRequestedPullRequests,
   listReviewRequests,
   mergePullRequest,
+  replyToReviewComment,
   submitReview,
 } from "../github/client";
 import { getLlmStatus, setLlmModel, setLlmProvider } from "../llm/settings";
@@ -49,6 +52,11 @@ const handlers: IpcApi = {
     listPullRequestReviews(repo, prNumber),
   addPullRequestComment: (repo, prNumber, body) =>
     addPullRequestComment(repo, prNumber, body),
+  listReviewComments: (repo, prNumber) => listReviewComments(repo, prNumber),
+  addReviewComment: (repo, prNumber, comment) =>
+    addReviewComment(repo, prNumber, comment),
+  replyToReviewComment: (repo, prNumber, commentId, body) =>
+    replyToReviewComment(repo, prNumber, commentId, body),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
   analyzePullRequest: (repo, prNumber, personality, force) =>

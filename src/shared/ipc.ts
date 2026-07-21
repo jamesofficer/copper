@@ -7,6 +7,7 @@ import type {
   LlmStatus,
   LlmTask,
   MergeMethod,
+  NewReviewComment,
   PullRequest,
   PullRequestComment,
   PullRequestCommit,
@@ -14,6 +15,7 @@ import type {
   PullRequestFile,
   PullRequestReview,
   Repository,
+  ReviewComment,
   ReviewPersonality,
   ReviewVerdict,
   SecretProvider,
@@ -53,6 +55,20 @@ export interface IpcApi {
     prNumber: number,
     body: string,
   ): Promise<PullRequestComment>;
+  // Inline review comments on diff lines — separate from the conversation
+  // comments above.
+  listReviewComments(repo: string, prNumber: number): Promise<ReviewComment[]>;
+  addReviewComment(
+    repo: string,
+    prNumber: number,
+    comment: NewReviewComment,
+  ): Promise<ReviewComment>;
+  replyToReviewComment(
+    repo: string,
+    prNumber: number,
+    commentId: number,
+    body: string,
+  ): Promise<ReviewComment>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
   listAnalyzedPullRequests(): Promise<AnalyzedPullRequest[]>;
   analyzePullRequest(
@@ -117,6 +133,9 @@ export const ipcChannels = [
   "listPullRequestComments",
   "listPullRequestReviews",
   "addPullRequestComment",
+  "listReviewComments",
+  "addReviewComment",
+  "replyToReviewComment",
   "getAnalysis",
   "listAnalyzedPullRequests",
   "analyzePullRequest",
