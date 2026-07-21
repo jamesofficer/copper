@@ -1,5 +1,6 @@
 import type {
   FileStatus,
+  MergeMethod,
   PullRequest,
   PullRequestComment,
   PullRequestCommit,
@@ -27,6 +28,8 @@ interface GitHubPullDetail extends GitHubPullSummary {
   state: "open" | "closed";
   draft: boolean;
   merged: boolean;
+  mergeable: boolean | null;
+  mergeable_state: string;
   base: { ref: string };
   head: { sha: string; ref: string };
   labels: Array<{ name: string; color: string }>;
@@ -298,6 +301,8 @@ export async function getPullRequest(
     state: pull.state,
     draft: pull.draft,
     merged: pull.merged,
+    mergeable: pull.mergeable,
+    mergeableState: pull.mergeable_state,
     reviewStatus,
     baseRef: pull.base.ref,
     headRef: pull.head.ref,
@@ -527,5 +532,21 @@ export async function submitReview(
       event: reviewEvents[verdict],
       ...(body ? { body } : {}),
     },
+  });
+}
+
+export async function mergePullRequest(
+  repo: string,
+  prNumber: number,
+  method: MergeMethod,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to merge.");
+  }
+
+  await githubFetch(token, `/repos/${repo}/pulls/${prNumber}/merge`, {
+    method: "PUT",
+    body: { merge_method: method },
   });
 }
