@@ -79,6 +79,7 @@ export default function MergeDialog({ detail }: Props) {
   });
 
   const conflicts = hasConflicts(detail);
+  const canMerge = detail.state === "open" && !detail.merged && !detail.draft;
 
   return (
     <Dialog.Root
@@ -89,8 +90,13 @@ export default function MergeDialog({ detail }: Props) {
       unmountOnExit
     >
       <Dialog.Trigger asChild>
-        <Button size="xs" colorPalette="green">
-          <LuGitMerge /> Merge pull request
+        <Button
+          size="xs"
+          variant="outline"
+          colorPalette="purple"
+          disabled={!canMerge}
+        >
+          <LuGitMerge /> {detail.merged ? "Merged" : "Merge pull request"}
         </Button>
       </Dialog.Trigger>
       <Portal>
@@ -168,8 +174,8 @@ export default function MergeDialog({ detail }: Props) {
                 Cancel
               </Button>
               <Button
-                size="xs"
-                colorPalette="green"
+                size="sm"
+                colorPalette="purple"
                 disabled={conflicts}
                 loading={merge.isPending}
                 onClick={() => merge.mutate()}

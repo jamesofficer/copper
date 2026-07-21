@@ -22,7 +22,6 @@ import { scrollbar } from "../lib/scrollbar";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import Markdown from "./Markdown";
-import MergeDialog from "./MergeDialog";
 import PrStateBadge from "./PrStateBadge";
 import ReviewCard from "./ReviewCard";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
@@ -191,15 +190,6 @@ export default function PullRequestOverview({ pr }: Props) {
           reviews={reviews}
           requestedReviewers={detail.reviewers}
         />
-
-        {detail.state === "open" &&
-          !detail.merged &&
-          !detail.draft &&
-          detail.reviewStatus === "approved" && (
-            <HStack justifyContent="flex-end">
-              <MergeDialog detail={detail} />
-            </HStack>
-          )}
 
         <Separator />
 

@@ -42,9 +42,11 @@ const verdictOptions: Array<{
 
 interface Props {
   pr: PullRequest;
+  // Reviewing a merged PR is pointless — the caller disables the trigger.
+  disabled?: boolean;
 }
 
-export default function SubmitReviewDialog({ pr }: Props) {
+export default function SubmitReviewDialog({ pr, disabled }: Props) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -93,7 +95,12 @@ export default function SubmitReviewDialog({ pr }: Props) {
       unmountOnExit
     >
       <Dialog.Trigger asChild>
-        <Button size="xs" variant="outline" colorPalette="green">
+        <Button
+          size="xs"
+          variant="outline"
+          colorPalette="green"
+          disabled={disabled}
+        >
           <LuPenLine /> Submit review
         </Button>
       </Dialog.Trigger>

@@ -7,6 +7,7 @@ import {
   Tabs,
   Text,
 } from "@chakra-ui/react";
+import { useQuery } from "@tanstack/react-query";
 import {
   LuArrowLeft,
   LuExternalLink,
@@ -17,6 +18,7 @@ import {
 import type { PullRequest } from "../../../shared/types";
 import ChangesView from "../components/ChangesView";
 import DiffViewModeSelect from "../components/DiffViewModeSelect";
+import MergeDialog from "../components/MergeDialog";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReanalyzeButton from "../components/ReanalyzeButton";
 import ReviewPanel from "../components/ReviewPanel";
@@ -28,6 +30,13 @@ interface Props {
 }
 
 export default function Review({ pr, onBack }: Props) {
+  // Same key as the Overview tab's query, so the two share one fetch.
+  const detailQuery = useQuery({
+    queryKey: ["pullRequest", pr.repo, pr.number],
+    queryFn: () => window.api.getPullRequest(pr.repo, pr.number),
+  });
+  const detail = detailQuery.data;
+
   return (
     <Flex direction="column" h="100vh">
       <HStack
@@ -53,7 +62,8 @@ export default function Review({ pr, onBack }: Props) {
           </a>
         </Button>
         <ReanalyzeButton pr={pr} />
-        <SubmitReviewDialog pr={pr} />
+        <SubmitReviewDialog pr={pr} disabled={detail?.merged} />
+        {detail && <MergeDialog detail={detail} />}
       </HStack>
 
       <Tabs.Root
