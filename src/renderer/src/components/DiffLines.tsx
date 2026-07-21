@@ -1,6 +1,7 @@
 import { Box, Flex, Text } from "@chakra-ui/react";
 import {
   Fragment,
+  memo,
   type ReactNode,
   useEffect,
   useMemo,
@@ -427,8 +428,11 @@ function SplitRows({
 
 // Renders a file's patch as diff rows — unified or side-by-side, following
 // the global view mode. Sizing and scrolling are the parent's job, so this
-// can live in a full pane (DiffView) or an embedded card.
-export default function DiffLines({ file, commenting }: Props) {
+// can live in a full pane (DiffView) or an embedded card. Memoized because
+// the row tree is by far the most expensive thing on screen — parents
+// re-render freely (e.g. on every file-filter keystroke) and must not drag
+// thousands of diff rows along.
+function DiffLines({ file, commenting }: Props) {
   const mode = useDiffViewMode();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [wide, setWide] = useState(false);
@@ -611,3 +615,5 @@ export default function DiffLines({ file, commenting }: Props) {
     </Box>
   );
 }
+
+export default memo(DiffLines);
