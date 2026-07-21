@@ -10,7 +10,7 @@ export default function App() {
   function openPullRequest(pr: PullRequest) {
     recordRecentPullRequest(pr);
     // Kick off the repo warm-up. The Overview tab's query may be served from
-    // a cache RecentPanel filled via peekPullRequest, which skips warm-up.
+    // a cache filled via peekPullRequest, which skips warm-up.
     void window.api.getPullRequest(pr.repo, pr.number).catch(() => {});
     setSelected(pr);
   }

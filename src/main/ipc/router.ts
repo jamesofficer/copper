@@ -10,6 +10,7 @@ import {
   listPullRequestComments,
   listPullRequestCommits,
   listPullRequestFiles,
+  listReviewRequestedPullRequests,
   listReviewRequests,
   submitReview,
 } from "../github/client";
@@ -27,6 +28,7 @@ const handlers: IpcApi = {
   addRepository: () => addRepository(),
   removeRepository: (path) => removeRepository(path),
   listPullRequests: (repo) => listReviewRequests(repo),
+  listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
   getPullRequest: async (repo, prNumber) => {
     const detail = await getPullRequest(repo, prNumber);
     // Best-effort background clone/fetch so repo context is ready for the chat.

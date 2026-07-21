@@ -1,0 +1,19 @@
+appId: com.jamesofficer.reviewr
+productName: Reviewr
+directories:
+  output: dist
+files:
+  - out/**
+  - resources/icon.png
+# The Agent SDK resolves files next to its own package at runtime; keep it
+# outside the asar archive so nothing breaks when it reads or spawns.
+asarUnpack:
+  - node_modules/@anthropic-ai/claude-agent-sdk/**
+# No native modules to rebuild.
+npmRebuild: false
+mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64

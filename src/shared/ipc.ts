@@ -23,6 +23,8 @@ export interface IpcApi {
   addRepository(): Promise<Repository | null>;
   removeRepository(path: string): Promise<Repository[]>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
+  // Open PRs (any repo) where the logged-in user's review is requested.
+  listReviewRequestedPullRequests(): Promise<PullRequest[]>;
   getPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
   // Same data as getPullRequest but without the background repo warm-up —
   // for bulk refreshes (e.g. the recently-viewed panel).
@@ -95,6 +97,7 @@ export const ipcChannels = [
   "addRepository",
   "removeRepository",
   "listPullRequests",
+  "listReviewRequestedPullRequests",
   "getPullRequest",
   "peekPullRequest",
   "listPullRequestFiles",

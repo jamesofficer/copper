@@ -128,6 +128,27 @@ async function getReviewStatus(
   return "awaiting_review";
 }
 
+function toPullRequest(
+  repo: string,
+  pull: GitHubPullDetail,
+  reviewStatus: ReviewStatus,
+): PullRequest {
+  return {
+    repo,
+    number: pull.number,
+    title: pull.title,
+    author: pull.user?.login ?? "unknown",
+    draft: pull.draft,
+    reviewStatus,
+    headSha: pull.head.sha.slice(0, 7),
+    url: pull.html_url,
+    additions: pull.additions,
+    deletions: pull.deletions,
+    changedFiles: pull.changed_files,
+    comments: pull.comments + pull.review_comments,
+  };
+}
+
 export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
   if (!repo.includes("/")) {
     throw new Error(
@@ -160,20 +181,45 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
     }),
   );
 
-  return details.map(({ pull, reviewStatus }) => ({
-    repo,
-    number: pull.number,
-    title: pull.title,
-    author: pull.user?.login ?? "unknown",
-    draft: pull.draft,
-    reviewStatus,
-    headSha: pull.head.sha.slice(0, 7),
-    url: pull.html_url,
-    additions: pull.additions,
-    deletions: pull.deletions,
-    changedFiles: pull.changed_files,
-    comments: pull.comments + pull.review_comments,
-  }));
+  return details.map(({ pull, reviewStatus }) =>
+    toPullRequest(repo, pull, reviewStatus),
+  );
+}
+
+interface GitHubSearchIssues {
+  items: Array<{ number: number; repository_url: string }>;
+}
+
+// Open PRs across all repos where the logged-in user's review is requested,
+// most recently updated first. Returns [] when no token is set — this feeds a
+// passive sidebar section and the setup banner already prompts for the token.
+export async function listReviewRequestedPullRequests(): Promise<
+  PullRequest[]
+> {
+  const token = await getGitHubToken();
+  if (!token) return [];
+
+  const query = encodeURIComponent(
+    "is:pr is:open archived:false review-requested:@me",
+  );
+  const search = await githubFetch<GitHubSearchIssues>(
+    token,
+    `/search/issues?q=${query}&sort=updated&order=desc&per_page=20&advanced_search=true`,
+  );
+
+  return Promise.all(
+    search.items.map(async (item) => {
+      const repo = item.repository_url.split("/repos/")[1];
+      const [pull, reviewStatus] = await Promise.all([
+        githubFetch<GitHubPullDetail>(
+          token,
+          `/repos/${repo}/pulls/${item.number}`,
+        ),
+        getReviewStatus(token, repo, item.number),
+      ]);
+      return toPullRequest(repo, pull, reviewStatus);
+    }),
+  );
 }
 
 export async function getPullRequest(

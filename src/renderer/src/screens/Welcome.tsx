@@ -3,10 +3,7 @@ import {
   Button,
   EmptyState,
   Flex,
-  Heading,
   HStack,
-  Icon,
-  IconButton,
   Spinner,
   Stack,
   Tabs,
@@ -19,17 +16,12 @@ import {
   LuFolderGit2,
   LuFolderPlus,
   LuGitPullRequest,
-  LuGitPullRequestArrow,
-  LuHistory,
-  LuSettings,
   LuSparkles,
-  LuTrash2,
 } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
 import AnalyzedPanel from "../components/AnalyzedPanel";
+import HomeSidebar from "../components/HomeSidebar";
 import PullRequestCard from "../components/PullRequestCard";
-import RecentPanel from "../components/RecentPanel";
-import RepoSidebar from "../components/RepoSidebar";
 import SettingsDialog from "../components/SettingsDialog";
 import SetupBanner from "../components/SetupBanner";
 import { toaster } from "../components/ui/toaster";
@@ -99,172 +91,131 @@ export default function Welcome({ onSelect }: Props) {
     }
   }
 
-  async function removeActive() {
-    if (!active) return;
-    const remaining = await window.api.removeRepository(active.path);
+  async function removeRepository(path: string) {
+    const remaining = await window.api.removeRepository(path);
     queryClient.setQueryData(["repositories"], remaining);
-    setActivePath(remaining[0]?.path ?? null);
+    if (activePath === path || !activePath) {
+      setActivePath(remaining[0]?.path ?? null);
+    }
   }
 
   return (
-    <Flex direction="column" h="100vh">
-      <HStack
-        justifyContent="space-between"
-        px="4"
-        py="2"
-        borderBottomWidth="1px"
-        flexShrink="0"
+    <Flex h="100vh" minH="0">
+      <HomeSidebar
+        repositories={repositories}
+        reposPending={reposQuery.isPending}
+        activePath={active?.path ?? null}
+        onSelectRepo={setActivePath}
+        onAddRepo={() => void addRepository()}
+        onRemoveRepo={(path) => void removeRepository(path)}
+        recent={recent}
+        onClearRecent={clearRecent}
+        onSelectPullRequest={onSelect}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+
+      <Tabs.Root
+        value={tab}
+        onValueChange={(event) => setTab(event.value)}
+        display="flex"
+        flexDirection="column"
+        flex="1"
+        minW="0"
       >
-        <HStack gap="2.5" color="colorPalette.fg">
-          <Icon size="sm">
-            <LuGitPullRequestArrow />
-          </Icon>
-          <Heading size="md" letterSpacing="tight">
-            PR Reviewer
-          </Heading>
-        </HStack>
-        <IconButton
-          aria-label="Settings"
-          variant="ghost"
-          size="sm"
-          color="fg.muted"
-          onClick={() => setSettingsOpen(true)}
-        >
-          <LuSettings />
-        </IconButton>
-      </HStack>
+        <Tabs.List flexShrink="0" px="4" alignItems="center">
+          <Tabs.Trigger value="open">
+            <LuGitPullRequest /> Open pull requests
+          </Tabs.Trigger>
+          <Tabs.Trigger value="analyzed">
+            <LuSparkles /> Analysed pull requests
+          </Tabs.Trigger>
+        </Tabs.List>
 
-      <Flex flex="1" minH="0">
-        <RepoSidebar
-          repositories={repositories}
-          isPending={reposQuery.isPending}
-          activePath={active?.path ?? null}
-          onSelect={setActivePath}
-          onAdd={() => void addRepository()}
-          onRemove={() => void removeActive()}
-        />
+        <Tabs.Content value="open" flex="1" minH="0" p="0">
+          <Stack
+            h="full"
+            minH="0"
+            overflowY="auto"
+            gap="3"
+            px="4"
+            py="4"
+            css={scrollbar}
+          >
+            <SetupBanner onOpenSettings={() => setSettingsOpen(true)} />
 
-        <Tabs.Root
-          value={tab}
-          onValueChange={(event) => setTab(event.value)}
-          display="flex"
-          flexDirection="column"
-          flex="1"
-          minW="0"
-        >
-          <Tabs.List flexShrink="0" px="4" alignItems="center">
-            <Tabs.Trigger value="open">
-              <LuGitPullRequest /> Open pull requests
-            </Tabs.Trigger>
-            <Tabs.Trigger value="recent">
-              <LuHistory /> Recently viewed
-            </Tabs.Trigger>
-            <Tabs.Trigger value="analyzed">
-              <LuSparkles /> Analysed pull requests
-            </Tabs.Trigger>
-            {tab === "recent" && recent.length > 0 && (
-              <Button
-                ml="auto"
-                size="xs"
-                variant="ghost"
-                color="fg.muted"
-                onClick={clearRecent}
+            {!reposQuery.isPending &&
+            (!repositories || repositories.length === 0) ? (
+              <EmptyState.Root
+                borderWidth="1px"
+                borderStyle="dashed"
+                rounded="xl"
+                maxW="2xl"
               >
-                <LuTrash2 /> Clear history
-              </Button>
-            )}
-          </Tabs.List>
+                <EmptyState.Content>
+                  <EmptyState.Indicator>
+                    <LuFolderGit2 />
+                  </EmptyState.Indicator>
+                  <VStack textAlign="center">
+                    <EmptyState.Title>No repositories yet</EmptyState.Title>
+                    <EmptyState.Description>
+                      Add a local git repository to start reviewing its pull
+                      requests.
+                    </EmptyState.Description>
+                  </VStack>
+                  <Button onClick={addRepository}>
+                    <LuFolderPlus /> Add repository
+                  </Button>
+                </EmptyState.Content>
+              </EmptyState.Root>
+            ) : (
+              <>
+                {active && !active.slug && (
+                  <Text fontSize="sm" color="fg.muted">
+                    This repository has no GitHub remote, so pull requests can’t
+                    be loaded.
+                  </Text>
+                )}
 
-          <Tabs.Content value="open" flex="1" minH="0" p="0">
-            <Stack
-              h="full"
-              minH="0"
-              overflowY="auto"
-              gap="3"
-              px="4"
-              py="4"
-              css={scrollbar}
-            >
-              <SetupBanner onOpenSettings={() => setSettingsOpen(true)} />
+                {prsError && (
+                  <Alert.Root status="error" rounded="lg" maxW="2xl">
+                    <Alert.Indicator />
+                    <Alert.Content>
+                      <Alert.Title>Couldn’t load pull requests</Alert.Title>
+                      <Alert.Description>{prsError}</Alert.Description>
+                    </Alert.Content>
+                  </Alert.Root>
+                )}
 
-              {!reposQuery.isPending &&
-              (!repositories || repositories.length === 0) ? (
-                <EmptyState.Root
-                  borderWidth="1px"
-                  borderStyle="dashed"
-                  rounded="xl"
-                  maxW="2xl"
-                >
-                  <EmptyState.Content>
-                    <EmptyState.Indicator>
-                      <LuFolderGit2 />
-                    </EmptyState.Indicator>
-                    <VStack textAlign="center">
-                      <EmptyState.Title>No repositories yet</EmptyState.Title>
-                      <EmptyState.Description>
-                        Add a local git repository to start reviewing its pull
-                        requests.
-                      </EmptyState.Description>
-                    </VStack>
-                    <Button onClick={addRepository}>
-                      <LuFolderPlus /> Add repository
-                    </Button>
-                  </EmptyState.Content>
-                </EmptyState.Root>
-              ) : (
-                <>
-                  {active && !active.slug && (
-                    <Text fontSize="sm" color="fg.muted">
-                      This repository has no GitHub remote, so pull requests
-                      can’t be loaded.
+                {active?.slug &&
+                  !prsError &&
+                  (prsQuery.isPending || !prs ? (
+                    <HStack color="fg.muted" py="4">
+                      <Spinner size="sm" />
+                      <Text fontSize="sm">Loading open pull requests…</Text>
+                    </HStack>
+                  ) : prs.length === 0 ? (
+                    <Text fontSize="sm" color="fg.muted" py="4">
+                      No open pull requests. Nice and quiet.
                     </Text>
-                  )}
+                  ) : (
+                    prs.map((pr) => (
+                      <PullRequestCard
+                        key={`${pr.repo}#${pr.number}`}
+                        pr={pr}
+                        onSelect={onSelect}
+                        maxW="2xl"
+                      />
+                    ))
+                  ))}
+              </>
+            )}
+          </Stack>
+        </Tabs.Content>
 
-                  {prsError && (
-                    <Alert.Root status="error" rounded="lg" maxW="2xl">
-                      <Alert.Indicator />
-                      <Alert.Content>
-                        <Alert.Title>Couldn’t load pull requests</Alert.Title>
-                        <Alert.Description>{prsError}</Alert.Description>
-                      </Alert.Content>
-                    </Alert.Root>
-                  )}
-
-                  {active?.slug &&
-                    !prsError &&
-                    (prsQuery.isPending || !prs ? (
-                      <HStack color="fg.muted" py="4">
-                        <Spinner size="sm" />
-                        <Text fontSize="sm">Loading open pull requests…</Text>
-                      </HStack>
-                    ) : prs.length === 0 ? (
-                      <Text fontSize="sm" color="fg.muted" py="4">
-                        No open pull requests. Nice and quiet.
-                      </Text>
-                    ) : (
-                      prs.map((pr) => (
-                        <PullRequestCard
-                          key={`${pr.repo}#${pr.number}`}
-                          pr={pr}
-                          onSelect={onSelect}
-                          maxW="2xl"
-                        />
-                      ))
-                    ))}
-                </>
-              )}
-            </Stack>
-          </Tabs.Content>
-
-          <Tabs.Content value="recent" flex="1" minH="0" p="0">
-            <RecentPanel recent={recent} onSelect={onSelect} />
-          </Tabs.Content>
-
-          <Tabs.Content value="analyzed" flex="1" minH="0" p="0">
-            <AnalyzedPanel onSelect={onSelect} />
-          </Tabs.Content>
-        </Tabs.Root>
-      </Flex>
+        <Tabs.Content value="analyzed" flex="1" minH="0" p="0">
+          <AnalyzedPanel onSelect={onSelect} />
+        </Tabs.Content>
+      </Tabs.Root>
 
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </Flex>
