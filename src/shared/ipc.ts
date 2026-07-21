@@ -11,6 +11,7 @@ import type {
   PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
+  PullRequestReview,
   Repository,
   ReviewPersonality,
   ReviewVerdict,
@@ -42,6 +43,10 @@ export interface IpcApi {
     repo: string,
     prNumber: number,
   ): Promise<PullRequestComment[]>;
+  listPullRequestReviews(
+    repo: string,
+    prNumber: number,
+  ): Promise<PullRequestReview[]>;
   addPullRequestComment(
     repo: string,
     prNumber: number,
@@ -104,6 +109,7 @@ export const ipcChannels = [
   "listPullRequestCommits",
   "listCommitFiles",
   "listPullRequestComments",
+  "listPullRequestReviews",
   "addPullRequestComment",
   "getAnalysis",
   "listAnalyzedPullRequests",

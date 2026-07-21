@@ -10,6 +10,7 @@ import {
   listPullRequestComments,
   listPullRequestCommits,
   listPullRequestFiles,
+  listPullRequestReviews,
   listReviewRequestedPullRequests,
   listReviewRequests,
   submitReview,
@@ -43,6 +44,8 @@ const handlers: IpcApi = {
   listCommitFiles: (repo, commitSha) => listCommitFiles(repo, commitSha),
   listPullRequestComments: (repo, prNumber) =>
     listPullRequestComments(repo, prNumber),
+  listPullRequestReviews: (repo, prNumber) =>
+    listPullRequestReviews(repo, prNumber),
   addPullRequestComment: (repo, prNumber, body) =>
     addPullRequestComment(repo, prNumber, body),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),

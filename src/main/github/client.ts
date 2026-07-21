@@ -5,6 +5,8 @@ import type {
   PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
+  PullRequestReview,
+  ReviewState,
   ReviewStatus,
   ReviewVerdict,
 } from "../../shared/types";
@@ -95,23 +97,35 @@ async function githubErrorDetail(res: Response): Promise<string> {
 }
 
 interface GitHubReview {
+  id: number;
   user: { login: string } | null;
   state: string;
+  body: string | null;
+  submitted_at: string | null;
 }
+
+async function fetchReviews(
+  token: string,
+  repo: string,
+  prNumber: number,
+): Promise<GitHubReview[]> {
+  return githubFetch<GitHubReview[]>(
+    token,
+    `/repos/${repo}/pulls/${prNumber}/reviews?per_page=100`,
+  );
+}
+
+const reviewStates: Record<string, ReviewState> = {
+  APPROVED: "approved",
+  CHANGES_REQUESTED: "changes_requested",
+  COMMENTED: "commented",
+  DISMISSED: "dismissed",
+};
 
 // Mirrors GitHub's review decision. Reviews arrive oldest-first, so each
 // reviewer's latest APPROVED/CHANGES_REQUESTED wins; a dismissal wipes their
 // vote; COMMENTED and PENDING reviews don't count.
-async function getReviewStatus(
-  token: string,
-  repo: string,
-  prNumber: number,
-): Promise<ReviewStatus> {
-  const reviews = await githubFetch<GitHubReview[]>(
-    token,
-    `/repos/${repo}/pulls/${prNumber}/reviews?per_page=100`,
-  );
-
+function reviewStatusFrom(reviews: GitHubReview[]): ReviewStatus {
   const latestByReviewer = new Map<string, string>();
   for (const review of reviews) {
     if (!review.user) continue;
@@ -147,6 +161,43 @@ function toPullRequest(
     changedFiles: pull.changed_files,
     comments: pull.comments + pull.review_comments,
   };
+}
+
+async function getReviewStatus(
+  token: string,
+  repo: string,
+  prNumber: number,
+): Promise<ReviewStatus> {
+  return reviewStatusFrom(await fetchReviews(token, repo, prNumber));
+}
+
+// Every submitted review, oldest first. PENDING reviews (drafts the author
+// hasn't submitted) and any state GitHub adds later are dropped.
+export async function listPullRequestReviews(
+  repo: string,
+  prNumber: number,
+): Promise<PullRequestReview[]> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const reviews = await fetchReviews(token, repo, prNumber);
+  return reviews.flatMap((review) => {
+    const state = reviewStates[review.state];
+    if (!state || !review.submitted_at) return [];
+    return [
+      {
+        id: review.id,
+        author: review.user?.login ?? "unknown",
+        state,
+        body: review.body ?? "",
+        submittedAt: review.submitted_at,
+      },
+    ];
+  });
 }
 
 export async function listReviewRequests(repo: string): Promise<PullRequest[]> {

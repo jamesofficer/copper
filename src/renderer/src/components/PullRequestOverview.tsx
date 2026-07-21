@@ -12,25 +12,54 @@ import {
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { LuGitCommitHorizontal } from "react-icons/lu";
-import type { PullRequest } from "../../../shared/types";
+import type {
+  PullRequest,
+  PullRequestComment,
+  PullRequestReview,
+} from "../../../shared/types";
+import { formatDate } from "../lib/formatDate";
 import { scrollbar } from "../lib/scrollbar";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import Markdown from "./Markdown";
 import PrStateBadge from "./PrStateBadge";
+import ReviewCard from "./ReviewCard";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
+import ReviewSummary from "./ReviewSummary";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
   pr: PullRequest;
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+type TimelineItem =
+  | { kind: "comment"; date: string; comment: PullRequestComment }
+  | { kind: "review"; date: string; review: PullRequestReview };
+
+// Merge conversation comments and meaningful review events into one
+// oldest-first thread. Reviews only appear when they carry a verdict or a
+// written comment — bare "commented" reviews and dismissals are noise here.
+function buildTimeline(
+  comments: PullRequestComment[],
+  reviews: PullRequestReview[],
+): TimelineItem[] {
+  const items: TimelineItem[] = comments.map((comment) => ({
+    kind: "comment",
+    date: comment.createdAt,
+    comment,
+  }));
+
+  for (const review of reviews) {
+    const meaningful =
+      review.state === "approved" ||
+      review.state === "changes_requested" ||
+      (review.state === "commented" && review.body.trim().length > 0);
+    if (meaningful) {
+      items.push({ kind: "review", date: review.submittedAt, review });
+    }
+  }
+
+  return items.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
 }
 
 export default function PullRequestOverview({ pr }: Props) {
@@ -44,6 +73,12 @@ export default function PullRequestOverview({ pr }: Props) {
     queryFn: () => window.api.listPullRequestComments(pr.repo, pr.number),
   });
   const comments = commentsQuery.data;
+
+  const reviewsQuery = useQuery({
+    queryKey: ["pullRequestReviews", pr.repo, pr.number],
+    queryFn: () => window.api.listPullRequestReviews(pr.repo, pr.number),
+  });
+  const reviews = reviewsQuery.data ?? [];
 
   if (detailQuery.isPending) {
     return (
@@ -69,6 +104,7 @@ export default function PullRequestOverview({ pr }: Props) {
   }
 
   const detail = detailQuery.data;
+  const timeline = comments ? buildTimeline(comments, reviews) : [];
 
   return (
     <Box h="full" overflowY="auto" css={scrollbar}>
@@ -150,17 +186,10 @@ export default function PullRequestOverview({ pr }: Props) {
           </HStack>
         </HStack>
 
-        {detail.reviewers.length > 0 && (
-          <HStack fontSize="sm" gap="2" flexWrap="wrap">
-            <Text color="fg.muted">Reviewers</Text>
-            {detail.reviewers.map((reviewer) => (
-              <Badge key={reviewer} variant="subtle" fontFamily="mono">
-                <UserAvatar username={reviewer} boxSize="3.5" />
-                {reviewer}
-              </Badge>
-            ))}
-          </HStack>
-        )}
+        <ReviewSummary
+          reviews={reviews}
+          requestedReviewers={detail.reviewers}
+        />
 
         <Separator />
 
@@ -194,13 +223,23 @@ export default function PullRequestOverview({ pr }: Props) {
                 letterSpacing="wider"
                 mb="3"
               >
-                Comments ({comments.length})
+                Conversation ({timeline.length})
               </Heading>
               <VStack gap="3" alignItems="stretch">
-                {comments.map((comment) => (
-                  <CommentCard key={comment.id} comment={comment} />
-                ))}
-                <Box mt={comments.length > 0 ? "3" : "0"}>
+                {timeline.map((item) =>
+                  item.kind === "comment" ? (
+                    <CommentCard
+                      key={`comment-${item.comment.id}`}
+                      comment={item.comment}
+                    />
+                  ) : (
+                    <ReviewCard
+                      key={`review-${item.review.id}`}
+                      review={item.review}
+                    />
+                  ),
+                )}
+                <Box mt={timeline.length > 0 ? "3" : "0"}>
                   <Heading
                     size="xs"
                     color="fg.muted"

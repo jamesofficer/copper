@@ -57,6 +57,22 @@ export interface PullRequestDetail {
 // Mirrors GitHub's review events: comment, approve, or request changes.
 export type ReviewVerdict = "comment" | "approve" | "request_changes";
 
+// A submitted review on the PR. Mirrors GitHub's review states; PENDING
+// reviews aren't submitted yet, so they never reach the renderer.
+export type ReviewState =
+  | "approved"
+  | "changes_requested"
+  | "commented"
+  | "dismissed";
+
+export interface PullRequestReview {
+  id: number;
+  author: string;
+  state: ReviewState;
+  body: string;
+  submittedAt: string;
+}
+
 // The voice the analysis text is written in. Changes only the wording of an
 // analysis, never what it reports.
 export const reviewPersonalities = [

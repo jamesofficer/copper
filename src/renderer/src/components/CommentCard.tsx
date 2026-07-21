@@ -1,18 +1,11 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { PullRequestComment } from "../../../shared/types";
+import { formatDate } from "../lib/formatDate";
 import Markdown from "./Markdown";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
   comment: PullRequestComment;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 export default function CommentCard({ comment }: Props) {
