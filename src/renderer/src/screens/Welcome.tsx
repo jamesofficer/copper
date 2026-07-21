@@ -34,11 +34,16 @@ import { scrollbar } from "../lib/scrollbar";
 
 interface Props {
   onSelect(pr: PullRequest): void;
+  activePath: string | null;
+  onActivePathChange(path: string | null): void;
 }
 
-export default function Welcome({ onSelect }: Props) {
+export default function Welcome({
+  onSelect,
+  activePath,
+  onActivePathChange,
+}: Props) {
   const queryClient = useQueryClient();
-  const [activePath, setActivePath] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tab, setTab] = useState("open");
   const [recent, setRecent] = useState(() => listRecentPullRequests());
@@ -81,7 +86,7 @@ export default function Welcome({ onSelect }: Props) {
         added,
         ...(prev ?? []).filter((repo) => repo.path !== added.path),
       ]);
-      setActivePath(added.path);
+      onActivePathChange(added.path);
     } catch (cause) {
       toaster.create({
         type: "error",
@@ -99,7 +104,7 @@ export default function Welcome({ onSelect }: Props) {
     const remaining = await window.api.removeRepository(path);
     queryClient.setQueryData(["repositories"], remaining);
     if (activePath === path || !activePath) {
-      setActivePath(remaining[0]?.path ?? null);
+      onActivePathChange(remaining[0]?.path ?? null);
     }
   }
 
@@ -109,7 +114,7 @@ export default function Welcome({ onSelect }: Props) {
         repositories={repositories}
         reposPending={reposQuery.isPending}
         activePath={active?.path ?? null}
-        onSelectRepo={setActivePath}
+        onSelectRepo={onActivePathChange}
         onAddRepo={() => void addRepository()}
         onRemoveRepo={(path) => void removeRepository(path)}
         recent={recent}
