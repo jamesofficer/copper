@@ -58,6 +58,9 @@ const fontStyles = {
   lineHeight: "1.6",
 } as const;
 
+// Marks the lines an existing comment thread covers.
+const commentedStripe = "inset 3px 0 0 {colors.yellow.solid}";
+
 // GitHub's anchoring rule: deleted lines belong to the LEFT (old) side of
 // the diff, added and context lines to the RIGHT (new) side.
 interface CommentAnchor {
@@ -84,6 +87,9 @@ interface CommentContext {
   composer: { side: DiffSide; line: number; startLine: number | null } | null;
   anchorOf(line: DiffLine): CommentAnchor | undefined;
   threadsFor(line: DiffLine): ReviewThread[];
+  // Whether an existing thread's range covers this line — marks the lines a
+  // comment was left on.
+  isCommented(line: DiffLine): boolean;
   isSelected(line: DiffLine): boolean;
   isComposerLine(line: DiffLine): boolean;
   startSelect(event: React.MouseEvent, anchor: CommentAnchor): void;
@@ -246,6 +252,7 @@ function InlineRows({
         const style = rowStyles[line.kind];
         const anchor = ctx?.anchorOf(line);
         const selected = ctx?.isSelected(line) ?? false;
+        const commented = ctx?.isCommented(line) ?? false;
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: patch lines have no stable id
           <Fragment key={index}>
@@ -253,6 +260,7 @@ function InlineRows({
               className={anchor ? "group" : undefined}
               position="relative"
               bg={selected ? "blue.subtle" : style.bg}
+              boxShadow={commented ? commentedStripe : undefined}
               color={line.kind === "hunk" ? "fg.muted" : "fg"}
               onMouseEnter={anchor ? () => ctx?.extendSelect(line) : undefined}
             >
@@ -321,11 +329,13 @@ function SplitCell({
     anchor !== undefined &&
     (side === "old" ? line.kind === "del" : line.kind !== "del");
   const selected = ctx?.isSelected(line) ?? false;
+  const commented = ctx?.isCommented(line) ?? false;
   return (
     <Flex
       className={plusHere ? "group" : undefined}
       position="relative"
       bg={selected ? "blue.subtle" : style.bg}
+      boxShadow={commented ? commentedStripe : undefined}
       onMouseEnter={anchor ? () => ctx?.extendSelect(line) : undefined}
     >
       <Gutter value={side === "old" ? line.oldNumber : line.newNumber} />
@@ -494,6 +504,20 @@ export default function DiffLines({ file, commenting }: Props) {
     return map;
   }, [commenting?.threads]);
 
+  // Every side:line an existing thread's range covers, so those lines can be
+  // marked in the gutter.
+  const commentedKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const thread of commenting?.threads ?? []) {
+      const { side, line, startLine } = thread.root;
+      if (line === null) continue;
+      for (let n = startLine ?? line; n <= line; n++) {
+        keys.add(`${side}:${n}`);
+      }
+    }
+    return keys;
+  }, [commenting?.threads]);
+
   let ctx: CommentContext | undefined;
   if (commenting) {
     const low = draft ? Math.min(draft.start, draft.end) : 0;
@@ -522,6 +546,11 @@ export default function DiffLines({ file, commenting }: Props) {
         }
         return result;
       },
+      isCommented: (line) =>
+        (line.oldNumber !== null &&
+          commentedKeys.has(`LEFT:${line.oldNumber}`)) ||
+        (line.newNumber !== null &&
+          commentedKeys.has(`RIGHT:${line.newNumber}`)),
       isSelected: (line) => {
         if (!draft) return false;
         const anchor = anchors.get(line);

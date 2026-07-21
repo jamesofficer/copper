@@ -1,6 +1,15 @@
-import { Box, Button, HStack, Text, Textarea, VStack } from "@chakra-ui/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Box,
+  Button,
+  HStack,
+  IconButton,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { LuTrash2 } from "react-icons/lu";
 import type { ReviewComment } from "../../../shared/types";
 import { formatDate } from "../lib/formatDate";
 import type { ReviewThread } from "../lib/reviewComments";
@@ -18,6 +27,17 @@ export default function DiffCommentThread({ thread, repo, prNumber }: Props) {
   const queryClient = useQueryClient();
   const [replying, setReplying] = useState(false);
   const [body, setBody] = useState("");
+  // The comment whose delete button is waiting for confirmation.
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
+
+  // GitHub only lets you delete your own comments, so the button is offered
+  // on those alone.
+  const viewerQuery = useQuery({
+    queryKey: ["viewer"],
+    queryFn: () => window.api.getViewer(),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const viewer = viewerQuery.data;
 
   const reply = useMutation({
     mutationFn: () =>
@@ -45,6 +65,28 @@ export default function DiffCommentThread({ thread, repo, prNumber }: Props) {
     },
   });
 
+  const remove = useMutation({
+    mutationFn: (commentId: number) =>
+      window.api.deleteReviewComment(repo, commentId),
+    // Refetch instead of editing the cache: deleting a thread's opening
+    // comment re-roots its replies, which only the server knows about.
+    onSuccess: () => {
+      setConfirmingId(null);
+      queryClient.invalidateQueries({
+        queryKey: ["reviewComments", repo, prNumber],
+      });
+    },
+    onError: (cause) => {
+      setConfirmingId(null);
+      toaster.create({
+        type: "error",
+        title: "Couldn’t delete comment",
+        description: cause instanceof Error ? cause.message : String(cause),
+        closable: true,
+      });
+    },
+  });
+
   const canReply = body.trim().length > 0 && !reply.isPending;
 
   function handleKeyDown(event: React.KeyboardEvent) {
@@ -64,6 +106,7 @@ export default function DiffCommentThread({ thread, repo, prNumber }: Props) {
       {[thread.root, ...thread.replies].map((comment, index) => (
         <Box
           key={comment.id}
+          className="group"
           px="3"
           py="2.5"
           borderTopWidth={index > 0 ? "1px" : undefined}
@@ -76,6 +119,41 @@ export default function DiffCommentThread({ thread, repo, prNumber }: Props) {
             <Text fontSize="xs" color="fg.subtle">
               {formatDate(comment.createdAt)}
             </Text>
+            {viewer === comment.author &&
+              (confirmingId === comment.id ? (
+                <HStack gap="1" ml="auto">
+                  <Button
+                    size="2xs"
+                    colorPalette="red"
+                    loading={remove.isPending}
+                    onClick={() => remove.mutate(comment.id)}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    size="2xs"
+                    variant="ghost"
+                    disabled={remove.isPending}
+                    onClick={() => setConfirmingId(null)}
+                  >
+                    Cancel
+                  </Button>
+                </HStack>
+              ) : (
+                <IconButton
+                  size="2xs"
+                  variant="ghost"
+                  color="fg.muted"
+                  aria-label="Delete comment"
+                  ml="auto"
+                  opacity="0"
+                  _groupHover={{ opacity: 1 }}
+                  _focusVisible={{ opacity: 1 }}
+                  onClick={() => setConfirmingId(comment.id)}
+                >
+                  <LuTrash2 />
+                </IconButton>
+              ))}
           </HStack>
           {comment.body.trim() ? (
             <Markdown>{comment.body}</Markdown>

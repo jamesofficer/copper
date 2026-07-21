@@ -6,7 +6,9 @@ import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
   addPullRequestComment,
   addReviewComment,
+  deleteReviewComment,
   getPullRequest,
+  getViewer,
   listCommitFiles,
   listPullRequestComments,
   listPullRequestCommits,
@@ -57,6 +59,9 @@ const handlers: IpcApi = {
     addReviewComment(repo, prNumber, comment),
   replyToReviewComment: (repo, prNumber, commentId, body) =>
     replyToReviewComment(repo, prNumber, commentId, body),
+  deleteReviewComment: (repo, commentId) =>
+    deleteReviewComment(repo, commentId),
+  getViewer: () => getViewer(),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
   analyzePullRequest: (repo, prNumber, personality, force) =>

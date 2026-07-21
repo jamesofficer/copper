@@ -121,6 +121,9 @@ export interface ReviewComment {
   startLine: number | null;
   side: DiffSide;
   inReplyTo: number | null;
+  // The diff excerpt GitHub attaches to the comment, ending at its anchor
+  // line — shown where the full diff isn't (the Overview's conversation).
+  diffHunk: string;
 }
 
 // What the composer sends when opening a new inline comment thread.

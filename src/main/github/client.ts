@@ -78,7 +78,20 @@ async function githubFetch<T>(
     );
   }
 
+  // Deletes come back as 204 with no body.
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+// The login the stored token belongs to — the renderer uses it to decide
+// which comments offer a delete button.
+export async function getViewer(): Promise<string> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings first.");
+  }
+  const user = await githubFetch<{ login: string }>(token, "/user");
+  return user.login;
 }
 
 // GitHub's error bodies put the useful text in `message`, and validation
@@ -521,6 +534,7 @@ interface GitHubReviewComment {
   start_line: number | null;
   side: "LEFT" | "RIGHT";
   in_reply_to_id?: number;
+  diff_hunk: string | null;
 }
 
 function toReviewComment(comment: GitHubReviewComment): ReviewComment {
@@ -534,6 +548,7 @@ function toReviewComment(comment: GitHubReviewComment): ReviewComment {
     startLine: comment.start_line,
     side: comment.side,
     inReplyTo: comment.in_reply_to_id ?? null,
+    diffHunk: comment.diff_hunk ?? "",
   };
 }
 
@@ -612,6 +627,22 @@ export async function replyToReviewComment(
   );
 
   return toReviewComment(created);
+}
+
+export async function deleteReviewComment(
+  repo: string,
+  commentId: number,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to delete comments.");
+  }
+
+  await githubFetch<undefined>(
+    token,
+    `/repos/${repo}/pulls/comments/${commentId}`,
+    { method: "DELETE", body: undefined },
+  );
 }
 
 const reviewEvents: Record<ReviewVerdict, string> = {

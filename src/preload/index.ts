@@ -34,6 +34,9 @@ const api: WindowApi = {
     ipcRenderer.invoke("addReviewComment", repo, prNumber, comment),
   replyToReviewComment: (repo, prNumber, commentId, body) =>
     ipcRenderer.invoke("replyToReviewComment", repo, prNumber, commentId, body),
+  deleteReviewComment: (repo, commentId) =>
+    ipcRenderer.invoke("deleteReviewComment", repo, commentId),
+  getViewer: () => ipcRenderer.invoke("getViewer"),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),
   listAnalyzedPullRequests: () =>

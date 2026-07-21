@@ -69,6 +69,9 @@ export interface IpcApi {
     commentId: number,
     body: string,
   ): Promise<ReviewComment>;
+  deleteReviewComment(repo: string, commentId: number): Promise<void>;
+  // The GitHub login the stored token belongs to.
+  getViewer(): Promise<string>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
   listAnalyzedPullRequests(): Promise<AnalyzedPullRequest[]>;
   analyzePullRequest(
@@ -136,6 +139,8 @@ export const ipcChannels = [
   "listReviewComments",
   "addReviewComment",
   "replyToReviewComment",
+  "deleteReviewComment",
+  "getViewer",
   "getAnalysis",
   "listAnalyzedPullRequests",
   "analyzePullRequest",
