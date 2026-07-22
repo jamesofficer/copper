@@ -2,6 +2,7 @@ import type {
   AnalysisResult,
   AnalyzedPullRequest,
   ChatMessage,
+  DraftReviewComment,
   KeyTestResult,
   LlmProviderChoice,
   LlmStatus,
@@ -103,6 +104,29 @@ export interface IpcApi {
     rootCommentId: number,
     resolved: boolean,
   ): Promise<void>;
+  // Inline comments drafted locally for a batch review. Nothing reaches
+  // GitHub until submitReview, which posts them all as one review and then
+  // clears them.
+  listDraftComments(
+    repo: string,
+    prNumber: number,
+  ): Promise<DraftReviewComment[]>;
+  addDraftComment(
+    repo: string,
+    prNumber: number,
+    comment: NewReviewComment,
+  ): Promise<DraftReviewComment>;
+  updateDraftComment(
+    repo: string,
+    prNumber: number,
+    draftId: string,
+    body: string,
+  ): Promise<DraftReviewComment>;
+  deleteDraftComment(
+    repo: string,
+    prNumber: number,
+    draftId: string,
+  ): Promise<void>;
   // Paths the viewer marked as viewed, synced with GitHub's own checkboxes
   // (GraphQL viewerViewedState — a file changed after viewing drops out).
   listViewedFiles(repo: string, prNumber: number): Promise<string[]>;
@@ -194,6 +218,10 @@ export const ipcChannels = [
   "deleteReviewComment",
   "listResolvedReviewThreads",
   "setReviewThreadResolved",
+  "listDraftComments",
+  "addDraftComment",
+  "updateDraftComment",
+  "deleteDraftComment",
   "listViewedFiles",
   "setFileViewed",
   "getViewer",

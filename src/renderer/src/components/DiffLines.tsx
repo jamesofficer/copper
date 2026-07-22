@@ -9,7 +9,11 @@ import {
   useState,
 } from "react";
 import { LuPlus } from "react-icons/lu";
-import type { DiffSide, PullRequestFile } from "../../../shared/types";
+import type {
+  DiffSide,
+  DraftReviewComment,
+  PullRequestFile,
+} from "../../../shared/types";
 import {
   buildSplitRows,
   type DiffLine,
@@ -24,6 +28,7 @@ import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
 import DiffCommentComposer from "./DiffCommentComposer";
 import DiffCommentThread from "./DiffCommentThread";
+import DraftCommentCard from "./DraftCommentCard";
 
 // Everything a diff needs to host inline review comments: the file's
 // existing threads plus the ids the composer posts new ones with.
@@ -35,6 +40,11 @@ export interface DiffCommenting {
   // Root-comment ids of resolved threads, so each thread's resolve button
   // can read the current state.
   resolvedRootIds: Set<number>;
+  // The file's locally drafted review comments, rendered like threads.
+  drafts: DraftReviewComment[];
+  // True once ANY draft exists on the PR — a review is in progress, which
+  // changes the composer's buttons.
+  reviewStarted: boolean;
 }
 
 interface Props {
@@ -74,7 +84,8 @@ interface CommentAnchor {
   hunk: number;
 }
 
-interface DraftRange {
+// An in-progress drag over line numbers, before the composer opens.
+interface SelectionRange {
   side: DiffSide;
   start: number;
   end: number;
@@ -90,8 +101,10 @@ interface CommentContext {
   path: string;
   composer: { side: DiffSide; line: number; startLine: number | null } | null;
   resolvedIds: Set<number>;
+  reviewStarted: boolean;
   anchorOf(line: DiffLine): CommentAnchor | undefined;
   threadsFor(line: DiffLine): ReviewThread[];
+  draftsFor(line: DiffLine): DraftReviewComment[];
   // Whether an existing thread's range covers this line — marks the lines a
   // comment was left on.
   isCommented(line: DiffLine): boolean;
@@ -206,10 +219,12 @@ function CommentBand({ children }: { children: ReactNode }) {
 function CommentBands({
   ctx,
   threads,
+  drafts,
   composerHere,
 }: {
   ctx: CommentContext;
   threads: ReviewThread[];
+  drafts: DraftReviewComment[];
   composerHere: boolean;
 }) {
   return (
@@ -224,6 +239,15 @@ function CommentBands({
           />
         </CommentBand>
       ))}
+      {drafts.map((draft) => (
+        <CommentBand key={draft.id}>
+          <DraftCommentCard
+            draft={draft}
+            repo={ctx.repo}
+            prNumber={ctx.prNumber}
+          />
+        </CommentBand>
+      ))}
       {composerHere && ctx.composer && (
         <CommentBand>
           <DiffCommentComposer
@@ -234,6 +258,7 @@ function CommentBands({
             side={ctx.composer.side}
             line={ctx.composer.line}
             startLine={ctx.composer.startLine}
+            reviewStarted={ctx.reviewStarted}
             onClose={ctx.closeComposer}
           />
         </CommentBand>
@@ -288,6 +313,7 @@ function InlineRows({
               <CommentBands
                 ctx={ctx}
                 threads={ctx.threadsFor(line)}
+                drafts={ctx.draftsFor(line)}
                 composerHere={ctx.isComposerLine(line)}
               />
             )}
@@ -355,6 +381,7 @@ function SplitCell({
 interface SplitSegment {
   rows: SplitRow[];
   threads: ReviewThread[];
+  drafts: DraftReviewComment[];
   composer: boolean;
 }
 
@@ -377,16 +404,17 @@ function SplitRows({
     if (!ctx) continue;
     const cells = row.left === row.right ? [row.left] : [row.left, row.right];
     const threads = cells.flatMap((cell) => (cell ? ctx.threadsFor(cell) : []));
+    const drafts = cells.flatMap((cell) => (cell ? ctx.draftsFor(cell) : []));
     const composer = cells.some(
       (cell) => cell !== null && ctx.isComposerLine(cell),
     );
-    if (threads.length > 0 || composer) {
-      segments.push({ rows: current, threads, composer });
+    if (threads.length > 0 || drafts.length > 0 || composer) {
+      segments.push({ rows: current, threads, drafts, composer });
       current = [];
     }
   }
   if (current.length > 0 || segments.length === 0) {
-    segments.push({ rows: current, threads: [], composer: false });
+    segments.push({ rows: current, threads: [], drafts: [], composer: false });
   }
 
   return (
@@ -422,6 +450,7 @@ function SplitRows({
             <CommentBands
               ctx={ctx}
               threads={segment.threads}
+              drafts={segment.drafts}
               composerHere={segment.composer}
             />
           )}
@@ -441,7 +470,7 @@ function DiffLines({ file, commenting }: Props) {
   const mode = useDiffViewMode();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [wide, setWide] = useState(false);
-  const [draft, setDraft] = useState<DraftRange | null>(null);
+  const [selection, setSelection] = useState<SelectionRange | null>(null);
   const [composing, setComposing] = useState(false);
 
   useEffect(() => {
@@ -461,20 +490,20 @@ function DiffLines({ file, commenting }: Props) {
   // in-progress selection belongs to the previous diff.
   // biome-ignore lint/correctness/useExhaustiveDependencies: file.path is the reset trigger
   useEffect(() => {
-    setDraft(null);
+    setSelection(null);
     setComposing(false);
   }, [file.path]);
 
   // Releasing the mouse anywhere finishes the selection and opens the
   // composer under its last line.
   useEffect(() => {
-    if (!draft || composing) return;
+    if (!selection || composing) return;
     function finish() {
       setComposing(true);
     }
     window.addEventListener("mouseup", finish);
     return () => window.removeEventListener("mouseup", finish);
-  }, [draft, composing]);
+  }, [selection, composing]);
 
   const split = mode === "split" || (mode === "dynamic" && wide);
   const language = languageForPath(file.path);
@@ -513,34 +542,51 @@ function DiffLines({ file, commenting }: Props) {
     return map;
   }, [commenting?.threads]);
 
-  // Every side:line an existing thread's range covers, so those lines can be
-  // marked in the gutter.
+  const draftsByKey = useMemo(() => {
+    const map = new Map<string, DraftReviewComment[]>();
+    for (const draft of commenting?.drafts ?? []) {
+      const key = `${draft.side}:${draft.line}`;
+      const list = map.get(key);
+      if (list) list.push(draft);
+      else map.set(key, [draft]);
+    }
+    return map;
+  }, [commenting?.drafts]);
+
+  // Every side:line an existing thread's or draft's range covers, so those
+  // lines can be marked in the gutter.
   const commentedKeys = useMemo(() => {
     const keys = new Set<string>();
-    for (const thread of commenting?.threads ?? []) {
-      const { side, line, startLine } = thread.root;
-      if (line === null) continue;
-      for (let n = startLine ?? line; n <= line; n++) {
+    function mark(side: DiffSide, line: number | null, start: number | null) {
+      if (line === null) return;
+      for (let n = start ?? line; n <= line; n++) {
         keys.add(`${side}:${n}`);
       }
     }
+    for (const thread of commenting?.threads ?? []) {
+      mark(thread.root.side, thread.root.line, thread.root.startLine);
+    }
+    for (const draft of commenting?.drafts ?? []) {
+      mark(draft.side, draft.line, draft.startLine);
+    }
     return keys;
-  }, [commenting?.threads]);
+  }, [commenting?.threads, commenting?.drafts]);
 
   let ctx: CommentContext | undefined;
   if (commenting) {
-    const low = draft ? Math.min(draft.start, draft.end) : 0;
-    const high = draft ? Math.max(draft.start, draft.end) : 0;
+    const low = selection ? Math.min(selection.start, selection.end) : 0;
+    const high = selection ? Math.max(selection.start, selection.end) : 0;
     ctx = {
       repo: commenting.repo,
       prNumber: commenting.prNumber,
       commitId: commenting.commitId,
       path: file.path,
       resolvedIds: commenting.resolvedRootIds,
+      reviewStarted: commenting.reviewStarted,
       composer:
-        draft && composing
+        selection && composing
           ? {
-              side: draft.side,
+              side: selection.side,
               line: high,
               startLine: low < high ? low : null,
             }
@@ -556,27 +602,37 @@ function DiffLines({ file, commenting }: Props) {
         }
         return result;
       },
+      draftsFor: (line) => {
+        const result: DraftReviewComment[] = [];
+        if (line.oldNumber !== null) {
+          result.push(...(draftsByKey.get(`LEFT:${line.oldNumber}`) ?? []));
+        }
+        if (line.newNumber !== null) {
+          result.push(...(draftsByKey.get(`RIGHT:${line.newNumber}`) ?? []));
+        }
+        return result;
+      },
       isCommented: (line) =>
         (line.oldNumber !== null &&
           commentedKeys.has(`LEFT:${line.oldNumber}`)) ||
         (line.newNumber !== null &&
           commentedKeys.has(`RIGHT:${line.newNumber}`)),
       isSelected: (line) => {
-        if (!draft) return false;
+        if (!selection) return false;
         const anchor = anchors.get(line);
         return (
           anchor !== undefined &&
-          anchor.side === draft.side &&
+          anchor.side === selection.side &&
           anchor.line >= low &&
           anchor.line <= high
         );
       },
       isComposerLine: (line) => {
-        if (!draft || !composing) return false;
+        if (!selection || !composing) return false;
         const anchor = anchors.get(line);
         return (
           anchor !== undefined &&
-          anchor.side === draft.side &&
+          anchor.side === selection.side &&
           anchor.line === high
         );
       },
@@ -585,7 +641,7 @@ function DiffLines({ file, commenting }: Props) {
         event.preventDefault();
         // An open composer keeps its text until it's cancelled explicitly.
         if (composing) return;
-        setDraft({
+        setSelection({
           side: anchor.side,
           start: anchor.line,
           end: anchor.line,
@@ -593,19 +649,21 @@ function DiffLines({ file, commenting }: Props) {
         });
       },
       extendSelect: (line) => {
-        if (!draft || composing) return;
+        if (!selection || composing) return;
         const anchor = anchors.get(line);
         if (
           !anchor ||
-          anchor.side !== draft.side ||
-          anchor.hunk !== draft.hunk
+          anchor.side !== selection.side ||
+          anchor.hunk !== selection.hunk
         ) {
           return;
         }
-        if (anchor.line !== draft.end) setDraft({ ...draft, end: anchor.line });
+        if (anchor.line !== selection.end) {
+          setSelection({ ...selection, end: anchor.line });
+        }
       },
       closeComposer: () => {
-        setDraft(null);
+        setSelection(null);
         setComposing(false);
       },
     };

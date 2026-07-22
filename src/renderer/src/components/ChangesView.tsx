@@ -14,7 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { LuChevronRight, LuSearch } from "react-icons/lu";
 import { useDebounce } from "use-debounce";
-import type { PullRequest } from "../../../shared/types";
+import type { DraftReviewComment, PullRequest } from "../../../shared/types";
 import { buildReviewThreads } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import { usePanelWidth } from "../lib/usePanelWidth";
@@ -138,6 +138,23 @@ export default function ChangesView({ pr }: Props) {
     },
   });
 
+  // Locally drafted review comments — shown on the diff like threads, and
+  // submitted together by the Submit review dialog.
+  const draftsQuery = useQuery({
+    queryKey: ["draftComments", pr.repo, pr.number],
+    queryFn: () => window.api.listDraftComments(pr.repo, pr.number),
+  });
+  const draftsByPath = useMemo(() => {
+    const map = new Map<string, DraftReviewComment[]>();
+    for (const draft of draftsQuery.data ?? []) {
+      const list = map.get(draft.path);
+      if (list) list.push(draft);
+      else map.set(draft.path, [draft]);
+    }
+    return map;
+  }, [draftsQuery.data]);
+  const reviewStarted = (draftsQuery.data?.length ?? 0) > 0;
+
   // Resolution comes from a separate GraphQL lookup; if it fails, threads
   // simply all show as unresolved.
   const resolvedQuery = useQuery({
@@ -163,6 +180,8 @@ export default function ChangesView({ pr }: Props) {
             commitId: headSha,
             threads: threadsByPath.get(selectedFile.path) ?? [],
             resolvedRootIds,
+            drafts: draftsByPath.get(selectedFile.path) ?? [],
+            reviewStarted,
           }
         : undefined,
     [
@@ -171,6 +190,8 @@ export default function ChangesView({ pr }: Props) {
       selectedFile,
       threadsByPath,
       resolvedRootIds,
+      draftsByPath,
+      reviewStarted,
       pr.repo,
       pr.number,
     ],

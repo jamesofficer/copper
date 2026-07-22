@@ -177,6 +177,19 @@ export interface NewReviewComment {
   body: string;
 }
 
+// An inline comment drafted locally as part of a batch review. Nothing
+// reaches GitHub until the review is submitted, which posts every draft as
+// one review — so drafts are freely editable and deletable.
+export interface DraftReviewComment {
+  id: string;
+  path: string;
+  side: DiffSide;
+  line: number;
+  startLine: number | null;
+  body: string;
+  createdAt: string;
+}
+
 export interface PullRequestCommit {
   sha: string;
   subject: string;

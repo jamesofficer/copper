@@ -1,14 +1,17 @@
 import {
+  Box,
   Button,
   CloseButton,
   Dialog,
+  HStack,
   Portal,
   RadioGroup,
+  Stack,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuPenLine } from "react-icons/lu";
 import type { PullRequest, ReviewVerdict } from "../../../shared/types";
@@ -52,6 +55,14 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
   const [body, setBody] = useState("");
   const [verdict, setVerdict] = useState<ReviewVerdict>("comment");
 
+  // Locally drafted inline comments — submitted (and cleared) with the
+  // review, so both the trigger and the dialog surface them.
+  const draftsQuery = useQuery({
+    queryKey: ["draftComments", pr.repo, pr.number],
+    queryFn: () => window.api.listDraftComments(pr.repo, pr.number),
+  });
+  const drafts = draftsQuery.data ?? [];
+
   const submit = useMutation({
     mutationFn: () =>
       window.api.submitReview(pr.repo, pr.number, verdict, body.trim()),
@@ -77,6 +88,13 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
       void queryClient.invalidateQueries({
         queryKey: ["reviewDecision", pr.repo, pr.number],
       });
+      // Drafts became real inline comments and were cleared server-side.
+      void queryClient.invalidateQueries({
+        queryKey: ["draftComments", pr.repo, pr.number],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["reviewComments", pr.repo, pr.number],
+      });
       void queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
       void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
     },
@@ -93,8 +111,10 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
     },
   });
 
-  // GitHub rejects a plain comment review with no text; approvals don't need one.
-  const needsBody = verdict === "comment" && body.trim().length === 0;
+  // GitHub rejects a plain comment review with no text — unless drafted
+  // comments are going with it; approvals don't need one either way.
+  const needsBody =
+    verdict === "comment" && body.trim().length === 0 && drafts.length === 0;
 
   return (
     <Dialog.Root
@@ -112,6 +132,7 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
           disabled={disabled}
         >
           <LuPenLine /> Submit review
+          {drafts.length > 0 ? ` (${drafts.length})` : ""}
         </Button>
       </Dialog.Trigger>
       <Portal>
@@ -126,6 +147,32 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
             </Dialog.CloseTrigger>
             <Dialog.Body>
               <VStack alignItems="stretch" gap="4">
+                {drafts.length > 0 && (
+                  <Box borderWidth="1px" rounded="md" px="3" py="2.5">
+                    <Text fontSize="xs" fontWeight="medium" mb="1.5">
+                      {drafts.length} pending comment
+                      {drafts.length === 1 ? "" : "s"} will be submitted with
+                      this review
+                    </Text>
+                    <Stack gap="1">
+                      {drafts.map((draft) => (
+                        <HStack key={draft.id} gap="2" minW="0">
+                          <Text
+                            fontSize="xs"
+                            fontFamily="mono"
+                            color="fg.muted"
+                            truncate
+                          >
+                            {draft.path}:{draft.line}
+                          </Text>
+                          <Text fontSize="xs" truncate flex="1">
+                            {draft.body}
+                          </Text>
+                        </HStack>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
                 <Textarea
                   placeholder="Leave a comment"
                   rows={6}

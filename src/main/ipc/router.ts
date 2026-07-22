@@ -41,6 +41,12 @@ import {
 } from "../repo/local";
 import { warmUpPullRequest } from "../repo/workspace";
 import { clearKey, getKeyStatus, saveKey } from "../settings/keys";
+import {
+  addDraftComment,
+  deleteDraftComment,
+  listDraftComments,
+  updateDraftComment,
+} from "../store/drafts";
 
 const handlers: IpcApi = {
   listRepositories: () => listRepositories(),
@@ -85,6 +91,13 @@ const handlers: IpcApi = {
     listResolvedReviewThreads(repo, prNumber),
   setReviewThreadResolved: (repo, prNumber, rootCommentId, resolved) =>
     setReviewThreadResolved(repo, prNumber, rootCommentId, resolved),
+  listDraftComments: (repo, prNumber) => listDraftComments(repo, prNumber),
+  addDraftComment: (repo, prNumber, comment) =>
+    addDraftComment(repo, prNumber, comment),
+  updateDraftComment: (repo, prNumber, draftId, body) =>
+    updateDraftComment(repo, prNumber, draftId, body),
+  deleteDraftComment: (repo, prNumber, draftId) =>
+    deleteDraftComment(repo, prNumber, draftId),
   listViewedFiles: (repo, prNumber) => listViewedFiles(repo, prNumber),
   setFileViewed: (repo, prNumber, path, viewed) =>
     setFileViewed(repo, prNumber, path, viewed),

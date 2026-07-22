@@ -1,7 +1,11 @@
 import { Box, Button, HStack, Text, Textarea } from "@chakra-ui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import type { DiffSide, ReviewComment } from "../../../shared/types";
+import type {
+  DiffSide,
+  DraftReviewComment,
+  ReviewComment,
+} from "../../../shared/types";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -13,6 +17,9 @@ interface Props {
   line: number;
   // Set when the comment covers a range ending at `line`.
   startLine: number | null;
+  // True once any draft exists on the PR — a review is in progress, so the
+  // single-comment escape hatch is hidden (GitHub does the same).
+  reviewStarted: boolean;
   onClose(): void;
 }
 
@@ -24,21 +31,19 @@ export default function DiffCommentComposer({
   side,
   line,
   startLine,
+  reviewStarted,
   onClose,
 }: Props) {
   const queryClient = useQueryClient();
   const [body, setBody] = useState("");
 
+  function newComment() {
+    return { commitId, path, side, line, startLine, body: body.trim() };
+  }
+
+  // Posts to GitHub immediately, outside any review.
   const submit = useMutation({
-    mutationFn: () =>
-      window.api.addReviewComment(repo, prNumber, {
-        commitId,
-        path,
-        side,
-        line,
-        startLine,
-        body: body.trim(),
-      }),
+    mutationFn: () => window.api.addReviewComment(repo, prNumber, newComment()),
     onSuccess: (comment) => {
       queryClient.setQueryData<ReviewComment[]>(
         ["reviewComments", repo, prNumber],
@@ -56,7 +61,28 @@ export default function DiffCommentComposer({
     },
   });
 
-  const canSubmit = body.trim().length > 0 && !submit.isPending;
+  // Saves a local draft — submitted later as part of the batch review.
+  const saveDraft = useMutation({
+    mutationFn: () => window.api.addDraftComment(repo, prNumber, newComment()),
+    onSuccess: (created) => {
+      queryClient.setQueryData<DraftReviewComment[]>(
+        ["draftComments", repo, prNumber],
+        (existing) => [...(existing ?? []), created],
+      );
+      onClose();
+    },
+    onError: (cause) => {
+      toaster.create({
+        type: "error",
+        title: "Couldn’t save draft comment",
+        description: cause instanceof Error ? cause.message : String(cause),
+        closable: true,
+      });
+    },
+  });
+
+  const busy = submit.isPending || saveDraft.isPending;
+  const canSubmit = body.trim().length > 0 && !busy;
 
   function handleKeyDown(event: React.KeyboardEvent) {
     if (
@@ -64,7 +90,7 @@ export default function DiffCommentComposer({
       event.key === "Enter" &&
       canSubmit
     ) {
-      submit.mutate();
+      saveDraft.mutate();
     }
     if (event.key === "Escape") onClose();
   }
@@ -102,13 +128,24 @@ export default function DiffCommentComposer({
         <Button size="xs" variant="ghost" onClick={onClose}>
           Cancel
         </Button>
+        {!reviewStarted && (
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={!canSubmit}
+            loading={submit.isPending}
+            onClick={() => submit.mutate()}
+          >
+            Add single comment
+          </Button>
+        )}
         <Button
           size="xs"
           disabled={!canSubmit}
-          loading={submit.isPending}
-          onClick={() => submit.mutate()}
+          loading={saveDraft.isPending}
+          onClick={() => saveDraft.mutate()}
         >
-          Comment
+          {reviewStarted ? "Add review comment" : "Start a review"}
         </Button>
       </HStack>
     </Box>

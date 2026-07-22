@@ -18,6 +18,7 @@ import type {
   ReviewVerdict,
 } from "../../shared/types";
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
+import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
 
 const API = "https://api.github.com";
@@ -734,6 +735,9 @@ const reviewEvents: Record<ReviewVerdict, string> = {
   request_changes: "REQUEST_CHANGES",
 };
 
+// Submits the review with any locally drafted inline comments attached —
+// GitHub creates the review and all its comments in one call, so the author
+// gets a single notification. Drafts are only cleared after it succeeds.
 export async function submitReview(
   repo: string,
   prNumber: number,
@@ -745,13 +749,26 @@ export async function submitReview(
     throw new Error("Connect a GitHub token in settings to submit reviews.");
   }
 
+  const drafts = await listDraftComments(repo, prNumber);
+  const comments = drafts.map((draft) => ({
+    path: draft.path,
+    body: draft.body,
+    line: draft.line,
+    side: draft.side,
+    ...(draft.startLine !== null
+      ? { start_line: draft.startLine, start_side: draft.side }
+      : {}),
+  }));
+
   await githubFetch(token, `/repos/${repo}/pulls/${prNumber}/reviews`, {
     method: "POST",
     body: {
       event: reviewEvents[verdict],
       ...(body ? { body } : {}),
+      ...(comments.length > 0 ? { comments } : {}),
     },
   });
+  if (drafts.length > 0) await clearDraftComments(repo, prNumber);
 }
 
 interface GraphQlReviewThreads {

@@ -58,6 +58,14 @@ const api: WindowApi = {
       rootCommentId,
       resolved,
     ),
+  listDraftComments: (repo, prNumber) =>
+    ipcRenderer.invoke("listDraftComments", repo, prNumber),
+  addDraftComment: (repo, prNumber, comment) =>
+    ipcRenderer.invoke("addDraftComment", repo, prNumber, comment),
+  updateDraftComment: (repo, prNumber, draftId, body) =>
+    ipcRenderer.invoke("updateDraftComment", repo, prNumber, draftId, body),
+  deleteDraftComment: (repo, prNumber, draftId) =>
+    ipcRenderer.invoke("deleteDraftComment", repo, prNumber, draftId),
   listViewedFiles: (repo, prNumber) =>
     ipcRenderer.invoke("listViewedFiles", repo, prNumber),
   setFileViewed: (repo, prNumber, path, viewed) =>
