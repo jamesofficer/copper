@@ -32,6 +32,9 @@ export interface DiffCommenting {
   prNumber: number;
   commitId: string;
   threads: ReviewThread[];
+  // Root-comment ids of resolved threads, so each thread's resolve button
+  // can read the current state.
+  resolvedRootIds: Set<number>;
 }
 
 interface Props {
@@ -86,6 +89,7 @@ interface CommentContext {
   commitId: string;
   path: string;
   composer: { side: DiffSide; line: number; startLine: number | null } | null;
+  resolvedIds: Set<number>;
   anchorOf(line: DiffLine): CommentAnchor | undefined;
   threadsFor(line: DiffLine): ReviewThread[];
   // Whether an existing thread's range covers this line — marks the lines a
@@ -216,6 +220,7 @@ function CommentBands({
             thread={thread}
             repo={ctx.repo}
             prNumber={ctx.prNumber}
+            resolved={ctx.resolvedIds.has(thread.root.id)}
           />
         </CommentBand>
       ))}
@@ -531,6 +536,7 @@ function DiffLines({ file, commenting }: Props) {
       prNumber: commenting.prNumber,
       commitId: commenting.commitId,
       path: file.path,
+      resolvedIds: commenting.resolvedRootIds,
       composer:
         draft && composing
           ? {

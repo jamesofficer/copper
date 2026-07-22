@@ -21,9 +21,17 @@ interface Props {
   thread: ReviewThread;
   repo: string;
   prNumber: number;
+  // Current resolution state — undefined when the caller doesn't know it,
+  // which also hides the resolve button.
+  resolved?: boolean;
 }
 
-export default function DiffCommentThread({ thread, repo, prNumber }: Props) {
+export default function DiffCommentThread({
+  thread,
+  repo,
+  prNumber,
+  resolved,
+}: Props) {
   const queryClient = useQueryClient();
   const [replying, setReplying] = useState(false);
   const [body, setBody] = useState("");
@@ -81,6 +89,29 @@ export default function DiffCommentThread({ thread, repo, prNumber }: Props) {
       toaster.create({
         type: "error",
         title: "Couldn’t delete comment",
+        description: cause instanceof Error ? cause.message : String(cause),
+        closable: true,
+      });
+    },
+  });
+
+  const resolve = useMutation({
+    mutationFn: () =>
+      window.api.setReviewThreadResolved(
+        repo,
+        prNumber,
+        thread.root.id,
+        !resolved,
+      ),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["resolvedThreads", repo, prNumber],
+      });
+    },
+    onError: (cause) => {
+      toaster.create({
+        type: "error",
+        title: resolved ? "Couldn’t unresolve" : "Couldn’t resolve",
         description: cause instanceof Error ? cause.message : String(cause),
         closable: true,
       });
@@ -192,16 +223,30 @@ export default function DiffCommentThread({ thread, repo, prNumber }: Props) {
             </HStack>
           </VStack>
         ) : (
-          <Button
-            size="xs"
-            variant="ghost"
-            color="fg.muted"
-            w="full"
-            justifyContent="flex-start"
-            onClick={() => setReplying(true)}
-          >
-            Reply…
-          </Button>
+          <HStack gap="1">
+            <Button
+              size="xs"
+              variant="ghost"
+              color="fg.muted"
+              flex="1"
+              justifyContent="flex-start"
+              onClick={() => setReplying(true)}
+            >
+              Reply…
+            </Button>
+            {resolved !== undefined && (
+              <Button
+                size="xs"
+                variant="ghost"
+                color="fg.muted"
+                flexShrink="0"
+                loading={resolve.isPending}
+                onClick={() => resolve.mutate()}
+              >
+                {resolved ? "Unresolve conversation" : "Resolve conversation"}
+              </Button>
+            )}
+          </HStack>
         )}
       </Box>
     </Box>

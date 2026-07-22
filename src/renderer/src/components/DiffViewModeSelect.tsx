@@ -1,4 +1,10 @@
-import { createListCollection, HStack, Select, Text } from "@chakra-ui/react";
+import {
+  createListCollection,
+  HStack,
+  Portal,
+  Select,
+  Text,
+} from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LuColumns2, LuMonitor, LuRows3 } from "react-icons/lu";
 import {
@@ -52,19 +58,22 @@ export default function DiffViewModeSelect() {
           <Select.Indicator />
         </Select.IndicatorGroup>
       </Select.Control>
-      <Select.Positioner>
-        <Select.Content>
-          {modeCollection.items.map((item) => (
-            <Select.Item item={item} key={item.value}>
-              <HStack gap="1.5" flex="1" minW="0">
-                {modeIcons[item.value]}
-                <Text>{item.label}</Text>
-              </HStack>
-              <Select.ItemIndicator />
-            </Select.Item>
-          ))}
-        </Select.Content>
-      </Select.Positioner>
+      {/* Portalled so the menu stacks above the diff panes' sticky elements. */}
+      <Portal>
+        <Select.Positioner>
+          <Select.Content>
+            {modeCollection.items.map((item) => (
+              <Select.Item item={item} key={item.value}>
+                <HStack gap="1.5" flex="1" minW="0">
+                  {modeIcons[item.value]}
+                  <Text>{item.label}</Text>
+                </HStack>
+                <Select.ItemIndicator />
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Positioner>
+      </Portal>
     </Select.Root>
   );
 }

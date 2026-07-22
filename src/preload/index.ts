@@ -44,6 +44,14 @@ const api: WindowApi = {
     ipcRenderer.invoke("deleteReviewComment", repo, commentId),
   listResolvedReviewThreads: (repo, prNumber) =>
     ipcRenderer.invoke("listResolvedReviewThreads", repo, prNumber),
+  setReviewThreadResolved: (repo, prNumber, rootCommentId, resolved) =>
+    ipcRenderer.invoke(
+      "setReviewThreadResolved",
+      repo,
+      prNumber,
+      rootCommentId,
+      resolved,
+    ),
   getViewer: () => ipcRenderer.invoke("getViewer"),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),

@@ -770,6 +770,107 @@ export async function listResolvedReviewThreads(
   return resolved;
 }
 
+interface GraphQlThreadIds {
+  data?: {
+    repository?: {
+      pullRequest?: {
+        reviewThreads: {
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          nodes: Array<{
+            id: string;
+            comments: { nodes: Array<{ databaseId: number | null }> };
+          }>;
+        };
+      } | null;
+    } | null;
+  };
+  errors?: Array<{ message: string }>;
+}
+
+// Resolve or unresolve an inline thread. Like resolution state, the mutation
+// only exists in GraphQL and wants the thread's node id — looked up by
+// matching the thread's first comment to the REST root comment id.
+export async function setReviewThreadResolved(
+  repo: string,
+  prNumber: number,
+  rootCommentId: number,
+  resolved: boolean,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to resolve threads.");
+  }
+
+  const [owner, name] = repo.split("/");
+  const lookup = `
+    query ($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          reviewThreads(first: 100, after: $cursor) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              id
+              comments(first: 1) { nodes { databaseId } }
+            }
+          }
+        }
+      }
+    }`;
+
+  let threadId: string | undefined;
+  let cursor: string | null = null;
+  do {
+    const response: GraphQlThreadIds = await githubFetch<GraphQlThreadIds>(
+      token,
+      "/graphql",
+      {
+        method: "POST",
+        body: {
+          query: lookup,
+          variables: { owner, name, number: prNumber, cursor },
+        },
+      },
+    );
+    if (response.errors?.length) {
+      throw new Error(`GitHub: ${response.errors[0].message}`);
+    }
+    const threads = response.data?.repository?.pullRequest?.reviewThreads;
+    if (!threads) break;
+    threadId = threads.nodes.find(
+      (node) => node.comments.nodes[0]?.databaseId === rootCommentId,
+    )?.id;
+    cursor =
+      !threadId && threads.pageInfo.hasNextPage
+        ? threads.pageInfo.endCursor
+        : null;
+  } while (cursor);
+
+  if (!threadId) {
+    throw new Error("GitHub: couldn’t find the review thread to resolve.");
+  }
+
+  const mutation = resolved
+    ? `mutation ($threadId: ID!) {
+        resolveReviewThread(input: { threadId: $threadId }) {
+          thread { isResolved }
+        }
+      }`
+    : `mutation ($threadId: ID!) {
+        unresolveReviewThread(input: { threadId: $threadId }) {
+          thread { isResolved }
+        }
+      }`;
+
+  const result = await githubFetch<{ errors?: Array<{ message: string }> }>(
+    token,
+    "/graphql",
+    { method: "POST", body: { query: mutation, variables: { threadId } } },
+  );
+  if (result.errors?.length) {
+    throw new Error(`GitHub: ${result.errors[0].message}`);
+  }
+}
+
 interface GraphQlBranches {
   data?: {
     repository?: {

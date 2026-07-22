@@ -157,7 +157,12 @@ export default function ReviewThreadCard({
 
       {!collapsed && (
         <Box p="3">
-          <DiffCommentThread thread={thread} repo={repo} prNumber={prNumber} />
+          <DiffCommentThread
+            thread={thread}
+            repo={repo}
+            prNumber={prNumber}
+            resolved={resolved}
+          />
         </Box>
       )}
     </Box>

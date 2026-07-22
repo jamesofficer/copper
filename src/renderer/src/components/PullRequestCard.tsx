@@ -94,22 +94,32 @@ export default function PullRequestCard({
             ) : (
               <Text>{changedFiles} files</Text>
             )}
-            {comments > 0 && (
-              <HStack gap="1">
-                <LuMessageSquare size={12} />
-                <Text>{comments}</Text>
-              </HStack>
-            )}
           </HStack>
         </VStack>
-        <HStack fontFamily="mono" fontSize="xs" gap="2" flexShrink="0">
-          <Badge colorPalette="green" variant="surface">
-            +{additions}
-          </Badge>
-          <Badge colorPalette="red" variant="surface">
-            −{deletions}
-          </Badge>
-        </HStack>
+        <VStack
+          alignItems="flex-end"
+          justifyContent="space-between"
+          alignSelf="stretch"
+          flexShrink="0"
+          fontFamily="mono"
+          fontSize="xs"
+          gap="2"
+        >
+          <HStack gap="2">
+            <Badge colorPalette="green" variant="surface">
+              +{additions}
+            </Badge>
+            <Badge colorPalette="red" variant="surface">
+              −{deletions}
+            </Badge>
+          </HStack>
+          {comments > 0 && (
+            <Badge colorPalette="gray" variant="surface">
+              <LuMessageSquare size={10} />
+              {comments}
+            </Badge>
+          )}
+        </VStack>
       </HStack>
     </Box>
   );

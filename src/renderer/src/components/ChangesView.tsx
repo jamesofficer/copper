@@ -96,6 +96,17 @@ export default function ChangesView({ pr }: Props) {
     [reviewCommentsQuery.data],
   );
 
+  // Resolution comes from a separate GraphQL lookup; if it fails, threads
+  // simply all show as unresolved.
+  const resolvedQuery = useQuery({
+    queryKey: ["resolvedThreads", pr.repo, pr.number],
+    queryFn: () => window.api.listResolvedReviewThreads(pr.repo, pr.number),
+  });
+  const resolvedRootIds = useMemo(
+    () => new Set(resolvedQuery.data ?? []),
+    [resolvedQuery.data],
+  );
+
   // Inline commenting only works against the full changelist — a single
   // commit's diff numbers lines differently than the PR diff GitHub anchors
   // comments to. Memoized so DiffLines' memo sees a stable prop and unrelated
@@ -109,9 +120,18 @@ export default function ChangesView({ pr }: Props) {
             prNumber: pr.number,
             commitId: headSha,
             threads: threadsByPath.get(selectedFile.path) ?? [],
+            resolvedRootIds,
           }
         : undefined,
-    [selectedCommit, headSha, selectedFile, threadsByPath, pr.repo, pr.number],
+    [
+      selectedCommit,
+      headSha,
+      selectedFile,
+      threadsByPath,
+      resolvedRootIds,
+      pr.repo,
+      pr.number,
+    ],
   );
 
   return (

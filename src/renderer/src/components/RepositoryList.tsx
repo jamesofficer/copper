@@ -3,14 +3,13 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   PointerSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import {
-  restrictToParentElement,
-  restrictToVerticalAxis,
-} from "@dnd-kit/modifiers";
+import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import {
   arrayMove,
   SortableContext,
@@ -18,6 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useState } from "react";
 import { LuFolderGit2, LuTrash2 } from "react-icons/lu";
 import type { Repository } from "../../../shared/types";
 
@@ -29,7 +29,9 @@ interface Props {
   onReorder(repositories: Repository[]): void;
 }
 
-// The sidebar's repository rows, drag-sortable via dnd-kit.
+// The sidebar's repository rows, drag-sortable via dnd-kit. The dragged row
+// is rendered in a DragOverlay so dropping animates smoothly into place; the
+// row left behind dims to act as the placeholder.
 export default function RepositoryList({
   repositories,
   activePath,
@@ -37,12 +39,21 @@ export default function RepositoryList({
   onRemoveRepo,
   onReorder,
 }: Props) {
+  const [dragged, setDragged] = useState<Repository | null>(null);
+
   // Drag only starts after 4px of movement, so plain clicks still select.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
+  function handleDragStart(event: DragStartEvent) {
+    setDragged(
+      repositories.find((repo) => repo.path === event.active.id) ?? null,
+    );
+  }
+
   function handleDragEnd(event: DragEndEvent) {
+    setDragged(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
     const from = repositories.findIndex((repo) => repo.path === active.id);
@@ -55,8 +66,10 @@ export default function RepositoryList({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
-      modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+      modifiers={[restrictToVerticalAxis]}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={() => setDragged(null)}
     >
       <SortableContext
         items={repositories.map((repo) => repo.path)}
@@ -72,6 +85,20 @@ export default function RepositoryList({
           />
         ))}
       </SortableContext>
+      <DragOverlay>
+        {dragged && (
+          <HStack
+            className="group"
+            gap="0"
+            rounded="md"
+            bg={dragged.path === activePath ? "bg.emphasized" : "bg.panel"}
+            shadow="md"
+            cursor="grabbing"
+          >
+            <RowContent repo={dragged} />
+          </HStack>
+        )}
+      </DragOverlay>
     </DndContext>
   );
 }
@@ -101,8 +128,7 @@ function RepositoryRow({ repo, selected, onSelect, onRemove }: RowProps) {
       rounded="md"
       bg={selected ? "bg.emphasized" : undefined}
       _hover={selected ? undefined : { bg: "bg.subtle" }}
-      opacity={isDragging ? 0.6 : undefined}
-      zIndex={isDragging ? 1 : undefined}
+      opacity={isDragging ? 0.35 : undefined}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
@@ -111,6 +137,21 @@ function RepositoryRow({ repo, selected, onSelect, onRemove }: RowProps) {
       {...attributes}
       {...listeners}
     >
+      <RowContent repo={repo} onSelect={onSelect} onRemove={onRemove} />
+    </HStack>
+  );
+}
+
+interface RowContentProps {
+  repo: Repository;
+  // Absent on the DragOverlay copy — it's purely visual.
+  onSelect?(path: string): void;
+  onRemove?(path: string): void;
+}
+
+function RowContent({ repo, onSelect, onRemove }: RowContentProps) {
+  return (
+    <>
       <HStack
         as="button"
         flex="1"
@@ -120,7 +161,7 @@ function RepositoryRow({ repo, selected, onSelect, onRemove }: RowProps) {
         py="1.5"
         cursor="pointer"
         title={repo.path}
-        onClick={() => onSelect(repo.path)}
+        onClick={onSelect ? () => onSelect(repo.path) : undefined}
       >
         <Icon size="sm" color="fg.muted" flexShrink="0">
           <LuFolderGit2 />
@@ -138,10 +179,10 @@ function RepositoryRow({ repo, selected, onSelect, onRemove }: RowProps) {
         opacity="0"
         _groupHover={{ opacity: 1 }}
         _focusVisible={{ opacity: 1 }}
-        onClick={() => onRemove(repo.path)}
+        onClick={onRemove ? () => onRemove(repo.path) : undefined}
       >
         <LuTrash2 />
       </IconButton>
-    </HStack>
+    </>
   );
 }

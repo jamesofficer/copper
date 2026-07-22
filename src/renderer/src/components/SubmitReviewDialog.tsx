@@ -64,11 +64,17 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
       setOpen(false);
       setBody("");
       setVerdict("comment");
-      // The review changes the PR's review status; refetch what shows it.
+      // The review changes the PR's review status; refetch what shows it —
+      // the detail, the Overview's review timeline, the PR lists, and the
+      // sidebar's review-requested section (approving clears the request).
       void queryClient.invalidateQueries({
         queryKey: ["pullRequest", pr.repo, pr.number],
       });
+      void queryClient.invalidateQueries({
+        queryKey: ["pullRequestReviews", pr.repo, pr.number],
+      });
       void queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
+      void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
     },
     onError: (cause) => {
       toaster.create({

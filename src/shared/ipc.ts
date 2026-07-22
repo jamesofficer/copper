@@ -84,6 +84,13 @@ export interface IpcApi {
   // Root-comment ids of resolved inline threads — resolution only exists in
   // GitHub's GraphQL API, so it's a separate lookup from listReviewComments.
   listResolvedReviewThreads(repo: string, prNumber: number): Promise<number[]>;
+  // Resolve/unresolve the inline thread whose first comment is rootCommentId.
+  setReviewThreadResolved(
+    repo: string,
+    prNumber: number,
+    rootCommentId: number,
+    resolved: boolean,
+  ): Promise<void>;
   // The GitHub login the stored token belongs to.
   getViewer(): Promise<string>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
@@ -162,6 +169,7 @@ export const ipcChannels = [
   "replyToReviewComment",
   "deleteReviewComment",
   "listResolvedReviewThreads",
+  "setReviewThreadResolved",
   "getViewer",
   "getAnalysis",
   "listAnalyzedPullRequests",

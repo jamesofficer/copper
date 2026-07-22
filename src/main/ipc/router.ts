@@ -24,6 +24,7 @@ import {
   listReviewRequests,
   mergePullRequest,
   replyToReviewComment,
+  setReviewThreadResolved,
   submitReview,
 } from "../github/client";
 import { getLlmStatus, setLlmModel, setLlmProvider } from "../llm/settings";
@@ -73,6 +74,8 @@ const handlers: IpcApi = {
     deleteReviewComment(repo, commentId),
   listResolvedReviewThreads: (repo, prNumber) =>
     listResolvedReviewThreads(repo, prNumber),
+  setReviewThreadResolved: (repo, prNumber, rootCommentId, resolved) =>
+    setReviewThreadResolved(repo, prNumber, rootCommentId, resolved),
   getViewer: () => getViewer(),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
