@@ -2,13 +2,14 @@ import { Box, Center, Flex, HStack, Text } from "@chakra-ui/react";
 import type { PullRequestFile } from "../../../shared/types";
 import { statusMeta } from "../lib/fileStatus";
 import { scrollbar } from "../lib/scrollbar";
-import DiffLines from "./DiffLines";
+import DiffLines, { type DiffCommenting } from "./DiffLines";
 
 interface Props {
   file: PullRequestFile;
+  commenting?: DiffCommenting;
 }
 
-export default function DiffView({ file }: Props) {
+export default function DiffView({ file, commenting }: Props) {
   const meta = statusMeta[file.status];
 
   return (
@@ -63,7 +64,7 @@ export default function DiffView({ file }: Props) {
 
       {file.patch ? (
         <Box flex="1" minH="0" overflow="auto" css={scrollbar}>
-          <DiffLines file={file} />
+          <DiffLines file={file} commenting={commenting} />
         </Box>
       ) : (
         <Center flex="1" p="8">

@@ -5,15 +5,25 @@ import { listAnalyzedPullRequests } from "../analysis/cache";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
   addPullRequestComment,
+  addReviewComment,
+  createPullRequest,
+  deleteReviewComment,
+  getBranchInfo,
   getPullRequest,
+  getRepoMergeSettings,
+  getViewer,
   listCommitFiles,
+  listMyPullRequests,
   listPullRequestComments,
   listPullRequestCommits,
   listPullRequestFiles,
   listPullRequestReviews,
+  listResolvedReviewThreads,
+  listReviewComments,
   listReviewRequestedPullRequests,
   listReviewRequests,
   mergePullRequest,
+  replyToReviewComment,
   submitReview,
 } from "../github/client";
 import { getLlmStatus, setLlmModel, setLlmProvider } from "../llm/settings";
@@ -21,6 +31,7 @@ import {
   addRepository,
   listRepositories,
   removeRepository,
+  reorderRepositories,
 } from "../repo/local";
 import { warmUpPullRequest } from "../repo/workspace";
 import { clearKey, getKeyStatus, saveKey } from "../settings/keys";
@@ -29,8 +40,12 @@ const handlers: IpcApi = {
   listRepositories: () => listRepositories(),
   addRepository: () => addRepository(),
   removeRepository: (path) => removeRepository(path),
+  reorderRepositories: (paths) => reorderRepositories(paths),
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
+  listMyPullRequests: () => listMyPullRequests(),
+  getBranchInfo: (repo) => getBranchInfo(repo),
+  createPullRequest: (repo, pr) => createPullRequest(repo, pr),
   getPullRequest: async (repo, prNumber) => {
     const detail = await getPullRequest(repo, prNumber);
     // Best-effort background clone/fetch so repo context is ready for the chat.
@@ -49,6 +64,16 @@ const handlers: IpcApi = {
     listPullRequestReviews(repo, prNumber),
   addPullRequestComment: (repo, prNumber, body) =>
     addPullRequestComment(repo, prNumber, body),
+  listReviewComments: (repo, prNumber) => listReviewComments(repo, prNumber),
+  addReviewComment: (repo, prNumber, comment) =>
+    addReviewComment(repo, prNumber, comment),
+  replyToReviewComment: (repo, prNumber, commentId, body) =>
+    replyToReviewComment(repo, prNumber, commentId, body),
+  deleteReviewComment: (repo, commentId) =>
+    deleteReviewComment(repo, commentId),
+  listResolvedReviewThreads: (repo, prNumber) =>
+    listResolvedReviewThreads(repo, prNumber),
+  getViewer: () => getViewer(),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
   analyzePullRequest: (repo, prNumber, personality, force) =>
@@ -59,6 +84,7 @@ const handlers: IpcApi = {
   clearChat: (repo, prNumber) => clearChat(repo, prNumber),
   submitReview: (repo, prNumber, verdict, body) =>
     submitReview(repo, prNumber, verdict, body),
+  getRepoMergeSettings: (repo) => getRepoMergeSettings(repo),
   mergePullRequest: (repo, prNumber, method) =>
     mergePullRequest(repo, prNumber, method),
   getLlmStatus: () => getLlmStatus(),

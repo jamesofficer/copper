@@ -23,8 +23,8 @@ async function writeStore(store: SecretStore): Promise<void> {
 }
 
 export async function getSecretsStatus(): Promise<SecretsStatus> {
-  // Decrypt rather than just check presence — getSecret drops entries that
-  // can no longer be decrypted, so stale keys report as not set.
+  // Decrypt rather than just check presence, so an undecryptable key reports
+  // as not set instead of silently failing on first use.
   return {
     anthropic: Boolean(await getSecret("anthropic")),
     github: Boolean(await getSecret("github")),
@@ -62,10 +62,10 @@ export async function getSecret(
   try {
     return safeStorage.decryptString(Buffer.from(encrypted, "base64"));
   } catch {
-    // Undecryptable (e.g. the encryption key changed when the app was
-    // renamed) — drop it so the app treats the key as not set.
-    delete store[provider];
-    await writeStore(store);
+    // Can't decrypt right now — often transient (keychain locked, or access
+    // denied to this launch of the app). Keep the ciphertext: deleting here
+    // turns a temporary failure into permanent key loss. The key reports as
+    // not set until it decrypts again or the user saves a new one.
     return null;
   }
 }

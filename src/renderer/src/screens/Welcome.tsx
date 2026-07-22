@@ -1,5 +1,6 @@
 import {
   Alert,
+  Box,
   Button,
   EmptyState,
   Flex,
@@ -21,7 +22,8 @@ import {
 import type { PullRequest, Repository } from "../../../shared/types";
 import AnalyzedPanel from "../components/AnalyzedPanel";
 import HomeSidebar from "../components/HomeSidebar";
-import PullRequestCard from "../components/PullRequestCard";
+import NewPullRequestDialog from "../components/NewPullRequestDialog";
+import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
 import SettingsDialog from "../components/SettingsDialog";
 import SetupBanner from "../components/SetupBanner";
@@ -86,6 +88,10 @@ export default function Welcome({
         added,
         ...(prev ?? []).filter((repo) => repo.path !== added.path),
       ]);
+      // Both sidebar PR sections are filtered to registered repos in the
+      // main process, so the registry changing means new results.
+      void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
+      void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
       onActivePathChange(added.path);
     } catch (cause) {
       toaster.create({
@@ -100,9 +106,29 @@ export default function Welcome({
     }
   }
 
+  function reorderRepositories(ordered: Repository[]) {
+    // Optimistic: show the new order immediately, then persist it. The main
+    // process returns the saved list, which wins in case they disagree.
+    queryClient.setQueryData(["repositories"], ordered);
+    window.api
+      .reorderRepositories(ordered.map((repo) => repo.path))
+      .then((saved) => queryClient.setQueryData(["repositories"], saved))
+      .catch(() =>
+        queryClient.invalidateQueries({ queryKey: ["repositories"] }),
+      );
+  }
+
+  function openCreatedPullRequest(pr: PullRequest) {
+    void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
+    void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
+    onSelect(pr);
+  }
+
   async function removeRepository(path: string) {
     const remaining = await window.api.removeRepository(path);
     queryClient.setQueryData(["repositories"], remaining);
+    void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
+    void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
     if (activePath === path || !activePath) {
       onActivePathChange(remaining[0]?.path ?? null);
     }
@@ -117,6 +143,7 @@ export default function Welcome({
         onSelectRepo={onActivePathChange}
         onAddRepo={() => void addRepository()}
         onRemoveRepo={(path) => void removeRepository(path)}
+        onReorderRepos={reorderRepositories}
         recent={recent}
         onClearRecent={clearRecent}
         onSelectPullRequest={setPreview}
@@ -138,6 +165,15 @@ export default function Welcome({
           <Tabs.Trigger value="analyzed">
             <LuSparkles /> Analysed pull requests
           </Tabs.Trigger>
+          {active?.slug && (
+            <Box ml="auto">
+              <NewPullRequestDialog
+                key={active.slug}
+                repo={active.slug}
+                onCreated={openCreatedPullRequest}
+              />
+            </Box>
+          )}
         </Tabs.List>
 
         <Tabs.Content value="open" flex="1" minH="0" p="0">
@@ -207,18 +243,12 @@ export default function Welcome({
                       No open pull requests. Nice and quiet.
                     </Text>
                   ) : (
-                    prs.map((pr) => (
-                      <PullRequestCard
-                        key={`${pr.repo}#${pr.number}`}
-                        pr={pr}
-                        onSelect={setPreview}
-                        selected={
-                          preview?.repo === pr.repo &&
-                          preview?.number === pr.number
-                        }
-                        maxW="2xl"
-                      />
-                    ))
+                    <OpenPullRequestList
+                      key={active.slug}
+                      prs={prs}
+                      preview={preview}
+                      onSelect={setPreview}
+                    />
                   ))}
               </>
             )}

@@ -1,16 +1,22 @@
 import type {
   FileStatus,
   MergeMethod,
+  NewPullRequest,
+  NewReviewComment,
   PullRequest,
   PullRequestComment,
   PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
   PullRequestReview,
+  RepoBranchInfo,
+  RepoMergeSettings,
+  ReviewComment,
   ReviewState,
   ReviewStatus,
   ReviewVerdict,
 } from "../../shared/types";
+import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { getGitHubToken } from "./auth";
 
 const API = "https://api.github.com";
@@ -34,6 +40,7 @@ interface GitHubPullDetail extends GitHubPullSummary {
   head: { sha: string; ref: string };
   labels: Array<{ name: string; color: string }>;
   requested_reviewers: Array<{ login: string }> | null;
+  assignees: Array<{ login: string }> | null;
   additions: number;
   deletions: number;
   changed_files: number;
@@ -76,7 +83,20 @@ async function githubFetch<T>(
     );
   }
 
+  // Deletes come back as 204 with no body.
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
+}
+
+// The login the stored token belongs to — the renderer uses it to decide
+// which comments offer a delete button.
+export async function getViewer(): Promise<string> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings first.");
+  }
+  const user = await githubFetch<{ login: string }>(token, "/user");
+  return user.login;
 }
 
 // GitHub's error bodies put the useful text in `message`, and validation
@@ -163,6 +183,9 @@ function toPullRequest(
     deletions: pull.deletions,
     changedFiles: pull.changed_files,
     comments: pull.comments + pull.review_comments,
+    assignees: (pull.assignees ?? []).map((assignee) => assignee.login),
+    createdAt: pull.created_at,
+    updatedAt: pull.updated_at,
   };
 }
 
@@ -244,25 +267,37 @@ interface GitHubSearchIssues {
   items: Array<{ number: number; repository_url: string }>;
 }
 
-// Open PRs across all repos where the logged-in user's review is requested,
-// most recently updated first. Returns [] when no token is set — this feeds a
-// passive sidebar section and the setup banner already prompts for the token.
-export async function listReviewRequestedPullRequests(): Promise<
-  PullRequest[]
-> {
+// Open PRs matching a search qualifier, limited to the repositories added to
+// the app, most recently updated first. Returns [] when no token is set —
+// these feed passive sidebar sections and the setup banner already prompts
+// for the token.
+async function searchOpenPullRequests(
+  qualifier: string,
+): Promise<PullRequest[]> {
   const token = await getGitHubToken();
   if (!token) return [];
 
-  const query = encodeURIComponent(
-    "is:pr is:open archived:false review-requested:@me",
+  const repositories = await listRepositories();
+  const registeredSlugs = new Set(
+    repositories.flatMap((repo) =>
+      repo.slug ? [repo.slug.toLowerCase()] : [],
+    ),
   );
+  if (registeredSlugs.size === 0) return [];
+
+  const query = encodeURIComponent(`is:pr is:open archived:false ${qualifier}`);
   const search = await githubFetch<GitHubSearchIssues>(
     token,
     `/search/issues?q=${query}&sort=updated&order=desc&per_page=20&advanced_search=true`,
   );
 
+  const items = search.items.filter((item) => {
+    const repo = item.repository_url.split("/repos/")[1];
+    return registeredSlugs.has(repo.toLowerCase());
+  });
+
   return Promise.all(
-    search.items.map(async (item) => {
+    items.map(async (item) => {
       const repo = item.repository_url.split("/repos/")[1];
       const [pull, reviewStatus] = await Promise.all([
         githubFetch<GitHubPullDetail>(
@@ -274,6 +309,14 @@ export async function listReviewRequestedPullRequests(): Promise<
       return toPullRequest(repo, pull, reviewStatus);
     }),
   );
+}
+
+export function listReviewRequestedPullRequests(): Promise<PullRequest[]> {
+  return searchOpenPullRequests("review-requested:@me");
+}
+
+export function listMyPullRequests(): Promise<PullRequest[]> {
+  return searchOpenPullRequests("author:@me");
 }
 
 export async function getPullRequest(
@@ -314,6 +357,7 @@ export async function getPullRequest(
     reviewers: (pull.requested_reviewers ?? []).map(
       (reviewer) => reviewer.login,
     ),
+    assignees: (pull.assignees ?? []).map((assignee) => assignee.login),
     additions: pull.additions,
     deletions: pull.deletions,
     changedFiles: pull.changed_files,
@@ -509,6 +553,127 @@ export async function addPullRequestComment(
   return toPullRequestComment(comment);
 }
 
+interface GitHubReviewComment {
+  id: number;
+  body: string | null;
+  user: { login: string } | null;
+  created_at: string;
+  path: string;
+  line: number | null;
+  start_line: number | null;
+  side: "LEFT" | "RIGHT";
+  in_reply_to_id?: number;
+  diff_hunk: string | null;
+}
+
+function toReviewComment(comment: GitHubReviewComment): ReviewComment {
+  return {
+    id: comment.id,
+    author: comment.user?.login ?? "unknown",
+    body: comment.body ?? "",
+    createdAt: comment.created_at,
+    path: comment.path,
+    line: comment.line,
+    startLine: comment.start_line,
+    side: comment.side,
+    inReplyTo: comment.in_reply_to_id ?? null,
+    diffHunk: comment.diff_hunk ?? "",
+  };
+}
+
+// Inline review comments on the PR's diff, oldest first.
+export async function listReviewComments(
+  repo: string,
+  prNumber: number,
+): Promise<ReviewComment[]> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const comments: GitHubReviewComment[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const batch = await githubFetch<GitHubReviewComment[]>(
+      token,
+      `/repos/${repo}/pulls/${prNumber}/comments?per_page=100&page=${page}`,
+    );
+    comments.push(...batch);
+    if (batch.length < 100) break;
+  }
+
+  return comments.map(toReviewComment);
+}
+
+export async function addReviewComment(
+  repo: string,
+  prNumber: number,
+  comment: NewReviewComment,
+): Promise<ReviewComment> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to comment.");
+  }
+
+  const created = await githubFetch<GitHubReviewComment>(
+    token,
+    `/repos/${repo}/pulls/${prNumber}/comments`,
+    {
+      method: "POST",
+      body: {
+        body: comment.body,
+        commit_id: comment.commitId,
+        path: comment.path,
+        line: comment.line,
+        side: comment.side,
+        // GitHub rejects start_line unless it's strictly before line.
+        ...(comment.startLine !== null && comment.startLine < comment.line
+          ? { start_line: comment.startLine, start_side: comment.side }
+          : {}),
+      },
+    },
+  );
+
+  return toReviewComment(created);
+}
+
+export async function replyToReviewComment(
+  repo: string,
+  prNumber: number,
+  commentId: number,
+  body: string,
+): Promise<ReviewComment> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to comment.");
+  }
+
+  const created = await githubFetch<GitHubReviewComment>(
+    token,
+    `/repos/${repo}/pulls/${prNumber}/comments/${commentId}/replies`,
+    { method: "POST", body: { body } },
+  );
+
+  return toReviewComment(created);
+}
+
+export async function deleteReviewComment(
+  repo: string,
+  commentId: number,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to delete comments.");
+  }
+
+  await githubFetch<undefined>(
+    token,
+    `/repos/${repo}/pulls/comments/${commentId}`,
+    { method: "DELETE", body: undefined },
+  );
+}
+
 const reviewEvents: Record<ReviewVerdict, string> = {
   comment: "COMMENT",
   approve: "APPROVE",
@@ -533,6 +698,201 @@ export async function submitReview(
       ...(body ? { body } : {}),
     },
   });
+}
+
+interface GraphQlReviewThreads {
+  data?: {
+    repository?: {
+      pullRequest?: {
+        reviewThreads: {
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          nodes: Array<{
+            isResolved: boolean;
+            comments: { nodes: Array<{ databaseId: number | null }> };
+          }>;
+        };
+      } | null;
+    } | null;
+  };
+  errors?: Array<{ message: string }>;
+}
+
+// Root-comment ids of the PR's resolved inline threads. Thread resolution
+// only exists in GitHub's GraphQL API — REST review comments carry no
+// resolved flag — so this is a separate lookup joined to listReviewComments
+// by the thread's first comment id.
+export async function listResolvedReviewThreads(
+  repo: string,
+  prNumber: number,
+): Promise<number[]> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const [owner, name] = repo.split("/");
+  const query = `
+    query ($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          reviewThreads(first: 100, after: $cursor) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              isResolved
+              comments(first: 1) { nodes { databaseId } }
+            }
+          }
+        }
+      }
+    }`;
+
+  const resolved: number[] = [];
+  let cursor: string | null = null;
+  do {
+    const response: GraphQlReviewThreads =
+      await githubFetch<GraphQlReviewThreads>(token, "/graphql", {
+        method: "POST",
+        body: { query, variables: { owner, name, number: prNumber, cursor } },
+      });
+    if (response.errors?.length) {
+      throw new Error(`GitHub: ${response.errors[0].message}`);
+    }
+    const threads = response.data?.repository?.pullRequest?.reviewThreads;
+    if (!threads) break;
+    for (const node of threads.nodes) {
+      const rootId = node.comments.nodes[0]?.databaseId;
+      if (node.isResolved && rootId != null) resolved.push(rootId);
+    }
+    cursor = threads.pageInfo.hasNextPage ? threads.pageInfo.endCursor : null;
+  } while (cursor);
+  return resolved;
+}
+
+interface GraphQlBranches {
+  data?: {
+    repository?: {
+      defaultBranchRef: { name: string } | null;
+      refs: {
+        pageInfo: { hasNextPage: boolean; endCursor: string | null };
+        nodes: Array<{ name: string }>;
+      } | null;
+    } | null;
+  };
+  errors?: Array<{ message: string }>;
+}
+
+// What the new-PR dialog needs: the repo's branches sorted newest commit
+// first (REST can't sort branches by activity, so this is a GraphQL refs
+// query — which returns the default branch in the same call), plus the local
+// checkout's current branch, pinned to the top when it's on GitHub.
+export async function getBranchInfo(repo: string): Promise<RepoBranchInfo> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to load branches.");
+  }
+
+  const [owner, name] = repo.split("/");
+  const query = `
+    query ($owner: String!, $name: String!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        defaultBranchRef { name }
+        refs(refPrefix: "refs/heads/", first: 100, after: $cursor,
+             orderBy: { field: TAG_COMMIT_DATE, direction: DESC }) {
+          pageInfo { hasNextPage endCursor }
+          nodes { name }
+        }
+      }
+    }`;
+
+  const branches: string[] = [];
+  let defaultBranch = "";
+  let cursor: string | null = null;
+  do {
+    const response: GraphQlBranches = await githubFetch<GraphQlBranches>(
+      token,
+      "/graphql",
+      { method: "POST", body: { query, variables: { owner, name, cursor } } },
+    );
+    if (response.errors?.length) {
+      throw new Error(`GitHub: ${response.errors[0].message}`);
+    }
+    const repository = response.data?.repository;
+    if (!repository?.refs) break;
+    defaultBranch = repository.defaultBranchRef?.name ?? defaultBranch;
+    branches.push(...repository.refs.nodes.map((node) => node.name));
+    // Cap at 500 branches — plenty for a picker.
+    cursor =
+      repository.refs.pageInfo.hasNextPage && branches.length < 500
+        ? repository.refs.pageInfo.endCursor
+        : null;
+  } while (cursor);
+
+  const localBranch = await getLocalCheckoutBranch(repo);
+  if (localBranch) {
+    const index = branches.indexOf(localBranch);
+    if (index > 0) {
+      branches.splice(index, 1);
+      branches.unshift(localBranch);
+    }
+  }
+
+  return { branches, defaultBranch, localBranch };
+}
+
+export async function createPullRequest(
+  repo: string,
+  pr: NewPullRequest,
+): Promise<PullRequest> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to create pull requests.",
+    );
+  }
+
+  const created = await githubFetch<GitHubPullDetail>(
+    token,
+    `/repos/${repo}/pulls`,
+    {
+      method: "POST",
+      body: {
+        title: pr.title,
+        head: pr.head,
+        base: pr.base,
+        body: pr.body,
+        draft: pr.draft,
+      },
+    },
+  );
+
+  return toPullRequest(repo, created, "awaiting_review");
+}
+
+// Which merge methods the repo's settings allow. Missing fields (older
+// GitHub Enterprise) count as allowed, matching GitHub's defaults.
+export async function getRepoMergeSettings(
+  repo: string,
+): Promise<RepoMergeSettings> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to load pull requests.",
+    );
+  }
+
+  const data = await githubFetch<{
+    allow_merge_commit?: boolean;
+    allow_squash_merge?: boolean;
+    allow_rebase_merge?: boolean;
+  }>(token, `/repos/${repo}`);
+
+  const allowedMethods: MergeMethod[] = [];
+  if (data.allow_merge_commit !== false) allowedMethods.push("merge");
+  if (data.allow_squash_merge !== false) allowedMethods.push("squash");
+  if (data.allow_rebase_merge !== false) allowedMethods.push("rebase");
+  return { allowedMethods };
 }
 
 export async function mergePullRequest(

@@ -16,8 +16,11 @@ import type {
   PullRequest,
   PullRequestComment,
   PullRequestReview,
+  ReviewComment,
 } from "../../../shared/types";
 import { formatDate } from "../lib/formatDate";
+import { labelPalette } from "../lib/labelColor";
+import { listReviewThreads, type ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
@@ -26,6 +29,7 @@ import PrStateBadge from "./PrStateBadge";
 import ReviewCard from "./ReviewCard";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
 import ReviewSummary from "./ReviewSummary";
+import ReviewThreadCard from "./ReviewThreadCard";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
@@ -34,14 +38,17 @@ interface Props {
 
 type TimelineItem =
   | { kind: "comment"; date: string; comment: PullRequestComment }
-  | { kind: "review"; date: string; review: PullRequestReview };
+  | { kind: "review"; date: string; review: PullRequestReview }
+  | { kind: "thread"; date: string; thread: ReviewThread };
 
-// Merge conversation comments and meaningful review events into one
-// oldest-first thread. Reviews only appear when they carry a verdict or a
-// written comment — bare "commented" reviews and dismissals are noise here.
+// Merge conversation comments, meaningful review events, and inline review
+// threads into one oldest-first thread. Reviews only appear when they carry
+// a verdict or a written comment — bare "commented" reviews and dismissals
+// are noise here.
 function buildTimeline(
   comments: PullRequestComment[],
   reviews: PullRequestReview[],
+  reviewComments: ReviewComment[],
 ): TimelineItem[] {
   const items: TimelineItem[] = comments.map((comment) => ({
     kind: "comment",
@@ -57,6 +64,10 @@ function buildTimeline(
     if (meaningful) {
       items.push({ kind: "review", date: review.submittedAt, review });
     }
+  }
+
+  for (const thread of listReviewThreads(reviewComments)) {
+    items.push({ kind: "thread", date: thread.root.createdAt, thread });
   }
 
   return items.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
@@ -79,6 +90,20 @@ export default function PullRequestOverview({ pr }: Props) {
     queryFn: () => window.api.listPullRequestReviews(pr.repo, pr.number),
   });
   const reviews = reviewsQuery.data ?? [];
+
+  const reviewCommentsQuery = useQuery({
+    queryKey: ["reviewComments", pr.repo, pr.number],
+    queryFn: () => window.api.listReviewComments(pr.repo, pr.number),
+  });
+  const reviewComments = reviewCommentsQuery.data ?? [];
+
+  // Resolution comes from a separate GraphQL lookup; if it fails, threads
+  // simply all show as unresolved.
+  const resolvedQuery = useQuery({
+    queryKey: ["resolvedThreads", pr.repo, pr.number],
+    queryFn: () => window.api.listResolvedReviewThreads(pr.repo, pr.number),
+  });
+  const resolvedIds = new Set(resolvedQuery.data ?? []);
 
   if (detailQuery.isPending) {
     return (
@@ -104,7 +129,9 @@ export default function PullRequestOverview({ pr }: Props) {
   }
 
   const detail = detailQuery.data;
-  const timeline = comments ? buildTimeline(comments, reviews) : [];
+  const timeline = comments
+    ? buildTimeline(comments, reviews, reviewComments)
+    : [];
 
   return (
     <Box h="full" overflowY="auto" css={scrollbar}>
@@ -153,10 +180,7 @@ export default function PullRequestOverview({ pr }: Props) {
               <Badge
                 key={label.name}
                 variant="surface"
-                style={{
-                  borderColor: `#${label.color}`,
-                  color: `#${label.color}`,
-                }}
+                colorPalette={labelPalette(label.color)}
               >
                 {label.name}
               </Badge>
@@ -232,10 +256,18 @@ export default function PullRequestOverview({ pr }: Props) {
                       key={`comment-${item.comment.id}`}
                       comment={item.comment}
                     />
-                  ) : (
+                  ) : item.kind === "review" ? (
                     <ReviewCard
                       key={`review-${item.review.id}`}
                       review={item.review}
+                    />
+                  ) : (
+                    <ReviewThreadCard
+                      key={`thread-${item.thread.root.id}`}
+                      thread={item.thread}
+                      repo={pr.repo}
+                      prNumber={pr.number}
+                      resolved={resolvedIds.has(item.thread.root.id)}
                     />
                   ),
                 )}

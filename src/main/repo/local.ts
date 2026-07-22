@@ -78,6 +78,53 @@ export async function addRepository(): Promise<Repository | null> {
   return repository;
 }
 
+// The current branch of the registered checkout matching a GitHub slug —
+// prefills the new-PR dialog. Null when the repo isn't registered locally
+// or HEAD is detached.
+export async function getLocalCheckoutBranch(
+  slug: string,
+): Promise<string | null> {
+  const match = (await readRegistry()).find(
+    (repo) => repo.slug?.toLowerCase() === slug.toLowerCase(),
+  );
+  if (!match) return null;
+
+  try {
+    const { stdout } = await run("git", [
+      "-C",
+      match.path,
+      "symbolic-ref",
+      "--short",
+      "HEAD",
+    ]);
+    return stdout.trim();
+  } catch {
+    return null;
+  }
+}
+
+// Persists a drag-reordered list. Unknown paths are ignored; registered
+// repos missing from `paths` keep a spot at the end, so a stale renderer
+// list can never drop repositories.
+export async function reorderRepositories(
+  paths: string[],
+): Promise<Repository[]> {
+  const byPath = new Map(
+    (await readRegistry()).map((repo) => [repo.path, repo]),
+  );
+  const ordered: Repository[] = [];
+  for (const path of paths) {
+    const repo = byPath.get(path);
+    if (repo) {
+      ordered.push(repo);
+      byPath.delete(path);
+    }
+  }
+  ordered.push(...byPath.values());
+  await writeRegistry(ordered);
+  return ordered;
+}
+
 export async function removeRepository(path: string): Promise<Repository[]> {
   const repositories = (await readRegistry()).filter(
     (known) => known.path !== path,

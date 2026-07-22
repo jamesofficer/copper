@@ -9,9 +9,15 @@ const api: WindowApi = {
   listRepositories: () => ipcRenderer.invoke("listRepositories"),
   addRepository: () => ipcRenderer.invoke("addRepository"),
   removeRepository: (path) => ipcRenderer.invoke("removeRepository", path),
+  reorderRepositories: (paths) =>
+    ipcRenderer.invoke("reorderRepositories", paths),
   listPullRequests: (repo) => ipcRenderer.invoke("listPullRequests", repo),
   listReviewRequestedPullRequests: () =>
     ipcRenderer.invoke("listReviewRequestedPullRequests"),
+  listMyPullRequests: () => ipcRenderer.invoke("listMyPullRequests"),
+  getBranchInfo: (repo) => ipcRenderer.invoke("getBranchInfo", repo),
+  createPullRequest: (repo, pr) =>
+    ipcRenderer.invoke("createPullRequest", repo, pr),
   getPullRequest: (repo, prNumber) =>
     ipcRenderer.invoke("getPullRequest", repo, prNumber),
   peekPullRequest: (repo, prNumber) =>
@@ -28,6 +34,17 @@ const api: WindowApi = {
     ipcRenderer.invoke("listPullRequestReviews", repo, prNumber),
   addPullRequestComment: (repo, prNumber, body) =>
     ipcRenderer.invoke("addPullRequestComment", repo, prNumber, body),
+  listReviewComments: (repo, prNumber) =>
+    ipcRenderer.invoke("listReviewComments", repo, prNumber),
+  addReviewComment: (repo, prNumber, comment) =>
+    ipcRenderer.invoke("addReviewComment", repo, prNumber, comment),
+  replyToReviewComment: (repo, prNumber, commentId, body) =>
+    ipcRenderer.invoke("replyToReviewComment", repo, prNumber, commentId, body),
+  deleteReviewComment: (repo, commentId) =>
+    ipcRenderer.invoke("deleteReviewComment", repo, commentId),
+  listResolvedReviewThreads: (repo, prNumber) =>
+    ipcRenderer.invoke("listResolvedReviewThreads", repo, prNumber),
+  getViewer: () => ipcRenderer.invoke("getViewer"),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),
   listAnalyzedPullRequests: () =>
@@ -48,6 +65,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("clearChat", repo, prNumber),
   submitReview: (repo, prNumber, verdict, body) =>
     ipcRenderer.invoke("submitReview", repo, prNumber, verdict, body),
+  getRepoMergeSettings: (repo) =>
+    ipcRenderer.invoke("getRepoMergeSettings", repo),
   mergePullRequest: (repo, prNumber, method) =>
     ipcRenderer.invoke("mergePullRequest", repo, prNumber, method),
   getLlmStatus: () => ipcRenderer.invoke("getLlmStatus"),

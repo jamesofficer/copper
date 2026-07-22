@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import { toDisplayableImageSrc } from "../lib/githubImages";
 import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
 
@@ -182,6 +183,11 @@ export default function Markdown({ children, fontSize = "sm" }: Props) {
             </Link>
           ),
           code: Code,
+          // Private-repo attachments need the main process to fetch them
+          // with the GitHub token; other images load directly.
+          img: ({ src, alt, ...rest }) => (
+            <img {...rest} alt={alt} src={toDisplayableImageSrc(src)} />
+          ),
         }}
       >
         {children}
