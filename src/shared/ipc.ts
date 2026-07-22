@@ -7,6 +7,7 @@ import type {
   LlmStatus,
   LlmTask,
   MergeMethod,
+  NewPullRequest,
   NewReviewComment,
   PullRequest,
   PullRequestComment,
@@ -14,6 +15,8 @@ import type {
   PullRequestDetail,
   PullRequestFile,
   PullRequestReview,
+  RepoBranchInfo,
+  RepoMergeSettings,
   Repository,
   ReviewComment,
   ReviewPersonality,
@@ -27,8 +30,14 @@ export interface IpcApi {
   addRepository(): Promise<Repository | null>;
   removeRepository(path: string): Promise<Repository[]>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
-  // Open PRs (any repo) where the logged-in user's review is requested.
+  // Open PRs across the registered repos where the logged-in user's review is
+  // requested.
   listReviewRequestedPullRequests(): Promise<PullRequest[]>;
+  // Open PRs across the registered repos authored by the logged-in user.
+  listMyPullRequests(): Promise<PullRequest[]>;
+  // Branches + local checkout defaults for the new-PR dialog.
+  getBranchInfo(repo: string): Promise<RepoBranchInfo>;
+  createPullRequest(repo: string, pr: NewPullRequest): Promise<PullRequest>;
   getPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
   // Same data as getPullRequest but without the background repo warm-up —
   // for bulk refreshes (e.g. the recently-viewed panel).
@@ -70,6 +79,9 @@ export interface IpcApi {
     body: string,
   ): Promise<ReviewComment>;
   deleteReviewComment(repo: string, commentId: number): Promise<void>;
+  // Root-comment ids of resolved inline threads — resolution only exists in
+  // GitHub's GraphQL API, so it's a separate lookup from listReviewComments.
+  listResolvedReviewThreads(repo: string, prNumber: number): Promise<number[]>;
   // The GitHub login the stored token belongs to.
   getViewer(): Promise<string>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
@@ -93,6 +105,9 @@ export interface IpcApi {
     verdict: ReviewVerdict,
     body: string,
   ): Promise<void>;
+  // The merge methods the repo's settings allow, so the merge dialog only
+  // offers what GitHub would accept.
+  getRepoMergeSettings(repo: string): Promise<RepoMergeSettings>;
   mergePullRequest(
     repo: string,
     prNumber: number,
@@ -128,6 +143,9 @@ export const ipcChannels = [
   "removeRepository",
   "listPullRequests",
   "listReviewRequestedPullRequests",
+  "listMyPullRequests",
+  "getBranchInfo",
+  "createPullRequest",
   "getPullRequest",
   "peekPullRequest",
   "listPullRequestFiles",
@@ -140,6 +158,7 @@ export const ipcChannels = [
   "addReviewComment",
   "replyToReviewComment",
   "deleteReviewComment",
+  "listResolvedReviewThreads",
   "getViewer",
   "getAnalysis",
   "listAnalyzedPullRequests",
@@ -148,6 +167,7 @@ export const ipcChannels = [
   "getChatHistory",
   "clearChat",
   "submitReview",
+  "getRepoMergeSettings",
   "mergePullRequest",
   "getLlmStatus",
   "setLlmProvider",

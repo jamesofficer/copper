@@ -1,7 +1,7 @@
 import type { PullRequest } from "../../../shared/types";
 
 const STORAGE_KEY = "recentPullRequests";
-const MAX_RECENT = 20;
+const MAX_RECENT = 10;
 
 export type RecentPullRequest = PullRequest & { viewedAt: string };
 
@@ -10,7 +10,7 @@ export function listRecentPullRequests(): RecentPullRequest[] {
     const parsed = JSON.parse(
       localStorage.getItem(STORAGE_KEY) ?? "[]",
     ) as RecentPullRequest[];
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_RECENT) : [];
   } catch {
     return [];
   }

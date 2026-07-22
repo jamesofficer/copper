@@ -22,6 +22,9 @@ export interface PullRequest {
   changedFiles: number;
   // Conversation + inline review comments combined.
   comments: number;
+  assignees: string[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface PullRequestLabel {
@@ -48,6 +51,7 @@ export interface PullRequestDetail {
   headSha: string;
   labels: PullRequestLabel[];
   reviewers: string[];
+  assignees: string[];
   additions: number;
   deletions: number;
   changedFiles: number;
@@ -58,8 +62,35 @@ export interface PullRequestDetail {
   url: string;
 }
 
+// What the new-PR dialog needs to prefill itself: the repo's branches on
+// GitHub (the only valid heads — a branch must be pushed to be one), plus
+// the registered local checkout's current branch for smart defaults.
+export interface RepoBranchInfo {
+  // Newest commit first, with the local checkout's branch pinned to the top
+  // when it's on GitHub.
+  branches: string[];
+  defaultBranch: string;
+  // The local checkout's current branch — null when the repo isn't
+  // registered locally or HEAD is detached.
+  localBranch: string | null;
+}
+
+// What the new-PR dialog sends to open a pull request.
+export interface NewPullRequest {
+  title: string;
+  body: string;
+  head: string;
+  base: string;
+  draft: boolean;
+}
+
 // How GitHub combines the PR's commits when merging.
 export type MergeMethod = "merge" | "squash" | "rebase";
+
+// The merge methods a repository's settings allow, in GitHub's display order.
+export interface RepoMergeSettings {
+  allowedMethods: MergeMethod[];
+}
 
 // Mirrors GitHub's review events: comment, approve, or request changes.
 export type ReviewVerdict = "comment" | "approve" | "request_changes";

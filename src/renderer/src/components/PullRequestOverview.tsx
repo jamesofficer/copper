@@ -19,6 +19,7 @@ import type {
   ReviewComment,
 } from "../../../shared/types";
 import { formatDate } from "../lib/formatDate";
+import { labelPalette } from "../lib/labelColor";
 import { listReviewThreads, type ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import CommentCard from "./CommentCard";
@@ -96,6 +97,14 @@ export default function PullRequestOverview({ pr }: Props) {
   });
   const reviewComments = reviewCommentsQuery.data ?? [];
 
+  // Resolution comes from a separate GraphQL lookup; if it fails, threads
+  // simply all show as unresolved.
+  const resolvedQuery = useQuery({
+    queryKey: ["resolvedThreads", pr.repo, pr.number],
+    queryFn: () => window.api.listResolvedReviewThreads(pr.repo, pr.number),
+  });
+  const resolvedIds = new Set(resolvedQuery.data ?? []);
+
   if (detailQuery.isPending) {
     return (
       <Center h="full">
@@ -171,10 +180,7 @@ export default function PullRequestOverview({ pr }: Props) {
               <Badge
                 key={label.name}
                 variant="surface"
-                style={{
-                  borderColor: `#${label.color}`,
-                  color: `#${label.color}`,
-                }}
+                colorPalette={labelPalette(label.color)}
               >
                 {label.name}
               </Badge>
@@ -261,6 +267,7 @@ export default function PullRequestOverview({ pr }: Props) {
                       thread={item.thread}
                       repo={pr.repo}
                       prNumber={pr.number}
+                      resolved={resolvedIds.has(item.thread.root.id)}
                     />
                   ),
                 )}

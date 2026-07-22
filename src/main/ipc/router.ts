@@ -6,14 +6,19 @@ import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
   addPullRequestComment,
   addReviewComment,
+  createPullRequest,
   deleteReviewComment,
+  getBranchInfo,
   getPullRequest,
+  getRepoMergeSettings,
   getViewer,
   listCommitFiles,
+  listMyPullRequests,
   listPullRequestComments,
   listPullRequestCommits,
   listPullRequestFiles,
   listPullRequestReviews,
+  listResolvedReviewThreads,
   listReviewComments,
   listReviewRequestedPullRequests,
   listReviewRequests,
@@ -36,6 +41,9 @@ const handlers: IpcApi = {
   removeRepository: (path) => removeRepository(path),
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
+  listMyPullRequests: () => listMyPullRequests(),
+  getBranchInfo: (repo) => getBranchInfo(repo),
+  createPullRequest: (repo, pr) => createPullRequest(repo, pr),
   getPullRequest: async (repo, prNumber) => {
     const detail = await getPullRequest(repo, prNumber);
     // Best-effort background clone/fetch so repo context is ready for the chat.
@@ -61,6 +69,8 @@ const handlers: IpcApi = {
     replyToReviewComment(repo, prNumber, commentId, body),
   deleteReviewComment: (repo, commentId) =>
     deleteReviewComment(repo, commentId),
+  listResolvedReviewThreads: (repo, prNumber) =>
+    listResolvedReviewThreads(repo, prNumber),
   getViewer: () => getViewer(),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
@@ -72,6 +82,7 @@ const handlers: IpcApi = {
   clearChat: (repo, prNumber) => clearChat(repo, prNumber),
   submitReview: (repo, prNumber, verdict, body) =>
     submitReview(repo, prNumber, verdict, body),
+  getRepoMergeSettings: (repo) => getRepoMergeSettings(repo),
   mergePullRequest: (repo, prNumber, method) =>
     mergePullRequest(repo, prNumber, method),
   getLlmStatus: () => getLlmStatus(),

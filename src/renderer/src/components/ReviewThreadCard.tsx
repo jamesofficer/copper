@@ -1,5 +1,6 @@
 import { Badge, Box, Flex, HStack, Text } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { LuChevronDown, LuChevronRight } from "react-icons/lu";
 import type { ReviewComment } from "../../../shared/types";
 import { type DiffLine, languageForPath, parsePatch } from "../lib/diffParser";
 import { formatThreadRange, type ReviewThread } from "../lib/reviewComments";
@@ -11,6 +12,7 @@ interface Props {
   thread: ReviewThread;
   repo: string;
   prNumber: number;
+  resolved?: boolean;
 }
 
 const lineStyles: Record<string, { bg: string; sign: string }> = {
@@ -31,10 +33,18 @@ function trimHunk(root: ReviewComment, lines: DiffLine[]): DiffLine[] {
 }
 
 // An inline review thread shown in the Overview's conversation: where it was
-// left, the code it points at, and the discussion itself.
-export default function ReviewThreadCard({ thread, repo, prNumber }: Props) {
+// left, the code it points at, and the discussion itself. Resolved threads
+// collapse to their header, like on GitHub, and expand on click.
+export default function ReviewThreadCard({
+  thread,
+  repo,
+  prNumber,
+  resolved = false,
+}: Props) {
   const { root } = thread;
   const range = formatThreadRange(root);
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = resolved && !expanded;
 
   const hunkLines = useMemo(
     () =>
@@ -47,15 +57,20 @@ export default function ReviewThreadCard({ thread, repo, prNumber }: Props) {
   return (
     <Box borderWidth="1px" rounded="lg" overflow="hidden">
       <HStack
+        as={resolved ? "button" : undefined}
+        w="full"
         px="3"
         py="2"
         gap="2"
         bg="bg.subtle"
-        borderBottomWidth="1px"
+        borderBottomWidth={collapsed ? "0" : "1px"}
         fontSize="xs"
         flexWrap="wrap"
+        cursor={resolved ? "pointer" : undefined}
+        _hover={resolved ? { bg: "bg.muted" } : undefined}
+        onClick={resolved ? () => setExpanded(!expanded) : undefined}
       >
-        <Text fontFamily="mono" wordBreak="break-all">
+        <Text fontFamily="mono" wordBreak="break-all" textAlign="left">
           {root.path}
         </Text>
         {range ? (
@@ -67,9 +82,29 @@ export default function ReviewThreadCard({ thread, repo, prNumber }: Props) {
             Outdated
           </Badge>
         )}
+        {resolved && (
+          <>
+            <Badge
+              size="sm"
+              variant="surface"
+              colorPalette="orange"
+              flexShrink="0"
+            >
+              Resolved
+            </Badge>
+            <HStack ml="auto" gap="1" color="fg.muted" flexShrink="0">
+              <Text>{expanded ? "Hide" : "Show"}</Text>
+              {expanded ? (
+                <LuChevronDown size={12} />
+              ) : (
+                <LuChevronRight size={12} />
+              )}
+            </HStack>
+          </>
+        )}
       </HStack>
 
-      {hunkLines.length > 0 && (
+      {!collapsed && hunkLines.length > 0 && (
         <Box
           overflowX="auto"
           borderBottomWidth="1px"
@@ -120,9 +155,11 @@ export default function ReviewThreadCard({ thread, repo, prNumber }: Props) {
         </Box>
       )}
 
-      <Box p="3">
-        <DiffCommentThread thread={thread} repo={repo} prNumber={prNumber} />
-      </Box>
+      {!collapsed && (
+        <Box p="3">
+          <DiffCommentThread thread={thread} repo={repo} prNumber={prNumber} />
+        </Box>
+      )}
     </Box>
   );
 }

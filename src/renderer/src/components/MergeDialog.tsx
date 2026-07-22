@@ -8,7 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuGitMerge } from "react-icons/lu";
 import type { MergeMethod, PullRequestDetail } from "../../../shared/types";
@@ -50,9 +50,26 @@ export default function MergeDialog({ detail }: Props) {
   const [open, setOpen] = useState(false);
   const [method, setMethod] = useState<MergeMethod>("merge");
 
+  // Repo settings can disable merge methods (e.g. squash-only repos); offer
+  // only what GitHub would accept. Until they load (or if they fail), all
+  // three show — a wrong pick just errors on confirm.
+  const settingsQuery = useQuery({
+    queryKey: ["repoMergeSettings", detail.repo],
+    queryFn: () => window.api.getRepoMergeSettings(detail.repo),
+    staleTime: 5 * 60 * 1000,
+  });
+  const allowed = settingsQuery.data?.allowedMethods;
+  const options = allowed
+    ? methodOptions.filter((option) => allowed.includes(option.value))
+    : methodOptions;
+  // Falls back to the repo's first allowed method when the picked one is off.
+  const selectedMethod = options.some((option) => option.value === method)
+    ? method
+    : (options[0]?.value ?? "merge");
+
   const merge = useMutation({
     mutationFn: () =>
-      window.api.mergePullRequest(detail.repo, detail.number, method),
+      window.api.mergePullRequest(detail.repo, detail.number, selectedMethod),
     onSuccess: () => {
       toaster.create({
         type: "success",
@@ -136,13 +153,13 @@ export default function MergeDialog({ detail }: Props) {
                 )}
 
                 <RadioGroup.Root
-                  value={method}
+                  value={selectedMethod}
                   onValueChange={(event) =>
                     setMethod((event.value ?? "merge") as MergeMethod)
                   }
                 >
                   <VStack alignItems="stretch" gap="3">
-                    {methodOptions.map((option) => (
+                    {options.map((option) => (
                       <RadioGroup.Item
                         key={option.value}
                         value={option.value}

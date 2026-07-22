@@ -1,7 +1,11 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { app, BrowserWindow, nativeImage, shell } from "electron";
+import { handleAssetRequests, registerAssetScheme } from "./github/assets";
 import { registerIpcHandlers } from "./ipc/router";
+
+// Privileged schemes must be declared before the app is ready.
+registerAssetScheme();
 
 function setDockIcon(): void {
   if (process.platform !== "darwin" || !app.dock) return;
@@ -48,6 +52,7 @@ function createWindow(): void {
 void app.whenReady().then(() => {
   setDockIcon();
   registerIpcHandlers();
+  handleAssetRequests();
   createWindow();
 
   app.on("activate", () => {

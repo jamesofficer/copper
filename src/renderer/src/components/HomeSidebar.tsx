@@ -5,6 +5,7 @@ import {
   HStack,
   Icon,
   IconButton,
+  Separator,
   Spinner,
   Stack,
   Text,
@@ -52,6 +53,12 @@ export default function HomeSidebar({
     queryFn: () => window.api.listReviewRequestedPullRequests(),
   });
   const reviewRequests = reviewRequestsQuery.data;
+
+  const myPullRequestsQuery = useQuery({
+    queryKey: ["myPullRequests"],
+    queryFn: () => window.api.listMyPullRequests(),
+  });
+  const myPullRequests = myPullRequestsQuery.data;
 
   return (
     <Flex
@@ -134,6 +141,8 @@ export default function HomeSidebar({
           )}
         </Section>
 
+        <SectionDivider />
+
         <Section title="Review requests">
           {reviewRequestsQuery.isPending ? (
             <Spinner size="sm" color="fg.muted" alignSelf="center" my="2" />
@@ -157,6 +166,34 @@ export default function HomeSidebar({
             ))
           )}
         </Section>
+
+        <SectionDivider />
+
+        <Section title="My pull requests">
+          {myPullRequestsQuery.isPending ? (
+            <Spinner size="sm" color="fg.muted" alignSelf="center" my="2" />
+          ) : myPullRequestsQuery.isError ? (
+            <SectionNote>Couldn’t load your pull requests.</SectionNote>
+          ) : !myPullRequests || myPullRequests.length === 0 ? (
+            <SectionNote>No open pull requests of yours.</SectionNote>
+          ) : (
+            myPullRequests.map((pr) => (
+              <PullRequestRow
+                key={`${pr.repo}#${pr.number}`}
+                pr={pr}
+                onSelect={onSelectPullRequest}
+                meta={
+                  <HStack gap="1.5">
+                    <Text color="green.fg">+{pr.additions}</Text>
+                    <Text color="red.fg">−{pr.deletions}</Text>
+                  </HStack>
+                }
+              />
+            ))
+          )}
+        </Section>
+
+        <SectionDivider />
 
         <Section
           title="Recently viewed"
@@ -225,6 +262,11 @@ function SidebarAction({ icon, label, onClick }: SidebarActionProps) {
       <Text fontSize="sm">{label}</Text>
     </HStack>
   );
+}
+
+// Stretches edge to edge by cancelling the section stack's horizontal padding.
+function SectionDivider() {
+  return <Separator mx="-2" />;
 }
 
 interface SectionProps {
