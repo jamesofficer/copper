@@ -24,8 +24,10 @@ import {
   listReviewComments,
   listReviewRequestedPullRequests,
   listReviewRequests,
+  listViewedFiles,
   mergePullRequest,
   replyToReviewComment,
+  setFileViewed,
   setPullRequestState,
   setReviewThreadResolved,
   submitReview,
@@ -83,6 +85,9 @@ const handlers: IpcApi = {
     listResolvedReviewThreads(repo, prNumber),
   setReviewThreadResolved: (repo, prNumber, rootCommentId, resolved) =>
     setReviewThreadResolved(repo, prNumber, rootCommentId, resolved),
+  listViewedFiles: (repo, prNumber) => listViewedFiles(repo, prNumber),
+  setFileViewed: (repo, prNumber, path, viewed) =>
+    setFileViewed(repo, prNumber, path, viewed),
   getViewer: () => getViewer(),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),

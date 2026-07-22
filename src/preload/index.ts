@@ -58,6 +58,10 @@ const api: WindowApi = {
       rootCommentId,
       resolved,
     ),
+  listViewedFiles: (repo, prNumber) =>
+    ipcRenderer.invoke("listViewedFiles", repo, prNumber),
+  setFileViewed: (repo, prNumber, path, viewed) =>
+    ipcRenderer.invoke("setFileViewed", repo, prNumber, path, viewed),
   getViewer: () => ipcRenderer.invoke("getViewer"),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),

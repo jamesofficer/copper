@@ -1,4 +1,4 @@
-import { Box, Center, Flex, HStack, Text } from "@chakra-ui/react";
+import { Box, Center, Checkbox, Flex, HStack, Text } from "@chakra-ui/react";
 import type { PullRequestFile } from "../../../shared/types";
 import { statusMeta } from "../lib/fileStatus";
 import { scrollbar } from "../lib/scrollbar";
@@ -7,9 +7,17 @@ import DiffLines, { type DiffCommenting } from "./DiffLines";
 interface Props {
   file: PullRequestFile;
   commenting?: DiffCommenting;
+  // Undefined hides the Viewed checkbox (commit-by-commit views).
+  viewed?: boolean;
+  onToggleViewed?(viewed: boolean): void;
 }
 
-export default function DiffView({ file, commenting }: Props) {
+export default function DiffView({
+  file,
+  commenting,
+  viewed,
+  onToggleViewed,
+}: Props) {
   const meta = statusMeta[file.status];
 
   return (
@@ -60,6 +68,21 @@ export default function DiffView({ file, commenting }: Props) {
             −{file.deletions}
           </Text>
         </HStack>
+        {viewed !== undefined && onToggleViewed && (
+          <Checkbox.Root
+            size="sm"
+            cursor="pointer"
+            flexShrink="0"
+            checked={viewed}
+            onCheckedChange={(event) => onToggleViewed(Boolean(event.checked))}
+          >
+            <Checkbox.HiddenInput />
+            <Checkbox.Control />
+            <Checkbox.Label fontSize="xs" fontWeight="normal">
+              Viewed
+            </Checkbox.Label>
+          </Checkbox.Root>
+        )}
       </HStack>
 
       {file.patch ? (

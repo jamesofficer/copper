@@ -103,6 +103,15 @@ export interface IpcApi {
     rootCommentId: number,
     resolved: boolean,
   ): Promise<void>;
+  // Paths the viewer marked as viewed, synced with GitHub's own checkboxes
+  // (GraphQL viewerViewedState — a file changed after viewing drops out).
+  listViewedFiles(repo: string, prNumber: number): Promise<string[]>;
+  setFileViewed(
+    repo: string,
+    prNumber: number,
+    path: string,
+    viewed: boolean,
+  ): Promise<void>;
   // The GitHub login the stored token belongs to.
   getViewer(): Promise<string>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
@@ -185,6 +194,8 @@ export const ipcChannels = [
   "deleteReviewComment",
   "listResolvedReviewThreads",
   "setReviewThreadResolved",
+  "listViewedFiles",
+  "setFileViewed",
   "getViewer",
   "getAnalysis",
   "listAnalyzedPullRequests",

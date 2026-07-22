@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { LuArrowLeft, LuGitPullRequestCreate } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import MarkdownEditor, { type MarkdownEditorMode } from "./MarkdownEditor";
@@ -114,12 +114,18 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
     title.trim().length > 0 &&
     !create.isPending;
 
-  const headBranches = info
-    ? info.branches.filter((branch) => branch !== selectedBase)
-    : [];
-  const baseBranches = info
-    ? info.branches.filter((branch) => branch !== selectedHead)
-    : [];
+  // Stable references so the memoized selects skip re-rendering while the
+  // user types in the title/description — the branch lists can be huge.
+  const headBranches = useMemo(
+    () =>
+      info ? info.branches.filter((branch) => branch !== selectedBase) : [],
+    [info, selectedBase],
+  );
+  const baseBranches = useMemo(
+    () =>
+      info ? info.branches.filter((branch) => branch !== selectedHead) : [],
+    [info, selectedHead],
+  );
 
   return (
     <Dialog.Root
@@ -267,7 +273,14 @@ interface BranchSelectProps {
   onChange(value: string): void;
 }
 
-function BranchSelect({ label, branches, value, onChange }: BranchSelectProps) {
+// memo: the dialog re-renders on every title/description keystroke; with
+// hundreds of branches per select, those renders are what made typing lag.
+const BranchSelect = memo(function BranchSelect({
+  label,
+  branches,
+  value,
+  onChange,
+}: BranchSelectProps) {
   const collection = useMemo(
     () =>
       createListCollection({
@@ -283,6 +296,8 @@ function BranchSelect({ label, branches, value, onChange }: BranchSelectProps) {
         value={value ? [value] : []}
         onValueChange={(event) => onChange(event.value[0] ?? "")}
         size="sm"
+        lazyMount
+        unmountOnExit
       >
         <Select.HiddenSelect />
         <Select.Control>
@@ -314,4 +329,4 @@ function BranchSelect({ label, branches, value, onChange }: BranchSelectProps) {
       </Select.Root>
     </Field.Root>
   );
-}
+});

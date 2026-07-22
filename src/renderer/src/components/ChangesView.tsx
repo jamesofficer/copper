@@ -10,7 +10,7 @@ import {
   Spinner,
   Text,
 } from "@chakra-ui/react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { LuChevronRight, LuSearch } from "react-icons/lu";
 import { useDebounce } from "use-debounce";
@@ -21,6 +21,7 @@ import { usePanelWidth } from "../lib/usePanelWidth";
 import CommitList from "./CommitList";
 import DiffView from "./DiffView";
 import FileList from "./FileList";
+import { toaster } from "./ui/toaster";
 
 interface Props {
   pr: PullRequest;
@@ -95,6 +96,47 @@ export default function ChangesView({ pr }: Props) {
     () => buildReviewThreads(reviewCommentsQuery.data ?? []),
     [reviewCommentsQuery.data],
   );
+
+  // Viewed state is GitHub's own per-file checkbox (GraphQL), toggled
+  // optimistically — like the state itself, it only applies to the full
+  // changelist, not commit-by-commit views.
+  const queryClient = useQueryClient();
+  const viewedKey = ["viewedFiles", pr.repo, pr.number];
+  const viewedQuery = useQuery({
+    queryKey: viewedKey,
+    queryFn: () => window.api.listViewedFiles(pr.repo, pr.number),
+  });
+  const viewedPaths = useMemo(
+    () => new Set(viewedQuery.data ?? []),
+    [viewedQuery.data],
+  );
+  const setViewed = useMutation({
+    mutationFn: ({ path, viewed }: { path: string; viewed: boolean }) =>
+      window.api.setFileViewed(pr.repo, pr.number, path, viewed),
+    onMutate: async ({ path, viewed }) => {
+      await queryClient.cancelQueries({ queryKey: viewedKey });
+      const previous = queryClient.getQueryData<string[]>(viewedKey) ?? [];
+      queryClient.setQueryData<string[]>(
+        viewedKey,
+        viewed
+          ? [...previous, path]
+          : previous.filter((entry) => entry !== path),
+      );
+      return { previous };
+    },
+    onError: (cause, _variables, context) => {
+      queryClient.setQueryData(viewedKey, context?.previous ?? []);
+      toaster.create({
+        type: "error",
+        title: "Couldn’t update viewed state",
+        description:
+          cause instanceof Error
+            ? cause.message.replace(/^.*Error: /, "")
+            : String(cause),
+        closable: true,
+      });
+    },
+  });
 
   // Resolution comes from a separate GraphQL lookup; if it fails, threads
   // simply all show as unresolved.
@@ -182,18 +224,27 @@ export default function ChangesView({ pr }: Props) {
             </Collapsible.Root>
           )}
 
-          <Heading
-            size="xs"
-            color="fg.muted"
-            textTransform="uppercase"
-            letterSpacing="wider"
+          <HStack
             px="4"
             py="3"
             flexShrink="0"
             borderTopWidth={commits && commits.length > 1 ? "1px" : "0"}
           >
-            Files{fileCount ? ` (${fileCount})` : ""}
-          </Heading>
+            <Heading
+              size="xs"
+              color="fg.muted"
+              textTransform="uppercase"
+              letterSpacing="wider"
+            >
+              Files{fileCount ? ` (${fileCount})` : ""}
+            </Heading>
+            {selectedCommit === null && files && files.length > 0 && (
+              <Text ml="auto" fontFamily="mono" fontSize="2xs" color="fg.muted">
+                {files.filter((file) => viewedPaths.has(file.path)).length}/
+                {files.length} viewed
+              </Text>
+            )}
+          </HStack>
           <Box px="3" pb="2" flexShrink="0">
             <InputGroup startElement={<LuSearch size={12} />}>
               <Input
@@ -224,6 +275,7 @@ export default function ChangesView({ pr }: Props) {
                 files={visibleFiles}
                 selectedPath={selectedFile?.path ?? null}
                 onSelect={setSelectedPath}
+                viewedPaths={selectedCommit === null ? viewedPaths : undefined}
               />
             ) : (
               <Text fontSize="sm" color="fg.muted" px="1">
@@ -246,7 +298,21 @@ export default function ChangesView({ pr }: Props) {
 
       <Box flex="1" minH="0" minW="0">
         {selectedFile ? (
-          <DiffView file={selectedFile} commenting={commenting} />
+          <DiffView
+            file={selectedFile}
+            commenting={commenting}
+            viewed={
+              selectedCommit === null
+                ? viewedPaths.has(selectedFile.path)
+                : undefined
+            }
+            onToggleViewed={
+              selectedCommit === null
+                ? (viewed) =>
+                    setViewed.mutate({ path: selectedFile.path, viewed })
+                : undefined
+            }
+          />
         ) : (
           <Center h="full" p="4">
             <Text color="fg.muted" fontSize="sm">

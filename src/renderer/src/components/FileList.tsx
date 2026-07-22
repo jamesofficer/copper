@@ -1,4 +1,5 @@
-import { Box, HStack, Stack, Text } from "@chakra-ui/react";
+import { Box, HStack, Icon, Stack, Text } from "@chakra-ui/react";
+import { LuCheck } from "react-icons/lu";
 import type { PullRequestFile } from "../../../shared/types";
 import { statusMeta } from "../lib/fileStatus";
 
@@ -6,14 +7,23 @@ interface Props {
   files: PullRequestFile[];
   selectedPath: string | null;
   onSelect(path: string): void;
+  // Undefined hides viewed indicators (commit-by-commit views — viewed state
+  // is scoped to the full PR changelist).
+  viewedPaths?: Set<string>;
 }
 
-export default function FileList({ files, selectedPath, onSelect }: Props) {
+export default function FileList({
+  files,
+  selectedPath,
+  onSelect,
+  viewedPaths,
+}: Props) {
   return (
     <Stack gap="0.5">
       {files.map((file) => {
         const meta = statusMeta[file.status];
         const selected = file.path === selectedPath;
+        const viewed = viewedPaths?.has(file.path) ?? false;
         const slash = file.path.lastIndexOf("/");
         const dir = slash === -1 ? "" : file.path.slice(0, slash + 1);
         const name = slash === -1 ? file.path : file.path.slice(slash + 1);
@@ -28,6 +38,7 @@ export default function FileList({ files, selectedPath, onSelect }: Props) {
             py="1.5"
             bg={selected ? "bg.emphasized" : "transparent"}
             _hover={{ bg: selected ? "bg.emphasized" : "bg.subtle" }}
+            opacity={viewed ? 0.55 : undefined}
           >
             <HStack gap="2" minW="0">
               <Text
@@ -54,6 +65,11 @@ export default function FileList({ files, selectedPath, onSelect }: Props) {
                 <Text as="span" color="red.fg">
                   −{file.deletions}
                 </Text>
+                {viewed && (
+                  <Icon color="green.fg" size="xs">
+                    <LuCheck />
+                  </Icon>
+                )}
               </HStack>
             </HStack>
           </Box>

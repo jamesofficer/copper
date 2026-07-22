@@ -260,7 +260,7 @@ export default function Welcome({
         </Tabs.Content>
 
         <Tabs.Content value="analyzed" flex="1" minH="0" p="0">
-          <AnalyzedPanel onSelect={setPreview} />
+          <AnalyzedPanel repo={active?.slug ?? null} onSelect={setPreview} />
         </Tabs.Content>
       </Tabs.Root>
 

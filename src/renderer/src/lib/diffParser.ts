@@ -69,16 +69,88 @@ function escapeHtml(text: string): string {
     .replace(/>/g, "&gt;");
 }
 
-function highlight(text: string, language: string | null): string {
-  if (!text) return "";
-  if (language) {
-    try {
-      return hljs.highlight(text, { language, ignoreIllegals: true }).value;
-    } catch {
-      // fall back to plain text below
+// Highlights a multi-line snippet as ONE document, then splits the HTML back
+// into per-line chunks — open spans are closed at each newline and reopened on
+// the next line. Highlighting line-by-line instead would drop state that spans
+// lines (block comments, template literals), leaving e.g. the middle of a
+// /** ... */ block highlighted as code. Returns null if hljs fails.
+function highlightToLines(text: string, language: string): string[] | null {
+  let value: string;
+  try {
+    value = hljs.highlight(text, { language, ignoreIllegals: true }).value;
+  } catch {
+    return null;
+  }
+  // hljs output is only escaped text, <span class="...">, and </span>.
+  const lines: string[] = [];
+  const openTags: string[] = [];
+  let current = "";
+  let i = 0;
+  while (i < value.length) {
+    const char = value[i];
+    if (char === "<") {
+      const end = value.indexOf(">", i);
+      if (end === -1) return null;
+      const tag = value.slice(i, end + 1);
+      if (tag.startsWith("</")) openTags.pop();
+      else openTags.push(tag);
+      current += tag;
+      i = end + 1;
+    } else if (char === "\n") {
+      lines.push(current + "</span>".repeat(openTags.length));
+      current = openTags.join("");
+      i++;
+    } else {
+      current += char;
+      i++;
     }
   }
-  return escapeHtml(text);
+  lines.push(current + "</span>".repeat(openTags.length));
+  return lines;
+}
+
+// Each hunk is highlighted as two documents — the old side (del + context
+// lines) and the new side (add + context lines) — both contiguous slices of
+// their file version, so multi-line constructs keep their state. Hunks are
+// deliberately NOT concatenated: the unseen gap between them could open or
+// close anything, and a wrong carried-over state would poison every hunk
+// after it.
+function highlightSegment(segment: DiffLine[], language: string | null): void {
+  const newSide = segment.filter((line) => line.kind !== "del");
+  const oldSide = segment.filter((line) => line.kind !== "add");
+  const newHtml = language
+    ? highlightToLines(newSide.map((line) => line.text).join("\n"), language)
+    : null;
+  const oldHtml = language
+    ? highlightToLines(oldSide.map((line) => line.text).join("\n"), language)
+    : null;
+  newSide.forEach((line, index) => {
+    line.html =
+      newHtml && newHtml.length === newSide.length
+        ? newHtml[index]
+        : escapeHtml(line.text);
+  });
+  oldSide.forEach((line, index) => {
+    if (line.kind !== "del") return;
+    line.html =
+      oldHtml && oldHtml.length === oldSide.length
+        ? oldHtml[index]
+        : escapeHtml(line.text);
+  });
+}
+
+function applyHighlighting(lines: DiffLine[], language: string | null): void {
+  let segment: DiffLine[] = [];
+  for (const line of lines) {
+    if (line.kind === "hunk") {
+      highlightSegment(segment, language);
+      segment = [];
+    } else if (line.kind !== "meta") {
+      // "\ No newline" markers sit inside a change block — skip, don't split.
+      segment.push(line);
+    }
+  }
+  highlightSegment(segment, language);
 }
 
 // One row of a side-by-side diff. Context/hunk/meta lines appear on both
@@ -143,7 +215,7 @@ export function parsePatch(patch: string, language: string | null): DiffLine[] {
         oldNumber: null,
         newNumber,
         text,
-        html: highlight(text, language),
+        html: "",
       });
       newNumber++;
       continue;
@@ -155,7 +227,7 @@ export function parsePatch(patch: string, language: string | null): DiffLine[] {
         oldNumber,
         newNumber: null,
         text,
-        html: highlight(text, language),
+        html: "",
       });
       oldNumber++;
       continue;
@@ -178,11 +250,12 @@ export function parsePatch(patch: string, language: string | null): DiffLine[] {
       oldNumber,
       newNumber,
       text,
-      html: highlight(text, language),
+      html: "",
     });
     oldNumber++;
     newNumber++;
   }
 
+  applyHighlighting(lines, language);
   return lines;
 }

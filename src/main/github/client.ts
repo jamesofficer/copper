@@ -925,6 +925,148 @@ export async function setReviewThreadResolved(
   }
 }
 
+interface GraphQlViewedFiles {
+  data?: {
+    repository?: {
+      pullRequest?: {
+        files: {
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          nodes: Array<{ path: string; viewerViewedState: string }>;
+        } | null;
+      } | null;
+    } | null;
+  };
+  errors?: Array<{ message: string }>;
+}
+
+// Paths the viewer has marked as viewed — GitHub's own per-file checkbox
+// state, which only exists in GraphQL. DISMISSED (the file changed after it
+// was viewed) deliberately counts as not viewed, matching github.com.
+export async function listViewedFiles(
+  repo: string,
+  prNumber: number,
+): Promise<string[]> {
+  const token = await getGitHubToken();
+  if (!token) return [];
+
+  const [owner, name] = repo.split("/");
+  const query = `
+    query ($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          files(first: 100, after: $cursor) {
+            pageInfo { hasNextPage endCursor }
+            nodes { path viewerViewedState }
+          }
+        }
+      }
+    }`;
+
+  const viewed: string[] = [];
+  let cursor: string | null = null;
+  do {
+    const response: GraphQlViewedFiles = await githubFetch<GraphQlViewedFiles>(
+      token,
+      "/graphql",
+      {
+        method: "POST",
+        body: { query, variables: { owner, name, number: prNumber, cursor } },
+      },
+    );
+    if (response.errors?.length) {
+      throw new Error(`GitHub: ${response.errors[0].message}`);
+    }
+    const files = response.data?.repository?.pullRequest?.files;
+    if (!files) break;
+    for (const node of files.nodes) {
+      if (node.viewerViewedState === "VIEWED") viewed.push(node.path);
+    }
+    cursor = files.pageInfo.hasNextPage ? files.pageInfo.endCursor : null;
+  } while (cursor);
+  return viewed;
+}
+
+// PR node ids never change, so the mark/unmark mutations only pay for the
+// lookup once per PR per app run.
+const prNodeIds = new Map<string, string>();
+
+async function getPullRequestNodeId(
+  token: string,
+  repo: string,
+  prNumber: number,
+): Promise<string> {
+  const key = `${repo}#${prNumber}`;
+  const cached = prNodeIds.get(key);
+  if (cached) return cached;
+
+  const [owner, name] = repo.split("/");
+  const response = await githubFetch<{
+    data?: {
+      repository?: { pullRequest?: { id: string } | null } | null;
+    };
+    errors?: Array<{ message: string }>;
+  }>(token, "/graphql", {
+    method: "POST",
+    body: {
+      query: `
+        query ($owner: String!, $name: String!, $number: Int!) {
+          repository(owner: $owner, name: $name) {
+            pullRequest(number: $number) { id }
+          }
+        }`,
+      variables: { owner, name, number: prNumber },
+    },
+  });
+  if (response.errors?.length) {
+    throw new Error(`GitHub: ${response.errors[0].message}`);
+  }
+  const id = response.data?.repository?.pullRequest?.id;
+  if (!id) {
+    throw new Error("GitHub: couldn’t find the pull request.");
+  }
+  prNodeIds.set(key, id);
+  return id;
+}
+
+// Mark or unmark a changed file as viewed — the same state GitHub's file
+// checkboxes write, so it stays in sync with github.com.
+export async function setFileViewed(
+  repo: string,
+  prNumber: number,
+  path: string,
+  viewed: boolean,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to mark files viewed.");
+  }
+
+  const pullRequestId = await getPullRequestNodeId(token, repo, prNumber);
+  const mutation = viewed
+    ? `mutation ($pullRequestId: ID!, $path: String!) {
+        markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) {
+          pullRequest { id }
+        }
+      }`
+    : `mutation ($pullRequestId: ID!, $path: String!) {
+        unmarkFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) {
+          pullRequest { id }
+        }
+      }`;
+
+  const result = await githubFetch<{ errors?: Array<{ message: string }> }>(
+    token,
+    "/graphql",
+    {
+      method: "POST",
+      body: { query: mutation, variables: { pullRequestId, path } },
+    },
+  );
+  if (result.errors?.length) {
+    throw new Error(`GitHub: ${result.errors[0].message}`);
+  }
+}
+
 // Open-PR counts for every registered repo, keyed by slug — one aliased
 // GraphQL query instead of a REST call per repo. Counts are decorative
 // (sidebar badges), so no token or an inaccessible repo just means no entry.
