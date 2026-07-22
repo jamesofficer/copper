@@ -1,4 +1,4 @@
-import { HStack, Icon, IconButton, Text } from "@chakra-ui/react";
+import { Box, Center, HStack, Icon, IconButton, Text } from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -20,10 +20,13 @@ import { CSS } from "@dnd-kit/utilities";
 import { useState } from "react";
 import { LuFolderGit2, LuTrash2 } from "react-icons/lu";
 import type { Repository } from "../../../shared/types";
+import UserAvatar from "./UserAvatar";
 
 interface Props {
   repositories: Repository[];
   activePath: string | null;
+  // Open-PR count per slug — shown at the row's right edge when known.
+  openPrCounts: Record<string, number> | undefined;
   onSelectRepo(path: string): void;
   onRemoveRepo(path: string): void;
   onReorder(repositories: Repository[]): void;
@@ -35,6 +38,7 @@ interface Props {
 export default function RepositoryList({
   repositories,
   activePath,
+  openPrCounts,
   onSelectRepo,
   onRemoveRepo,
   onReorder,
@@ -80,6 +84,7 @@ export default function RepositoryList({
             key={repo.path}
             repo={repo}
             selected={repo.path === activePath}
+            count={repo.slug ? openPrCounts?.[repo.slug] : undefined}
             onSelect={onSelectRepo}
             onRemove={onRemoveRepo}
           />
@@ -95,7 +100,10 @@ export default function RepositoryList({
             shadow="md"
             cursor="grabbing"
           >
-            <RowContent repo={dragged} />
+            <RowContent
+              repo={dragged}
+              count={dragged.slug ? openPrCounts?.[dragged.slug] : undefined}
+            />
           </HStack>
         )}
       </DragOverlay>
@@ -106,11 +114,18 @@ export default function RepositoryList({
 interface RowProps {
   repo: Repository;
   selected: boolean;
+  count: number | undefined;
   onSelect(path: string): void;
   onRemove(path: string): void;
 }
 
-function RepositoryRow({ repo, selected, onSelect, onRemove }: RowProps) {
+function RepositoryRow({
+  repo,
+  selected,
+  count,
+  onSelect,
+  onRemove,
+}: RowProps) {
   const {
     attributes,
     listeners,
@@ -137,19 +152,26 @@ function RepositoryRow({ repo, selected, onSelect, onRemove }: RowProps) {
       {...attributes}
       {...listeners}
     >
-      <RowContent repo={repo} onSelect={onSelect} onRemove={onRemove} />
+      <RowContent
+        repo={repo}
+        count={count}
+        onSelect={onSelect}
+        onRemove={onRemove}
+      />
     </HStack>
   );
 }
 
 interface RowContentProps {
   repo: Repository;
+  count: number | undefined;
   // Absent on the DragOverlay copy — it's purely visual.
   onSelect?(path: string): void;
   onRemove?(path: string): void;
 }
 
-function RowContent({ repo, onSelect, onRemove }: RowContentProps) {
+function RowContent({ repo, count, onSelect, onRemove }: RowContentProps) {
+  const owner = repo.slug?.split("/")[0];
   return (
     <>
       <HStack
@@ -163,26 +185,53 @@ function RowContent({ repo, onSelect, onRemove }: RowContentProps) {
         title={repo.path}
         onClick={onSelect ? () => onSelect(repo.path) : undefined}
       >
-        <Icon size="sm" color="fg.muted" flexShrink="0">
-          <LuFolderGit2 />
-        </Icon>
+        {owner ? (
+          <UserAvatar
+            username={owner}
+            fallback={<LuFolderGit2 />}
+            shape="rounded"
+          />
+        ) : (
+          <Icon size="sm" color="fg.muted" flexShrink="0">
+            <LuFolderGit2 />
+          </Icon>
+        )}
         <Text fontSize="sm" fontFamily="mono" truncate>
           {repo.slug?.split("/")[1] ?? repo.name}
         </Text>
       </HStack>
-      <IconButton
-        aria-label="Remove repository"
-        size="2xs"
-        variant="ghost"
-        color="fg.muted"
-        mr="1"
-        opacity="0"
-        _groupHover={{ opacity: 1 }}
-        _focusVisible={{ opacity: 1 }}
-        onClick={onRemove ? () => onRemove(repo.path) : undefined}
-      >
-        <LuTrash2 />
-      </IconButton>
+      {/* One fixed slot at the row's edge: the open-PR count, replaced by
+          the remove button while the row is hovered. */}
+      <Box position="relative" boxSize="5" mr="1" flexShrink="0">
+        {count !== undefined && count > 0 && (
+          <Center
+            position="absolute"
+            inset="0"
+            fontSize="xs"
+            fontFamily="mono"
+            color="fg.muted"
+            _groupHover={onRemove ? { opacity: 0 } : undefined}
+          >
+            {count}
+          </Center>
+        )}
+        {onRemove && (
+          <IconButton
+            aria-label="Remove repository"
+            size="2xs"
+            variant="ghost"
+            color="fg.muted"
+            position="absolute"
+            inset="0"
+            opacity="0"
+            _groupHover={{ opacity: 1 }}
+            _focusVisible={{ opacity: 1 }}
+            onClick={() => onRemove(repo.path)}
+          >
+            <LuTrash2 />
+          </IconButton>
+        )}
+      </Box>
     </>
   );
 }

@@ -15,11 +15,17 @@ const api: WindowApi = {
   listReviewRequestedPullRequests: () =>
     ipcRenderer.invoke("listReviewRequestedPullRequests"),
   listMyPullRequests: () => ipcRenderer.invoke("listMyPullRequests"),
+  getOpenPullRequestCounts: () =>
+    ipcRenderer.invoke("getOpenPullRequestCounts"),
   getBranchInfo: (repo) => ipcRenderer.invoke("getBranchInfo", repo),
   createPullRequest: (repo, pr) =>
     ipcRenderer.invoke("createPullRequest", repo, pr),
   getPullRequest: (repo, prNumber) =>
     ipcRenderer.invoke("getPullRequest", repo, prNumber),
+  getReviewDecision: (repo, prNumber) =>
+    ipcRenderer.invoke("getReviewDecision", repo, prNumber),
+  setPullRequestState: (repo, prNumber, state) =>
+    ipcRenderer.invoke("setPullRequestState", repo, prNumber, state),
   peekPullRequest: (repo, prNumber) =>
     ipcRenderer.invoke("peekPullRequest", repo, prNumber),
   listPullRequestFiles: (repo, prNumber) =>

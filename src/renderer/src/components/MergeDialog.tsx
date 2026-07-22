@@ -50,6 +50,23 @@ export default function MergeDialog({ detail }: Props) {
   const [open, setOpen] = useState(false);
   const [method, setMethod] = useState<MergeMethod>("merge");
 
+  const isOpen = detail.state === "open" && !detail.merged;
+
+  // Repos can require review approval before merging; while GitHub says
+  // reviews are still needed, the merge button hides entirely. A failed
+  // lookup returns null (fail open) — a wrong guess just errors on confirm.
+  const decisionQuery = useQuery({
+    queryKey: ["reviewDecision", detail.repo, detail.number],
+    queryFn: () => window.api.getReviewDecision(detail.repo, detail.number),
+    enabled: isOpen,
+  });
+  const decision = decisionQuery.data;
+  const awaitingApproval =
+    isOpen &&
+    (decisionQuery.isPending ||
+      decision === "REVIEW_REQUIRED" ||
+      decision === "CHANGES_REQUESTED");
+
   // Repo settings can disable merge methods (e.g. squash-only repos); offer
   // only what GitHub would accept. Until they load (or if they fail), all
   // three show — a wrong pick just errors on confirm.
@@ -77,10 +94,15 @@ export default function MergeDialog({ detail }: Props) {
         description: `${detail.repo}#${detail.number} was merged.`,
       });
       setOpen(false);
+      // Merging removes the PR from every open-PR view: the detail, the PR
+      // lists, both sidebar sections, and the repo rows' open counts.
       void queryClient.invalidateQueries({
         queryKey: ["pullRequest", detail.repo, detail.number],
       });
       void queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
+      void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
+      void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
+      void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
     },
     onError: (cause) => {
       toaster.create({
@@ -96,7 +118,9 @@ export default function MergeDialog({ detail }: Props) {
   });
 
   const conflicts = hasConflicts(detail);
-  const canMerge = detail.state === "open" && !detail.merged && !detail.draft;
+  const canMerge = isOpen && !detail.draft;
+
+  if (awaitingApproval) return null;
 
   return (
     <Dialog.Root

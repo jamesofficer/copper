@@ -12,6 +12,7 @@ import type {
   RepoBranchInfo,
   RepoMergeSettings,
   ReviewComment,
+  ReviewDecision,
   ReviewState,
   ReviewStatus,
   ReviewVerdict,
@@ -674,6 +675,59 @@ export async function deleteReviewComment(
   );
 }
 
+// Whether merging still waits on required review approval — GraphQL only;
+// REST's pull detail doesn't carry reviewDecision. Null (no review
+// requirement), no token, or a failed lookup all mean "don't block merging".
+export async function getReviewDecision(
+  repo: string,
+  prNumber: number,
+): Promise<ReviewDecision> {
+  const token = await getGitHubToken();
+  if (!token) return null;
+
+  const [owner, name] = repo.split("/");
+  const query = `
+    query ($owner: String!, $name: String!, $number: Int!) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) { reviewDecision }
+      }
+    }`;
+
+  const response = await githubFetch<{
+    data?: {
+      repository?: {
+        pullRequest?: { reviewDecision: ReviewDecision } | null;
+      } | null;
+    };
+    errors?: Array<{ message: string }>;
+  }>(token, "/graphql", {
+    method: "POST",
+    body: { query, variables: { owner, name, number: prNumber } },
+  });
+
+  return response.data?.repository?.pullRequest?.reviewDecision ?? null;
+}
+
+// Close or reopen a pull request. Merged PRs can't change state — GitHub
+// rejects the PATCH.
+export async function setPullRequestState(
+  repo: string,
+  prNumber: number,
+  state: "open" | "closed",
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to update pull requests.",
+    );
+  }
+
+  await githubFetch(token, `/repos/${repo}/pulls/${prNumber}`, {
+    method: "PATCH",
+    body: { state },
+  });
+}
+
 const reviewEvents: Record<ReviewVerdict, string> = {
   comment: "COMMENT",
   approve: "APPROVE",
@@ -869,6 +923,45 @@ export async function setReviewThreadResolved(
   if (result.errors?.length) {
     throw new Error(`GitHub: ${result.errors[0].message}`);
   }
+}
+
+// Open-PR counts for every registered repo, keyed by slug — one aliased
+// GraphQL query instead of a REST call per repo. Counts are decorative
+// (sidebar badges), so no token or an inaccessible repo just means no entry.
+export async function getOpenPullRequestCounts(): Promise<
+  Record<string, number>
+> {
+  const token = await getGitHubToken();
+  if (!token) return {};
+
+  const slugs: string[] = [];
+  for (const repo of await listRepositories()) {
+    if (repo.slug && !slugs.includes(repo.slug)) slugs.push(repo.slug);
+  }
+  if (slugs.length === 0) return {};
+
+  const parts = slugs.map((slug, index) => {
+    const [owner, name] = slug.split("/");
+    return `r${index}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(
+      name,
+    )}) { pullRequests(states: OPEN) { totalCount } }`;
+  });
+
+  const response = await githubFetch<{
+    data?: Record<string, { pullRequests: { totalCount: number } } | null>;
+    errors?: Array<{ message: string }>;
+  }>(token, "/graphql", {
+    method: "POST",
+    body: { query: `query { ${parts.join(" ")} }` },
+  });
+
+  // Partial errors (one inaccessible repo) still return data for the rest.
+  const counts: Record<string, number> = {};
+  slugs.forEach((slug, index) => {
+    const count = response.data?.[`r${index}`]?.pullRequests.totalCount;
+    if (count !== undefined) counts[slug] = count;
+  });
+  return counts;
 }
 
 interface GraphQlBranches {

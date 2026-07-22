@@ -88,10 +88,12 @@ export default function Welcome({
         added,
         ...(prev ?? []).filter((repo) => repo.path !== added.path),
       ]);
-      // Both sidebar PR sections are filtered to registered repos in the
-      // main process, so the registry changing means new results.
+      // Both sidebar PR sections and the repo rows' PR counts are scoped to
+      // registered repos in the main process, so the registry changing means
+      // new results.
       void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
       void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
+      void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
       onActivePathChange(added.path);
     } catch (cause) {
       toaster.create({
@@ -121,6 +123,7 @@ export default function Welcome({
   function openCreatedPullRequest(pr: PullRequest) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
     void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
+    void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
     onSelect(pr);
   }
 
@@ -129,6 +132,7 @@ export default function Welcome({
     queryClient.setQueryData(["repositories"], remaining);
     void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
     void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
+    void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
     if (activePath === path || !activePath) {
       onActivePathChange(remaining[0]?.path ?? null);
     }

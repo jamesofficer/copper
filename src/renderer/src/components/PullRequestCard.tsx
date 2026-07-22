@@ -1,7 +1,7 @@
 import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { LuMessageSquare } from "react-icons/lu";
 import type { PullRequest, PullRequestDetail } from "../../../shared/types";
 import { timeAgo } from "../lib/recentPrs";
+import CommentCountBadge from "./CommentCountBadge";
 import PrStateBadge from "./PrStateBadge";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
 import UserAvatar from "./UserAvatar";
@@ -113,12 +113,7 @@ export default function PullRequestCard({
               −{deletions}
             </Badge>
           </HStack>
-          {comments > 0 && (
-            <Badge colorPalette="gray" variant="surface">
-              <LuMessageSquare size={10} />
-              {comments}
-            </Badge>
-          )}
+          <CommentCountBadge count={comments} />
         </VStack>
       </HStack>
     </Box>

@@ -9,8 +9,10 @@ import {
   createPullRequest,
   deleteReviewComment,
   getBranchInfo,
+  getOpenPullRequestCounts,
   getPullRequest,
   getRepoMergeSettings,
+  getReviewDecision,
   getViewer,
   listCommitFiles,
   listMyPullRequests,
@@ -24,6 +26,7 @@ import {
   listReviewRequests,
   mergePullRequest,
   replyToReviewComment,
+  setPullRequestState,
   setReviewThreadResolved,
   submitReview,
 } from "../github/client";
@@ -45,6 +48,7 @@ const handlers: IpcApi = {
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
   listMyPullRequests: () => listMyPullRequests(),
+  getOpenPullRequestCounts: () => getOpenPullRequestCounts(),
   getBranchInfo: (repo) => getBranchInfo(repo),
   createPullRequest: (repo, pr) => createPullRequest(repo, pr),
   getPullRequest: async (repo, prNumber) => {
@@ -53,6 +57,9 @@ const handlers: IpcApi = {
     void warmUpPullRequest(repo, prNumber, detail.headSha);
     return detail;
   },
+  getReviewDecision: (repo, prNumber) => getReviewDecision(repo, prNumber),
+  setPullRequestState: (repo, prNumber, state) =>
+    setPullRequestState(repo, prNumber, state),
   peekPullRequest: (repo, prNumber) => getPullRequest(repo, prNumber),
   listPullRequestFiles: (repo, prNumber) =>
     listPullRequestFiles(repo, prNumber),

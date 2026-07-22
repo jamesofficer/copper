@@ -21,7 +21,9 @@ import {
 import type { PullRequest, Repository } from "../../../shared/types";
 import { type RecentPullRequest, timeAgo } from "../lib/recentPrs";
 import { scrollbar } from "../lib/scrollbar";
+import CommentCountBadge from "./CommentCountBadge";
 import RepositoryList from "./RepositoryList";
+import UserAvatar from "./UserAvatar";
 
 interface Props {
   repositories: Repository[] | undefined;
@@ -62,6 +64,11 @@ export default function HomeSidebar({
   });
   const myPullRequests = myPullRequestsQuery.data;
 
+  const openPrCountsQuery = useQuery({
+    queryKey: ["openPrCounts"],
+    queryFn: () => window.api.getOpenPullRequestCounts(),
+  });
+
   return (
     <Flex
       direction="column"
@@ -90,6 +97,7 @@ export default function HomeSidebar({
             <RepositoryList
               repositories={repositories}
               activePath={activePath}
+              openPrCounts={openPrCountsQuery.data}
               onSelectRepo={onSelectRepo}
               onRemoveRepo={onRemoveRepo}
               onReorder={onReorderRepos}
@@ -112,12 +120,13 @@ export default function HomeSidebar({
                 key={`${pr.repo}#${pr.number}`}
                 pr={pr}
                 onSelect={onSelectPullRequest}
-                meta={
-                  <HStack gap="1.5">
-                    <Text color="green.fg">+{pr.additions}</Text>
-                    <Text color="red.fg">−{pr.deletions}</Text>
-                  </HStack>
+                leading={
+                  <UserAvatar
+                    username={pr.author}
+                    fallback={<LuGitPullRequest />}
+                  />
                 }
+                meta={<CommentCountBadge count={pr.comments} />}
               />
             ))
           )}
@@ -138,12 +147,7 @@ export default function HomeSidebar({
                 key={`${pr.repo}#${pr.number}`}
                 pr={pr}
                 onSelect={onSelectPullRequest}
-                meta={
-                  <HStack gap="1.5">
-                    <Text color="green.fg">+{pr.additions}</Text>
-                    <Text color="red.fg">−{pr.deletions}</Text>
-                  </HStack>
-                }
+                meta={<CommentCountBadge count={pr.comments} />}
               />
             ))
           )}
@@ -270,10 +274,12 @@ function SectionNote({ children }: SectionNoteProps) {
 interface PullRequestRowProps {
   pr: PullRequest;
   meta: ReactNode;
+  // Replaces the default PR icon (e.g. the author's avatar).
+  leading?: ReactNode;
   onSelect(pr: PullRequest): void;
 }
 
-function PullRequestRow({ pr, meta, onSelect }: PullRequestRowProps) {
+function PullRequestRow({ pr, meta, leading, onSelect }: PullRequestRowProps) {
   return (
     <HStack
       as="button"
@@ -286,9 +292,11 @@ function PullRequestRow({ pr, meta, onSelect }: PullRequestRowProps) {
       title={`${pr.repo}#${pr.number} — ${pr.title}`}
       onClick={() => onSelect(pr)}
     >
-      <Icon size="sm" color="fg.muted" flexShrink="0">
-        <LuGitPullRequest />
-      </Icon>
+      {leading ?? (
+        <Icon size="sm" color="fg.muted" flexShrink="0">
+          <LuGitPullRequest />
+        </Icon>
+      )}
       <Text fontSize="sm" truncate flex="1" textAlign="left">
         {pr.title}
       </Text>

@@ -17,6 +17,7 @@ import {
 } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import ChangesView from "../components/ChangesView";
+import ClosePullRequestButton from "../components/ClosePullRequestButton";
 import DiffViewModeSelect from "../components/DiffViewModeSelect";
 import MergeDialog from "../components/MergeDialog";
 import PullRequestOverview from "../components/PullRequestOverview";
@@ -62,6 +63,7 @@ export default function Review({ pr, onBack }: Props) {
           </a>
         </Button>
         <ReanalyzeButton pr={pr} />
+        {detail && <ClosePullRequestButton detail={detail} />}
         <SubmitReviewDialog pr={pr} disabled={detail?.merged} />
         {detail && <MergeDialog detail={detail} />}
       </HStack>

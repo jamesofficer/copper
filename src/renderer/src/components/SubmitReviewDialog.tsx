@@ -73,6 +73,10 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
       void queryClient.invalidateQueries({
         queryKey: ["pullRequestReviews", pr.repo, pr.number],
       });
+      // An approval can clear REVIEW_REQUIRED, which reveals the merge button.
+      void queryClient.invalidateQueries({
+        queryKey: ["reviewDecision", pr.repo, pr.number],
+      });
       void queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
       void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
     },

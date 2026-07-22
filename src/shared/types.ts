@@ -92,6 +92,14 @@ export interface RepoMergeSettings {
   allowedMethods: MergeMethod[];
 }
 
+// GitHub's overall review verdict for merging (GraphQL reviewDecision).
+// null when the base branch doesn't require reviews at all.
+export type ReviewDecision =
+  | "APPROVED"
+  | "CHANGES_REQUESTED"
+  | "REVIEW_REQUIRED"
+  | null;
+
 // Mirrors GitHub's review events: comment, approve, or request changes.
 export type ReviewVerdict = "comment" | "approve" | "request_changes";
 

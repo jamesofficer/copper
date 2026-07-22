@@ -19,6 +19,7 @@ import type {
   RepoMergeSettings,
   Repository,
   ReviewComment,
+  ReviewDecision,
   ReviewPersonality,
   ReviewVerdict,
   SecretProvider,
@@ -37,10 +38,21 @@ export interface IpcApi {
   listReviewRequestedPullRequests(): Promise<PullRequest[]>;
   // Open PRs across the registered repos authored by the logged-in user.
   listMyPullRequests(): Promise<PullRequest[]>;
+  // Open-PR counts per registered repo slug, for the sidebar's repo rows.
+  getOpenPullRequestCounts(): Promise<Record<string, number>>;
   // Branches + local checkout defaults for the new-PR dialog.
   getBranchInfo(repo: string): Promise<RepoBranchInfo>;
   createPullRequest(repo: string, pr: NewPullRequest): Promise<PullRequest>;
   getPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
+  // GitHub's merge-gating review verdict — REVIEW_REQUIRED while a required
+  // approval is missing, null when the base branch doesn't require reviews.
+  getReviewDecision(repo: string, prNumber: number): Promise<ReviewDecision>;
+  // Close or reopen a pull request.
+  setPullRequestState(
+    repo: string,
+    prNumber: number,
+    state: "open" | "closed",
+  ): Promise<void>;
   // Same data as getPullRequest but without the background repo warm-up —
   // for bulk refreshes (e.g. the recently-viewed panel).
   peekPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
@@ -154,9 +166,12 @@ export const ipcChannels = [
   "listPullRequests",
   "listReviewRequestedPullRequests",
   "listMyPullRequests",
+  "getOpenPullRequestCounts",
   "getBranchInfo",
   "createPullRequest",
   "getPullRequest",
+  "getReviewDecision",
+  "setPullRequestState",
   "peekPullRequest",
   "listPullRequestFiles",
   "listPullRequestCommits",
