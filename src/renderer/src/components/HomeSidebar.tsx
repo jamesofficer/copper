@@ -13,7 +13,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import {
-  LuFolderGit2,
   LuFolderPlus,
   LuGitPullRequest,
   LuSettings,
@@ -22,6 +21,7 @@ import {
 import type { PullRequest, Repository } from "../../../shared/types";
 import { type RecentPullRequest, timeAgo } from "../lib/recentPrs";
 import { scrollbar } from "../lib/scrollbar";
+import RepositoryList from "./RepositoryList";
 
 interface Props {
   repositories: Repository[] | undefined;
@@ -30,6 +30,7 @@ interface Props {
   onSelectRepo(path: string): void;
   onAddRepo(): void;
   onRemoveRepo(path: string): void;
+  onReorderRepos(repositories: Repository[]): void;
   recent: RecentPullRequest[];
   onClearRecent(): void;
   onSelectPullRequest(pr: PullRequest): void;
@@ -43,6 +44,7 @@ export default function HomeSidebar({
   onSelectRepo,
   onAddRepo,
   onRemoveRepo,
+  onReorderRepos,
   recent,
   onClearRecent,
   onSelectPullRequest,
@@ -68,14 +70,6 @@ export default function HomeSidebar({
       minH="0"
       borderRightWidth="1px"
     >
-      <Box px="2" pt="2" pb="1" flexShrink="0">
-        <SidebarAction
-          icon={<LuFolderPlus />}
-          label="Add repository"
-          onClick={onAddRepo}
-        />
-      </Box>
-
       <Stack
         flex="1"
         minH="0"
@@ -93,51 +87,13 @@ export default function HomeSidebar({
               No repositories yet. Add a local git repository to get started.
             </SectionNote>
           ) : (
-            repositories.map((repo) => {
-              const selected = repo.path === activePath;
-              return (
-                <HStack
-                  key={repo.path}
-                  className="group"
-                  gap="0"
-                  rounded="md"
-                  bg={selected ? "bg.emphasized" : undefined}
-                  _hover={selected ? undefined : { bg: "bg.subtle" }}
-                >
-                  <HStack
-                    as="button"
-                    flex="1"
-                    minW="0"
-                    gap="2"
-                    px="2"
-                    py="1.5"
-                    cursor="pointer"
-                    title={repo.path}
-                    onClick={() => onSelectRepo(repo.path)}
-                  >
-                    <Icon size="sm" color="fg.muted" flexShrink="0">
-                      <LuFolderGit2 />
-                    </Icon>
-                    <Text fontSize="sm" fontFamily="mono" truncate>
-                      {repo.slug?.split("/")[1] ?? repo.name}
-                    </Text>
-                  </HStack>
-                  <IconButton
-                    aria-label="Remove repository"
-                    size="2xs"
-                    variant="ghost"
-                    color="fg.muted"
-                    mr="1"
-                    opacity="0"
-                    _groupHover={{ opacity: 1 }}
-                    _focusVisible={{ opacity: 1 }}
-                    onClick={() => onRemoveRepo(repo.path)}
-                  >
-                    <LuTrash2 />
-                  </IconButton>
-                </HStack>
-              );
-            })
+            <RepositoryList
+              repositories={repositories}
+              activePath={activePath}
+              onSelectRepo={onSelectRepo}
+              onRemoveRepo={onRemoveRepo}
+              onReorder={onReorderRepos}
+            />
           )}
         </Section>
 
@@ -226,13 +182,18 @@ export default function HomeSidebar({
         </Section>
       </Stack>
 
-      <Box p="2" borderTopWidth="1px" flexShrink="0">
+      <Stack gap="1" p="2" borderTopWidth="1px" flexShrink="0">
+        <SidebarAction
+          icon={<LuFolderPlus />}
+          label="Add repository"
+          onClick={onAddRepo}
+        />
         <SidebarAction
           icon={<LuSettings />}
           label="Settings"
           onClick={onOpenSettings}
         />
-      </Box>
+      </Stack>
     </Flex>
   );
 }

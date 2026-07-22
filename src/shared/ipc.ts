@@ -29,6 +29,8 @@ export interface IpcApi {
   listRepositories(): Promise<Repository[]>;
   addRepository(): Promise<Repository | null>;
   removeRepository(path: string): Promise<Repository[]>;
+  // Persists a drag-reordered sidebar list; paths in their new order.
+  reorderRepositories(paths: string[]): Promise<Repository[]>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
   // Open PRs across the registered repos where the logged-in user's review is
   // requested.
@@ -141,6 +143,7 @@ export const ipcChannels = [
   "listRepositories",
   "addRepository",
   "removeRepository",
+  "reorderRepositories",
   "listPullRequests",
   "listReviewRequestedPullRequests",
   "listMyPullRequests",

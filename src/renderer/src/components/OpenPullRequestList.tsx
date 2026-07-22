@@ -14,6 +14,7 @@ import {
   sortPullRequests,
 } from "../lib/prFilters";
 import PullRequestCard from "./PullRequestCard";
+import UserAvatar from "./UserAvatar";
 
 interface Props {
   prs: PullRequest[];
@@ -21,9 +22,16 @@ interface Props {
   onSelect(pr: PullRequest): void;
 }
 
+interface FilterItem {
+  value: string;
+  label: string;
+  // GitHub login to show an avatar for — absent on "All …"/sort options.
+  avatar?: string;
+}
+
 interface FilterSelectProps {
   label: string;
-  items: Array<{ value: string; label: string }>;
+  items: FilterItem[];
   value: string;
   width?: string;
   onChange(value: string): void;
@@ -59,7 +67,10 @@ function FilterSelect({
           <Select.Content>
             {collection.items.map((item) => (
               <Select.Item item={item} key={item.value}>
-                <Select.ItemText>{item.label}</Select.ItemText>
+                <HStack gap="2" flex="1" minW="0">
+                  {item.avatar && <UserAvatar username={item.avatar} />}
+                  <Select.ItemText>{item.label}</Select.ItemText>
+                </HStack>
                 <Select.ItemIndicator />
               </Select.Item>
             ))}
@@ -82,7 +93,7 @@ export default function OpenPullRequestList({ prs, preview, onSelect }: Props) {
     const logins = [...new Set(prs.map((pr) => pr.author))].sort();
     return [
       { value: "all", label: "All authors" },
-      ...logins.map((login) => ({ value: login, label: login })),
+      ...logins.map((login) => ({ value: login, label: login, avatar: login })),
     ];
   }, [prs]);
 
@@ -91,7 +102,7 @@ export default function OpenPullRequestList({ prs, preview, onSelect }: Props) {
     return [
       { value: "all", label: "All assignees" },
       { value: "none", label: "Assigned to nobody" },
-      ...logins.map((login) => ({ value: login, label: login })),
+      ...logins.map((login) => ({ value: login, label: login, avatar: login })),
     ];
   }, [prs]);
 

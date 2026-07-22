@@ -103,6 +103,28 @@ export async function getLocalCheckoutBranch(
   }
 }
 
+// Persists a drag-reordered list. Unknown paths are ignored; registered
+// repos missing from `paths` keep a spot at the end, so a stale renderer
+// list can never drop repositories.
+export async function reorderRepositories(
+  paths: string[],
+): Promise<Repository[]> {
+  const byPath = new Map(
+    (await readRegistry()).map((repo) => [repo.path, repo]),
+  );
+  const ordered: Repository[] = [];
+  for (const path of paths) {
+    const repo = byPath.get(path);
+    if (repo) {
+      ordered.push(repo);
+      byPath.delete(path);
+    }
+  }
+  ordered.push(...byPath.values());
+  await writeRegistry(ordered);
+  return ordered;
+}
+
 export async function removeRepository(path: string): Promise<Repository[]> {
   const repositories = (await readRegistry()).filter(
     (known) => known.path !== path,

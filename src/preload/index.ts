@@ -9,6 +9,8 @@ const api: WindowApi = {
   listRepositories: () => ipcRenderer.invoke("listRepositories"),
   addRepository: () => ipcRenderer.invoke("addRepository"),
   removeRepository: (path) => ipcRenderer.invoke("removeRepository", path),
+  reorderRepositories: (paths) =>
+    ipcRenderer.invoke("reorderRepositories", paths),
   listPullRequests: (repo) => ipcRenderer.invoke("listPullRequests", repo),
   listReviewRequestedPullRequests: () =>
     ipcRenderer.invoke("listReviewRequestedPullRequests"),

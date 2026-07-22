@@ -106,6 +106,18 @@ export default function Welcome({
     }
   }
 
+  function reorderRepositories(ordered: Repository[]) {
+    // Optimistic: show the new order immediately, then persist it. The main
+    // process returns the saved list, which wins in case they disagree.
+    queryClient.setQueryData(["repositories"], ordered);
+    window.api
+      .reorderRepositories(ordered.map((repo) => repo.path))
+      .then((saved) => queryClient.setQueryData(["repositories"], saved))
+      .catch(() =>
+        queryClient.invalidateQueries({ queryKey: ["repositories"] }),
+      );
+  }
+
   function openCreatedPullRequest(pr: PullRequest) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
     void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
@@ -131,6 +143,7 @@ export default function Welcome({
         onSelectRepo={onActivePathChange}
         onAddRepo={() => void addRepository()}
         onRemoveRepo={(path) => void removeRepository(path)}
+        onReorderRepos={reorderRepositories}
         recent={recent}
         onClearRecent={clearRecent}
         onSelectPullRequest={setPreview}

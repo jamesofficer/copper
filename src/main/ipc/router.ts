@@ -31,6 +31,7 @@ import {
   addRepository,
   listRepositories,
   removeRepository,
+  reorderRepositories,
 } from "../repo/local";
 import { warmUpPullRequest } from "../repo/workspace";
 import { clearKey, getKeyStatus, saveKey } from "../settings/keys";
@@ -39,6 +40,7 @@ const handlers: IpcApi = {
   listRepositories: () => listRepositories(),
   addRepository: () => addRepository(),
   removeRepository: (path) => removeRepository(path),
+  reorderRepositories: (paths) => reorderRepositories(paths),
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
   listMyPullRequests: () => listMyPullRequests(),
