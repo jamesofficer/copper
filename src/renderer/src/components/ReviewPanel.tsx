@@ -96,6 +96,14 @@ export default function ReviewPanel({ pr }: Props) {
     enabled: Boolean(analysis),
   });
 
+  // The pre-review agent pass. Cache-only here (never auto-runs); the
+  // FindingsPane triggers the model when the user asks.
+  const findingsQuery = useQuery({
+    queryKey: ["findings", pr.repo, pr.number],
+    queryFn: () => window.api.getFindings(pr.repo, pr.number),
+    enabled: Boolean(analysis),
+  });
+
   // Live detail, to spot an analysis that's behind the PR's current commit.
   // Shares its query key with the Overview tab and recents.
   const detailQuery = useQuery({
@@ -232,6 +240,7 @@ export default function ReviewPanel({ pr }: Props) {
         >
           <AnalysisNav
             analysis={analysis}
+            findings={findingsQuery.data ?? null}
             selection={selection}
             onSelect={setSelection}
           />
@@ -239,8 +248,12 @@ export default function ReviewPanel({ pr }: Props) {
 
         <Box flex="1" minW="0" overflowY="auto" css={scrollbar}>
           <AnalysisDetail
+            pr={pr}
             analysis={analysis}
+            findings={findingsQuery.data ?? null}
             files={filesQuery.data}
+            currentHeadSha={currentHeadSha}
+            claudeCode={llmQuery.data?.effective === "claude-code"}
             selection={selection}
             onAskAbout={askAbout}
           />

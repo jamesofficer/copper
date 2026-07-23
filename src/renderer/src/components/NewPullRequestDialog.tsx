@@ -34,7 +34,9 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
   const [head, setHead] = useState<string | null>(null);
   const [base, setBase] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  // null = untouched, so a late-loading PR template can still prefill it; once
+  // the user types, their text (even empty) wins.
+  const [body, setBody] = useState<string | null>(null);
   const [draft, setDraft] = useState(false);
   const [mode, setMode] = useState<MarkdownEditorMode>("write");
 
@@ -56,6 +58,8 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
       : "";
   const selectedHead = head ?? suggestedHead;
   const selectedBase = base ?? info?.defaultBranch ?? "";
+  // Untouched body falls back to the repo's PR template once it loads.
+  const bodyValue = body ?? info?.pullRequestTemplate ?? "";
 
   const unpushedLocalBranch =
     info?.localBranch &&
@@ -70,7 +74,7 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
       setHead(null);
       setBase(null);
       setTitle("");
-      setBody("");
+      setBody(null);
       setDraft(false);
       setMode("write");
     }
@@ -80,7 +84,7 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
     mutationFn: () =>
       window.api.createPullRequest(repo, {
         title: title.trim(),
-        body,
+        body: bodyValue,
         head: selectedHead,
         base: selectedBase,
         draft,
@@ -216,7 +220,7 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
                     <Field.Label>Description</Field.Label>
                     <Box w="full">
                       <MarkdownEditor
-                        value={body}
+                        value={bodyValue}
                         mode={mode}
                         placeholder="Describe the change (markdown supported)"
                         rows={6}

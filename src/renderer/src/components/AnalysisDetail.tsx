@@ -20,6 +20,8 @@ import type {
   AnalysisResult,
   AnalysisUsage,
   ChangeGroup,
+  FindingsResult,
+  PullRequest,
   PullRequestFile,
 } from "../../../shared/types";
 import {
@@ -29,13 +31,18 @@ import {
 } from "../lib/askContext";
 import type { AnalysisSelection } from "./AnalysisNav";
 import FileDiffCard from "./FileDiffCard";
+import FindingsPane from "./FindingsPane";
 import Markdown from "./Markdown";
 import RiskBadge from "./RiskBadge";
 import RiskSeverityBadge from "./RiskSeverityBadge";
 
 interface Props {
+  pr: PullRequest;
   analysis: AnalysisResult;
+  findings: FindingsResult | null;
   files: PullRequestFile[] | undefined;
+  currentHeadSha: string | undefined;
+  claudeCode: boolean;
   selection: AnalysisSelection;
   onAskAbout(context: AskContext, question?: string): void;
 }
@@ -285,8 +292,12 @@ function GroupPane({
 }
 
 export default function AnalysisDetail({
+  pr,
   analysis,
+  findings,
   files,
+  currentHeadSha,
+  claudeCode,
   selection,
   onAskAbout,
 }: Props) {
@@ -295,6 +306,17 @@ export default function AnalysisDetail({
   );
 
   function resolve(): ReactNode {
+    if (selection.kind === "findings") {
+      return (
+        <FindingsPane
+          pr={pr}
+          findings={findings}
+          files={files}
+          currentHeadSha={currentHeadSha}
+          claudeCode={claudeCode}
+        />
+      );
+    }
     if (selection.kind === "risk") {
       const claim = analysis.risks[selection.index];
       if (claim) {

@@ -1140,6 +1140,61 @@ interface GraphQlBranches {
 // first (REST can't sort branches by activity, so this is a GraphQL refs
 // query — which returns the default branch in the same call), plus the local
 // checkout's current branch, pinned to the top when it's on GitHub.
+// GitHub looks for a PR template under the repo root, docs/, and .github/,
+// case-insensitively, with or without an extension. These are the paths real
+// repos actually use, in the order GitHub itself prefers.
+const PR_TEMPLATE_PATHS = [
+  ".github/PULL_REQUEST_TEMPLATE.md",
+  ".github/pull_request_template.md",
+  "PULL_REQUEST_TEMPLATE.md",
+  "pull_request_template.md",
+  "docs/PULL_REQUEST_TEMPLATE.md",
+  "docs/pull_request_template.md",
+];
+
+// Reads a repo file at a ref via the contents API, or null if it's not there.
+// Not githubFetch: a missing file is a 404 we want to treat as "no template",
+// not an error.
+async function fetchRepoFile(
+  token: string,
+  repo: string,
+  path: string,
+  ref: string,
+): Promise<string | null> {
+  const res = await fetch(
+    `${API}/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "pr-reviewer",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    },
+  );
+  if (!res.ok) return null;
+  const body = (await res.json()) as { content?: string; encoding?: string };
+  if (body.encoding !== "base64" || !body.content) return null;
+  return Buffer.from(body.content, "base64").toString("utf8");
+}
+
+// The repo's PR template from the default branch, or null. Probes the
+// conventional locations in parallel and keeps the highest-priority hit;
+// (a directory of templates — .github/PULL_REQUEST_TEMPLATE/ — isn't handled,
+// since there's no single default to prefill).
+async function fetchPullRequestTemplate(
+  token: string,
+  repo: string,
+  ref: string,
+): Promise<string | null> {
+  if (!ref) return null;
+  const results = await Promise.all(
+    PR_TEMPLATE_PATHS.map((path) => fetchRepoFile(token, repo, path, ref)),
+  );
+  const found = results.find((content) => content && content.trim().length > 0);
+  return found ?? null;
+}
+
 export async function getBranchInfo(repo: string): Promise<RepoBranchInfo> {
   const token = await getGitHubToken();
   if (!token) {
@@ -1191,7 +1246,21 @@ export async function getBranchInfo(repo: string): Promise<RepoBranchInfo> {
     }
   }
 
-  return { branches, defaultBranch, localBranch };
+  // Templates live on the base branch; the new-PR dialog defaults base to the
+  // default branch, so read it there. Best-effort — a lookup failure just
+  // means no prefill.
+  let pullRequestTemplate: string | null = null;
+  try {
+    pullRequestTemplate = await fetchPullRequestTemplate(
+      token,
+      repo,
+      defaultBranch,
+    );
+  } catch {
+    pullRequestTemplate = null;
+  }
+
+  return { branches, defaultBranch, localBranch, pullRequestTemplate };
 }
 
 export async function createPullRequest(

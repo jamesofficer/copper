@@ -1,17 +1,23 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { LuScrollText } from "react-icons/lu";
-import type { AnalysisResult, ChangeGroupRisk } from "../../../shared/types";
+import { LuScrollText, LuTelescope } from "react-icons/lu";
+import type {
+  AnalysisResult,
+  ChangeGroupRisk,
+  FindingsResult,
+} from "../../../shared/types";
 import { severityDotColor } from "./RiskSeverityBadge";
 
 export type AnalysisSelection =
   | { kind: "summary" }
+  | { kind: "findings" }
   | { kind: "risk"; index: number }
   | { kind: "behavior"; index: number }
   | { kind: "group"; id: string };
 
 interface Props {
   analysis: AnalysisResult;
+  findings: FindingsResult | null;
   selection: AnalysisSelection;
   onSelect(selection: AnalysisSelection): void;
 }
@@ -26,6 +32,8 @@ function sameSelection(a: AnalysisSelection, b: AnalysisSelection): boolean {
   if (a.kind !== b.kind) return false;
   switch (a.kind) {
     case "summary":
+      return true;
+    case "findings":
       return true;
     case "group":
       return b.kind === "group" && a.id === b.id;
@@ -84,22 +92,52 @@ function Dot({ color }: { color: string }) {
   );
 }
 
-export default function AnalysisNav({ analysis, selection, onSelect }: Props) {
+export default function AnalysisNav({
+  analysis,
+  findings,
+  selection,
+  onSelect,
+}: Props) {
+  const openFindings = findings
+    ? findings.findings.filter((finding) => !finding.resolution).length
+    : 0;
+
   return (
     <VStack alignItems="stretch" gap="5" px="3" py="4">
-      <NavItem
-        selected={sameSelection(selection, { kind: "summary" })}
-        onClick={() => onSelect({ kind: "summary" })}
-      >
-        <HStack gap="2">
-          <Box color="colorPalette.fg" flexShrink="0">
-            <LuScrollText size={13} />
-          </Box>
-          <Text fontSize="xs" fontWeight="medium">
-            Summary
-          </Text>
-        </HStack>
-      </NavItem>
+      <VStack alignItems="stretch" gap="1">
+        <NavItem
+          selected={sameSelection(selection, { kind: "summary" })}
+          onClick={() => onSelect({ kind: "summary" })}
+        >
+          <HStack gap="2">
+            <Box color="colorPalette.fg" flexShrink="0">
+              <LuScrollText size={13} />
+            </Box>
+            <Text fontSize="xs" fontWeight="medium">
+              Summary
+            </Text>
+          </HStack>
+        </NavItem>
+
+        <NavItem
+          selected={sameSelection(selection, { kind: "findings" })}
+          onClick={() => onSelect({ kind: "findings" })}
+        >
+          <HStack gap="2">
+            <Box color="colorPalette.fg" flexShrink="0">
+              <LuTelescope size={13} />
+            </Box>
+            <Text fontSize="xs" fontWeight="medium">
+              Issues
+            </Text>
+            {openFindings > 0 && (
+              <Badge size="sm" colorPalette="orange" variant="solid" ml="auto">
+                {openFindings}
+              </Badge>
+            )}
+          </HStack>
+        </NavItem>
+      </VStack>
 
       <VStack alignItems="stretch" gap="1">
         <SectionLabel>Reading guide ({analysis.groups.length})</SectionLabel>

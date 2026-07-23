@@ -3,6 +3,8 @@ import type {
   AnalyzedPullRequest,
   ChatMessage,
   DraftReviewComment,
+  FindingResolution,
+  FindingsResult,
   KeyTestResult,
   LlmProviderChoice,
   LlmStatus,
@@ -147,6 +149,21 @@ export interface IpcApi {
   // The GitHub login the stored token belongs to.
   getViewer(): Promise<string>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
+  // Pre-review agent pass: candidate issues to verify, anchored to the diff.
+  // getFindings is cache-only (null if never run); findIssues runs the model.
+  getFindings(repo: string, prNumber: number): Promise<FindingsResult | null>;
+  findIssues(
+    repo: string,
+    prNumber: number,
+    force?: boolean,
+  ): Promise<FindingsResult>;
+  // Record what the user did with a finding — "open" clears it (a restore).
+  setFindingResolution(
+    repo: string,
+    prNumber: number,
+    findingId: string,
+    resolution: FindingResolution | "open",
+  ): Promise<void>;
   listAnalyzedPullRequests(): Promise<AnalyzedPullRequest[]>;
   analyzePullRequest(
     repo: string,
@@ -235,6 +252,9 @@ export const ipcChannels = [
   "setFileViewed",
   "getViewer",
   "getAnalysis",
+  "getFindings",
+  "findIssues",
+  "setFindingResolution",
   "listAnalyzedPullRequests",
   "analyzePullRequest",
   "askQuestion",

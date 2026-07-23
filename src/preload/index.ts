@@ -75,6 +75,18 @@ const api: WindowApi = {
   getViewer: () => ipcRenderer.invoke("getViewer"),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),
+  getFindings: (repo, prNumber) =>
+    ipcRenderer.invoke("getFindings", repo, prNumber),
+  findIssues: (repo, prNumber, force) =>
+    ipcRenderer.invoke("findIssues", repo, prNumber, force),
+  setFindingResolution: (repo, prNumber, findingId, resolution) =>
+    ipcRenderer.invoke(
+      "setFindingResolution",
+      repo,
+      prNumber,
+      findingId,
+      resolution,
+    ),
   listAnalyzedPullRequests: () =>
     ipcRenderer.invoke("listAnalyzedPullRequests"),
   analyzePullRequest: (repo, prNumber, personality, force) =>

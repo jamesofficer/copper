@@ -2,6 +2,7 @@ import { ipcMain } from "electron";
 import type { IpcApi } from "../../shared/ipc";
 import { askQuestion, clearChat, getChatHistory } from "../agent/session";
 import { listAnalyzedPullRequests } from "../analysis/cache";
+import { findIssues, getExistingFindings } from "../analysis/findings";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
   addPullRequestComment,
@@ -47,6 +48,7 @@ import {
   listDraftComments,
   updateDraftComment,
 } from "../store/drafts";
+import { setFindingResolution } from "../store/findings";
 
 const handlers: IpcApi = {
   listRepositories: () => listRepositories(),
@@ -104,6 +106,10 @@ const handlers: IpcApi = {
     setFileViewed(repo, prNumber, path, viewed),
   getViewer: () => getViewer(),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
+  getFindings: (repo, prNumber) => getExistingFindings(repo, prNumber),
+  findIssues: (repo, prNumber, force) => findIssues(repo, prNumber, force),
+  setFindingResolution: (repo, prNumber, findingId, resolution) =>
+    setFindingResolution(repo, prNumber, findingId, resolution),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
   analyzePullRequest: (repo, prNumber, personality, force) =>
     analyzePullRequest(repo, prNumber, personality, force),

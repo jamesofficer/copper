@@ -73,6 +73,10 @@ export interface RepoBranchInfo {
   // The local checkout's current branch — null when the repo isn't
   // registered locally or HEAD is detached.
   localBranch: string | null;
+  // The repo's PR description template (from .github/PULL_REQUEST_TEMPLATE.md
+  // or a conventional variant), used to prefill the new-PR body. Null when the
+  // repo has none.
+  pullRequestTemplate: string | null;
 }
 
 // What the new-PR dialog sends to open a pull request.
@@ -261,6 +265,56 @@ export interface AnalysisResult {
   risks: RiskClaim[];
   behaviorChanges: AnalysisClaim[];
   outOfScope: string[];
+}
+
+// The kind of issue the pre-review agent flagged. "blast_radius" is the
+// standout: callers or usages OUTSIDE the diff that the change should have
+// updated but didn't — found via the repo tools, not the diff alone.
+export type FindingCategory =
+  | "bug"
+  | "blast_radius"
+  | "edge_case"
+  | "security"
+  | "performance"
+  | "maintainability"
+  | "test_gap";
+
+// What the user did with a finding. Absent = still open. Both states hide the
+// finding from the active list and survive re-runs, so nothing nags twice.
+export type FindingResolution = "accepted" | "dismissed";
+
+// A candidate issue from the pre-review agent pass — a suggestion for the
+// human to verify, never an auto-comment. Anchored to one diff line (new-file
+// numbering, RIGHT side) so accepting it drafts a review comment there.
+export interface ReviewFinding {
+  // Stable across runs: derived from category + path + line, so a re-run of
+  // the same issue keeps its identity (and its resolution).
+  id: string;
+  category: FindingCategory;
+  severity: RiskSeverity;
+  // Short label (3–7 words) for the list.
+  title: string;
+  // Full explanation, GitHub-flavored markdown.
+  body: string;
+  path: string;
+  // A line present in the file's diff (new-file numbering).
+  line: number;
+  // Ready-to-post comment text, phrased for the PR author.
+  suggestion: string;
+  // Filled by the main process from the saved resolution set; never persisted
+  // inside the run itself.
+  resolution?: FindingResolution;
+}
+
+// The outcome of a findings run, cached by head SHA like an analysis.
+export interface FindingsResult {
+  repo: string;
+  prNumber: number;
+  headSha: string;
+  model: string;
+  ranAt: string;
+  usage?: AnalysisUsage;
+  findings: ReviewFinding[];
 }
 
 // A pointer to a cached analysis — just enough to look up the PR it belongs

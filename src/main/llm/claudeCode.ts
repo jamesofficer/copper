@@ -44,7 +44,10 @@ function baseOptions(model: string, systemPrompt: string): Options {
 }
 
 function toUsage(result: SDKResultMessage): ClaudeCodeUsage {
+  // Present on success and on error result messages (e.g. max-turns), but
+  // guard anyway — a missing-usage crash would mask the real outcome.
   const usage = result.usage;
+  if (!usage) return { inputTokens: 0, outputTokens: 0 };
   return {
     inputTokens:
       usage.input_tokens +
@@ -107,6 +110,71 @@ export async function runStructuredQuery(params: {
     throw new Error(describeFailure(result));
   }
   return { output: result.structured_output, usage: toUsage(result) };
+}
+
+// One report_findings finding, kept loose — normalizeFindings validates it.
+const findingShape = {
+  category: z.string(),
+  severity: z.string(),
+  title: z.string(),
+  body: z.string(),
+  path: z.string(),
+  line: z.number(),
+  suggestion: z.string(),
+};
+
+// The pre-review findings pass on the Claude Code provider. The model
+// investigates with the repo tools (callers, history — that's how blast
+// radius works), then reports every finding by CALLING a report_findings
+// tool. We can't use the SDK's json_schema output format here: combined with
+// MCP tools it comes back empty (subtype "success", no structured_output).
+// So report_findings is itself an MCP tool whose handler captures the input —
+// the same "report via tool call" shape the API path uses.
+export async function runFindingsAgentQuery(params: {
+  model: string;
+  systemPrompt: string;
+  prompt: string;
+  toolContext: ToolContext;
+  maxTurns: number;
+}): Promise<{ findings: unknown[]; usage: ClaudeCodeUsage }> {
+  let captured: unknown[] = [];
+  const reportServer = createSdkMcpServer({
+    name: "report",
+    version: "1.0.0",
+    tools: [
+      tool(
+        "report_findings",
+        "Report the candidate issues found in the pull request for the reviewer to verify. Call this exactly once when your investigation is complete, with every finding (an empty list if there is nothing to flag).",
+        { findings: z.array(z.object(findingShape)) },
+        async (args) => {
+          captured = args.findings ?? [];
+          return {
+            content: [{ type: "text" as const, text: "Findings recorded." }],
+          };
+        },
+      ),
+    ],
+  });
+
+  const stream = query({
+    prompt: params.prompt,
+    options: {
+      ...baseOptions(params.model, params.systemPrompt),
+      mcpServers: {
+        repo: repoToolServer(params.toolContext),
+        report: reportServer,
+      },
+      allowedTools: [...REPO_TOOL_NAMES, "mcp__report__report_findings"],
+      maxTurns: params.maxTurns,
+    },
+  });
+
+  const result = await runToResult(stream);
+  // A finished run with no report_findings call means nothing was flagged.
+  if (result.subtype !== "success" && captured.length === 0) {
+    throw new Error(describeFailure(result));
+  }
+  return { findings: captured, usage: toUsage(result) };
 }
 
 // The chat's repo tools, exposed to Claude Code as an in-process MCP server.
