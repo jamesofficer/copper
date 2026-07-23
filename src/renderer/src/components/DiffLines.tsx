@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { LuPlus } from "react-icons/lu";
+import { LuChevronsUpDown, LuPlus } from "react-icons/lu";
 import type {
   DiffSide,
   DraftReviewComment,
@@ -16,11 +16,15 @@ import type {
 } from "../../../shared/types";
 import {
   buildSplitRows,
+  computeGaps,
   type DiffLine,
+  expandLines,
+  highlightToLines,
   type LineKind,
   languageForPath,
   parsePatch,
   type SplitRow,
+  TAIL_GAP,
 } from "../lib/diffParser";
 import { useDiffViewMode } from "../lib/diffViewMode";
 import type { ReviewThread } from "../lib/reviewComments";
@@ -47,11 +51,23 @@ export interface DiffCommenting {
   reviewStarted: boolean;
 }
 
+// Access to the full file at the diff's commit. Enables "expand hidden
+// lines" and upgrades added/context-line syntax highlighting from per-hunk
+// fragments (which mis-highlight when a hunk starts mid-construct) to slices
+// of the whole highlighted file.
+export interface DiffExpansion {
+  // File text at the diff's commit; null while loading or unavailable.
+  fullFile: string | null;
+  // Asks the parent to fetch fullFile — called on the first expand click.
+  requestFullFile(): void;
+}
+
 interface Props {
   file: PullRequestFile;
   // When set, lines grow a hover "+" button for commenting and existing
   // threads render under the lines they anchor to.
   commenting?: DiffCommenting;
+  expansion?: DiffExpansion;
 }
 
 // "dynamic" mode switches to side-by-side when the diff's container is at
@@ -66,7 +82,8 @@ const rowStyles: Record<LineKind, { bg: string; sign: string }> = {
   meta: { bg: "transparent", sign: "" },
 };
 
-const fontStyles = {
+// Shared with FileView so the full-file listing matches the diff rows.
+export const diffFontStyles = {
   fontFamily: "'JetBrains Mono', monospace",
   fontSize: "14px",
   lineHeight: "1.6",
@@ -113,6 +130,67 @@ interface CommentContext {
   startSelect(event: React.MouseEvent, anchor: CommentAnchor): void;
   extendSelect(line: DiffLine): void;
   closeComposer(): void;
+}
+
+// Per-render expansion helpers shared by the inline and split renderers.
+interface ExpandContext {
+  // Hidden lines above this hunk header — undefined when nothing to expand.
+  hiddenAbove(line: DiffLine): number | undefined;
+  expand(line: DiffLine): void;
+  // Hidden lines after the last hunk: null = count unknown until the file
+  // loads, undefined = nothing there (or already expanded).
+  tailHidden: number | null | undefined;
+  expandTail(): void;
+}
+
+function ExpandButton({
+  hidden,
+  onExpand,
+}: {
+  hidden: number;
+  onExpand(): void;
+}) {
+  return (
+    <Box
+      as="button"
+      aria-label={`Show ${hidden} hidden lines`}
+      title={`Show ${hidden} hidden lines`}
+      px="2"
+      color="blue.fg"
+      cursor="pointer"
+      display="flex"
+      alignItems="center"
+      _hover={{ bg: "blue.subtle" }}
+      onClick={onExpand}
+    >
+      <LuChevronsUpDown size={14} />
+    </Box>
+  );
+}
+
+// The strip after the last hunk that reveals the rest of the file.
+function TailExpandRow({ expand }: { expand: ExpandContext }) {
+  return (
+    <Flex
+      as="button"
+      w="full"
+      alignItems="center"
+      bg="bg.muted"
+      color="blue.fg"
+      cursor="pointer"
+      _hover={{ bg: "blue.subtle" }}
+      onClick={expand.expandTail}
+    >
+      <Box px="2" display="flex" alignItems="center">
+        <LuChevronsUpDown size={14} />
+      </Box>
+      <Text as="span" py="0.5" fontSize="12px">
+        {expand.tailHidden === null
+          ? "Show lines after the last change"
+          : `Show ${expand.tailHidden} more lines`}
+      </Text>
+    </Flex>
+  );
 }
 
 function Gutter({ value }: { value: number | null }) {
@@ -270,9 +348,11 @@ function CommentBands({
 function InlineRows({
   lines,
   ctx,
+  expand,
 }: {
   lines: DiffLine[];
   ctx?: CommentContext;
+  expand?: ExpandContext;
 }) {
   return (
     // minW=max-content: inside a scroll container a block element only gets
@@ -284,6 +364,8 @@ function InlineRows({
         const anchor = ctx?.anchorOf(line);
         const selected = ctx?.isSelected(line) ?? false;
         const commented = ctx?.isCommented(line) ?? false;
+        const hiddenAbove =
+          line.kind === "hunk" ? expand?.hiddenAbove(line) : undefined;
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: patch lines have no stable id
           <Fragment key={index}>
@@ -296,9 +378,17 @@ function InlineRows({
               onMouseEnter={anchor ? () => ctx?.extendSelect(line) : undefined}
             >
               {line.kind === "hunk" || line.kind === "meta" ? (
-                <Text as="span" px="3" py="0.5" whiteSpace="pre">
-                  {line.text}
-                </Text>
+                <>
+                  {expand && hiddenAbove !== undefined && (
+                    <ExpandButton
+                      hidden={hiddenAbove}
+                      onExpand={() => expand.expand(line)}
+                    />
+                  )}
+                  <Text as="span" px="3" py="0.5" whiteSpace="pre">
+                    {line.text}
+                  </Text>
+                </>
               ) : (
                 <>
                   <Gutter value={line.oldNumber} />
@@ -320,6 +410,9 @@ function InlineRows({
           </Fragment>
         );
       })}
+      {expand && expand.tailHidden !== undefined && (
+        <TailExpandRow expand={expand} />
+      )}
     </Box>
   );
 }
@@ -330,10 +423,12 @@ function SplitCell({
   line,
   side,
   ctx,
+  expand,
 }: {
   line: DiffLine | null;
   side: "old" | "new";
   ctx?: CommentContext;
+  expand?: ExpandContext;
 }) {
   if (line === null) {
     return (
@@ -345,8 +440,17 @@ function SplitCell({
     );
   }
   if (line.kind === "hunk" || line.kind === "meta") {
+    // Both columns get the expand button — left-only was easy to miss.
+    const hiddenAbove =
+      line.kind === "hunk" ? expand?.hiddenAbove(line) : undefined;
     return (
       <Flex bg="bg.muted" color="fg.muted">
+        {expand && hiddenAbove !== undefined && (
+          <ExpandButton
+            hidden={hiddenAbove}
+            onExpand={() => expand.expand(line)}
+          />
+        )}
         <Text as="span" px="3" py="0.5" whiteSpace="pre">
           {side === "old" ? line.text || " " : " "}
         </Text>
@@ -388,9 +492,11 @@ interface SplitSegment {
 function SplitRows({
   lines,
   ctx,
+  expand,
 }: {
   lines: DiffLine[];
   ctx?: CommentContext;
+  expand?: ExpandContext;
 }) {
   const rows = useMemo(() => buildSplitRows(lines), [lines]);
 
@@ -440,6 +546,7 @@ function SplitRows({
                       line={side === "old" ? row.left : row.right}
                       side={side}
                       ctx={ctx}
+                      expand={expand}
                     />
                   ))}
                 </Box>
@@ -456,6 +563,9 @@ function SplitRows({
           )}
         </Fragment>
       ))}
+      {expand && expand.tailHidden !== undefined && (
+        <TailExpandRow expand={expand} />
+      )}
     </Box>
   );
 }
@@ -466,12 +576,15 @@ function SplitRows({
 // the row tree is by far the most expensive thing on screen — parents
 // re-render freely (e.g. on every file-filter keystroke) and must not drag
 // thousands of diff rows along.
-function DiffLines({ file, commenting }: Props) {
+function DiffLines({ file, commenting, expansion }: Props) {
   const mode = useDiffViewMode();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [wide, setWide] = useState(false);
   const [selection, setSelection] = useState<SelectionRange | null>(null);
   const [composing, setComposing] = useState(false);
+  const [expandedGaps, setExpandedGaps] = useState<ReadonlySet<number>>(
+    new Set(),
+  );
 
   useEffect(() => {
     if (mode !== "dynamic") return;
@@ -492,6 +605,7 @@ function DiffLines({ file, commenting }: Props) {
   useEffect(() => {
     setSelection(null);
     setComposing(false);
+    setExpandedGaps(new Set());
   }, [file.path]);
 
   // Releasing the mouse anywhere finishes the selection and opens the
@@ -512,11 +626,70 @@ function DiffLines({ file, commenting }: Props) {
     [file.patch, language],
   );
 
+  const fullFile = expansion?.fullFile ?? null;
+  const fileLines = useMemo(() => {
+    if (fullFile === null) return null;
+    const parts = fullFile.split("\n");
+    if (parts.at(-1) === "") parts.pop();
+    return parts;
+  }, [fullFile]);
+  const fileHtml = useMemo(
+    () =>
+      fullFile !== null && language
+        ? highlightToLines(fullFile, language)
+        : null,
+    [fullFile, language],
+  );
+
+  // Guard against the fetched file not matching the diff (stale clone, wrong
+  // sha): if any added/context line disagrees with it, ignore the file.
+  const fileMatchesDiff = useMemo(() => {
+    if (!fileLines) return false;
+    return lines.every(
+      (line) =>
+        (line.kind !== "add" && line.kind !== "context") ||
+        line.newNumber === null ||
+        fileLines[line.newNumber - 1] === line.text,
+    );
+  }, [fileLines, lines]);
+  const fileReady = fileLines !== null && fileMatchesDiff;
+
+  // What actually renders: hunk lines get their html swapped for slices of
+  // the whole highlighted file (fragment highlighting mis-colors hunks that
+  // start mid-construct, e.g. inside a JSX tag), and expanded gaps are
+  // spliced in as extra context rows.
+  const displayLines = useMemo(() => {
+    if (!fileReady || !fileLines) return lines;
+    let result = lines;
+    if (fileHtml) {
+      result = result.map((line) =>
+        (line.kind === "add" || line.kind === "context") &&
+        line.newNumber !== null &&
+        fileHtml[line.newNumber - 1] !== undefined
+          ? { ...line, html: fileHtml[line.newNumber - 1] }
+          : line,
+      );
+    }
+    return expandedGaps.size > 0
+      ? expandLines(result, expandedGaps, fileLines, fileHtml)
+      : result;
+  }, [lines, fileReady, fileLines, fileHtml, expandedGaps]);
+
   const anchors = useMemo(() => {
     const map = new Map<DiffLine, CommentAnchor>();
     let hunk = -1;
-    for (const line of lines) {
-      if (line.kind === "hunk") hunk++;
+    // Expanded runs separate hunks exactly like the headers they replaced —
+    // a comment selection still can't cross what GitHub sees as a boundary.
+    let inSeparator = false;
+    for (const line of displayLines) {
+      if (line.kind === "hunk" || line.expanded) {
+        if (!inSeparator) {
+          hunk++;
+          inSeparator = true;
+        }
+        continue;
+      }
+      inSeparator = false;
       if (line.kind === "del" && line.oldNumber !== null) {
         map.set(line, { side: "LEFT", line: line.oldNumber, hunk });
       } else if (
@@ -527,7 +700,7 @@ function DiffLines({ file, commenting }: Props) {
       }
     }
     return map;
-  }, [lines]);
+  }, [displayLines]);
 
   const threadsByKey = useMemo(() => {
     const map = new Map<string, ReviewThread[]>();
@@ -571,6 +744,49 @@ function DiffLines({ file, commenting }: Props) {
     }
     return keys;
   }, [commenting?.threads, commenting?.drafts]);
+
+  // Gap ids are hunk-line indices in the ORIGINAL parsed lines; the hunk
+  // DiffLine objects survive into displayLines untouched, so renderers can
+  // look their gap up by identity even after splicing shifts positions.
+  const gapIdByLine = useMemo(() => {
+    const map = new Map<DiffLine, number>();
+    lines.forEach((line, index) => {
+      if (line.kind === "hunk") map.set(line, index);
+    });
+    return map;
+  }, [lines]);
+  const gaps = useMemo(
+    () => (expansion ? computeGaps(lines, fileLines?.length ?? null) : null),
+    [expansion, lines, fileLines],
+  );
+
+  let expandCtx: ExpandContext | undefined;
+  if (expansion && gaps) {
+    const tail = gaps.get(TAIL_GAP);
+    expandCtx = {
+      hiddenAbove: (line) => {
+        const id = gapIdByLine.get(line);
+        const hidden = id === undefined ? undefined : gaps.get(id);
+        return hidden === 0 || hidden == null ? undefined : hidden;
+      },
+      expand: (line) => {
+        const id = gapIdByLine.get(line);
+        if (id === undefined) return;
+        expansion.requestFullFile();
+        setExpandedGaps((prev) => new Set(prev).add(id));
+      },
+      tailHidden:
+        tail === undefined ||
+        tail === 0 ||
+        (expandedGaps.has(TAIL_GAP) && fileReady)
+          ? undefined
+          : tail,
+      expandTail: () => {
+        expansion.requestFullFile();
+        setExpandedGaps((prev) => new Set(prev).add(TAIL_GAP));
+      },
+    };
+  }
 
   let ctx: CommentContext | undefined;
   if (commenting) {
@@ -670,11 +886,11 @@ function DiffLines({ file, commenting }: Props) {
   }
 
   return (
-    <Box ref={rootRef} {...fontStyles} css={tokenColors}>
+    <Box ref={rootRef} {...diffFontStyles} css={tokenColors}>
       {split ? (
-        <SplitRows lines={lines} ctx={ctx} />
+        <SplitRows lines={displayLines} ctx={ctx} expand={expandCtx} />
       ) : (
-        <InlineRows lines={lines} ctx={ctx} />
+        <InlineRows lines={displayLines} ctx={ctx} expand={expandCtx} />
       )}
     </Box>
   );

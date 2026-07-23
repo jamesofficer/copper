@@ -39,7 +39,7 @@ import {
   removeRepository,
   reorderRepositories,
 } from "../repo/local";
-import { warmUpPullRequest } from "../repo/workspace";
+import { readFileAtCommit, warmUpPullRequest } from "../repo/workspace";
 import { clearKey, getKeyStatus, saveKey } from "../settings/keys";
 import {
   addDraftComment,
@@ -74,6 +74,7 @@ const handlers: IpcApi = {
   listPullRequestCommits: (repo, prNumber) =>
     listPullRequestCommits(repo, prNumber),
   listCommitFiles: (repo, commitSha) => listCommitFiles(repo, commitSha),
+  getFileAtCommit: (repo, sha, path) => readFileAtCommit(repo, sha, path),
   listPullRequestComments: (repo, prNumber) =>
     listPullRequestComments(repo, prNumber),
   listPullRequestReviews: (repo, prNumber) =>

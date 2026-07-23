@@ -171,6 +171,13 @@ export default function ChangesView({ pr }: Props) {
   // comments to. Memoized so DiffLines' memo sees a stable prop and unrelated
   // re-renders (filter keystrokes) skip the diff entirely.
   const headSha = detailQuery.data?.headSha;
+  // Which commit the shown diff belongs to — the full changelist diffs
+  // against the head, a picked commit against itself.
+  const fileContext = useMemo(() => {
+    const sha = selectedCommit ?? headSha;
+    return sha ? { repo: pr.repo, sha } : undefined;
+  }, [selectedCommit, headSha, pr.repo]);
+
   const commenting = useMemo(
     () =>
       selectedCommit === null && headSha && selectedFile
@@ -322,6 +329,7 @@ export default function ChangesView({ pr }: Props) {
           <DiffView
             file={selectedFile}
             commenting={commenting}
+            fileContext={fileContext}
             viewed={
               selectedCommit === null
                 ? viewedPaths.has(selectedFile.path)

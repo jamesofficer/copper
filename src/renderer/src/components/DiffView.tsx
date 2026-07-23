@@ -1,15 +1,33 @@
-import { Box, Center, Checkbox, Flex, HStack, Text } from "@chakra-ui/react";
+import {
+  Box,
+  Button,
+  Center,
+  Flex,
+  HStack,
+  Spinner,
+  Text,
+} from "@chakra-ui/react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { LuCheck, LuFileCode, LuFileDiff } from "react-icons/lu";
 import type { PullRequestFile } from "../../../shared/types";
 import { statusMeta } from "../lib/fileStatus";
 import { scrollbar } from "../lib/scrollbar";
-import DiffLines, { type DiffCommenting } from "./DiffLines";
+import DiffLines, {
+  type DiffCommenting,
+  type DiffExpansion,
+} from "./DiffLines";
+import FileView from "./FileView";
 
 interface Props {
   file: PullRequestFile;
   commenting?: DiffCommenting;
-  // Undefined hides the Viewed checkbox (commit-by-commit views).
+  // Undefined hides the Viewed button (commit-by-commit views).
   viewed?: boolean;
   onToggleViewed?(viewed: boolean): void;
+  // Where to read the full file from — enables expand-hidden-lines,
+  // whole-file syntax highlighting, and the full-file view.
+  fileContext?: { repo: string; sha: string };
 }
 
 export default function DiffView({
@@ -17,8 +35,49 @@ export default function DiffView({
   commenting,
   viewed,
   onToggleViewed,
+  fileContext,
 }: Props) {
   const meta = statusMeta[file.status];
+  const [showFullFile, setShowFullFile] = useState(false);
+
+  // Deleted files don't exist at the diff's commit.
+  const canReadFile = Boolean(fileContext) && file.status !== "deleted";
+
+  // Fetched eagerly (not just on demand): DiffLines uses the full file to fix
+  // fragment-highlighting artifacts even when nothing is expanded. Content at
+  // a fixed sha never changes, hence the infinite staleTime.
+  const fileQuery = useQuery({
+    queryKey: ["fileAtCommit", fileContext?.repo, fileContext?.sha, file.path],
+    queryFn: () =>
+      window.api.getFileAtCommit(
+        fileContext?.repo ?? "",
+        fileContext?.sha ?? "",
+        file.path,
+      ),
+    enabled: canReadFile,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const fullFile = fileQuery.data ?? null;
+
+  // This component instance is reused when the user switches files.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: file.path is the reset trigger
+  useEffect(() => {
+    setShowFullFile(false);
+  }, [file.path]);
+
+  // Stable callback so the memoized DiffLines only re-renders when the file
+  // content itself changes; a re-request only matters after a failed read.
+  const latestFile = useRef(fullFile);
+  latestFile.current = fullFile;
+  const refetch = fileQuery.refetch;
+  const requestFullFile = useCallback(() => {
+    if (latestFile.current === null) void refetch();
+  }, [refetch]);
+
+  const expansion = useMemo<DiffExpansion | undefined>(
+    () => (canReadFile ? { fullFile, requestFullFile } : undefined),
+    [canReadFile, fullFile, requestFullFile],
+  );
 
   return (
     <Flex direction="column" h="full" minH="0">
@@ -54,40 +113,63 @@ export default function DiffView({
             (from {file.previousPath})
           </Text>
         )}
-        <HStack
-          gap="1.5"
-          fontFamily="mono"
-          fontSize="2xs"
-          flexShrink="0"
-          ml="auto"
-        >
-          <Text as="span" color="green.fg">
-            +{file.additions}
-          </Text>
-          <Text as="span" color="red.fg">
-            −{file.deletions}
-          </Text>
+        <HStack gap="2" flexShrink="0" ml="auto">
+          {canReadFile && (
+            <Button
+              size="2xs"
+              variant="ghost"
+              color="fg.muted"
+              onClick={() => setShowFullFile(!showFullFile)}
+            >
+              {showFullFile ? <LuFileDiff /> : <LuFileCode />}
+              {showFullFile ? "View diff" : "View file"}
+            </Button>
+          )}
+          {viewed !== undefined && onToggleViewed && (
+            <Button
+              size="2xs"
+              variant="outline"
+              colorPalette={viewed ? "green" : undefined}
+              color={viewed ? undefined : "fg.muted"}
+              onClick={() => onToggleViewed(!viewed)}
+            >
+              {viewed && <LuCheck />} Viewed
+            </Button>
+          )}
+          <HStack gap="1.5" fontFamily="mono" fontSize="2xs">
+            <Text as="span" color="green.fg">
+              +{file.additions}
+            </Text>
+            <Text as="span" color="red.fg">
+              −{file.deletions}
+            </Text>
+          </HStack>
         </HStack>
-        {viewed !== undefined && onToggleViewed && (
-          <Checkbox.Root
-            size="sm"
-            cursor="pointer"
-            flexShrink="0"
-            checked={viewed}
-            onCheckedChange={(event) => onToggleViewed(Boolean(event.checked))}
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-            <Checkbox.Label fontSize="xs" fontWeight="normal">
-              Viewed
-            </Checkbox.Label>
-          </Checkbox.Root>
-        )}
       </HStack>
 
-      {file.patch ? (
+      {showFullFile ? (
+        fileQuery.isPending ? (
+          <Center flex="1" p="8">
+            <Spinner size="sm" />
+          </Center>
+        ) : fullFile === null ? (
+          <Center flex="1" p="8">
+            <Text color="fg.muted" fontSize="sm" textAlign="center">
+              The file couldn’t be read from the local repo clone.
+            </Text>
+          </Center>
+        ) : (
+          <Box flex="1" minH="0" overflow="auto" css={scrollbar}>
+            <FileView path={file.path} text={fullFile} />
+          </Box>
+        )
+      ) : file.patch ? (
         <Box flex="1" minH="0" overflow="auto" css={scrollbar}>
-          <DiffLines file={file} commenting={commenting} />
+          <DiffLines
+            file={file}
+            commenting={commenting}
+            expansion={expansion}
+          />
         </Box>
       ) : (
         <Center flex="1" p="8">

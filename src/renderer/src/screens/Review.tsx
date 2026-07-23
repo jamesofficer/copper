@@ -4,6 +4,7 @@ import {
   Flex,
   Heading,
   HStack,
+  Stack,
   Tabs,
   Text,
 } from "@chakra-ui/react";
@@ -51,12 +52,14 @@ export default function Review({ pr, onBack }: Props) {
         <Button variant="outline" size="xs" onClick={onBack}>
           <LuArrowLeft /> Back
         </Button>
-        <Heading size="lg" truncate>
-          {pr.title}
-        </Heading>
-        <Text fontFamily="mono" fontSize="sm" color="fg.muted" flex="1">
-          {pr.repo}#{pr.number}
-        </Text>
+        <Stack gap="0" flex="1" minW="0">
+          <Heading size="lg" truncate>
+            {pr.title}
+          </Heading>
+          <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+            {pr.repo}#{pr.number}
+          </Text>
+        </Stack>
         <Button asChild variant="outline" size="xs">
           <a href={pr.url} target="_blank" rel="noreferrer">
             <LuExternalLink /> Open in GitHub

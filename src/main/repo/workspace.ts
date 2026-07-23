@@ -8,6 +8,7 @@ import {
   git,
   hasCommit,
   listMissingBlobs,
+  showFile,
 } from "./git";
 import { listRepositories } from "./local";
 
@@ -103,6 +104,24 @@ export async function ensureHeadBlobs(
   backfills.set(key, task);
   await task;
   backfilled.add(key);
+}
+
+// A file's full contents at a commit, read from the workspace clone — powers
+// the diff viewer's context expansion, whole-file syntax highlighting, and
+// full-file view. Null when the clone, commit, or file isn't available (the
+// viewer quietly falls back to diff-only), or when the content looks binary.
+export async function readFileAtCommit(
+  slug: string,
+  sha: string,
+  path: string,
+): Promise<string | null> {
+  try {
+    const dir = await ensureRepo(slug);
+    const content = await showFile(dir, sha, path);
+    return content.includes("\u0000") ? null : content;
+  } catch {
+    return null;
+  }
 }
 
 // Fired in the background when a PR is opened so the workspace is usually

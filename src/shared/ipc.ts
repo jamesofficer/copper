@@ -66,6 +66,14 @@ export interface IpcApi {
     prNumber: number,
   ): Promise<PullRequestCommit[]>;
   listCommitFiles(repo: string, commitSha: string): Promise<PullRequestFile[]>;
+  // Full file contents at a commit, read from the local workspace clone —
+  // null when unavailable. Powers the diff viewer's context expansion,
+  // whole-file highlighting, and full-file view.
+  getFileAtCommit(
+    repo: string,
+    sha: string,
+    path: string,
+  ): Promise<string | null>;
   listPullRequestComments(
     repo: string,
     prNumber: number,
@@ -209,6 +217,7 @@ export const ipcChannels = [
   "listPullRequestFiles",
   "listPullRequestCommits",
   "listCommitFiles",
+  "getFileAtCommit",
   "listPullRequestComments",
   "listPullRequestReviews",
   "addPullRequestComment",

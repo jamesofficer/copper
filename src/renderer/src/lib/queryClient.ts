@@ -21,7 +21,7 @@ export const queryClient = new QueryClient({
 
 // Query keys that never get written to localStorage: file patches are too
 // large for its ~5MB quota and are cheap to refetch.
-const doNotPersist = ["pullRequestFiles", "commitFiles"];
+const doNotPersist = ["pullRequestFiles", "commitFiles", "fileAtCommit"];
 
 export const persistOptions: Omit<PersistQueryClientOptions, "queryClient"> = {
   persister: createSyncStoragePersister({
