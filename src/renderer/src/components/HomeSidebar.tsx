@@ -179,6 +179,12 @@ export default function HomeSidebar({
                 key={`${pr.repo}#${pr.number}`}
                 pr={pr}
                 onSelect={onSelectPullRequest}
+                leading={
+                  <UserAvatar
+                    username={pr.author}
+                    fallback={<LuGitPullRequest />}
+                  />
+                }
                 meta={<Text color="fg.muted">{timeAgo(pr.viewedAt)}</Text>}
               />
             ))

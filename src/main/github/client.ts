@@ -729,6 +729,26 @@ export async function setPullRequestState(
   });
 }
 
+// Retarget an open PR onto a different base branch. GitHub recomputes the
+// diff against the new base.
+export async function setPullRequestBase(
+  repo: string,
+  prNumber: number,
+  base: string,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to update pull requests.",
+    );
+  }
+
+  await githubFetch(token, `/repos/${repo}/pulls/${prNumber}`, {
+    method: "PATCH",
+    body: { base },
+  });
+}
+
 const reviewEvents: Record<ReviewVerdict, string> = {
   comment: "COMMENT",
   approve: "APPROVE",

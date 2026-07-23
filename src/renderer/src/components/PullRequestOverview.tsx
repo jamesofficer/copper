@@ -22,6 +22,7 @@ import { formatDate } from "../lib/formatDate";
 import { labelPalette } from "../lib/labelColor";
 import { listReviewThreads, type ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
+import BaseBranchSelect from "./BaseBranchSelect";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import Markdown from "./Markdown";
@@ -168,7 +169,7 @@ export default function PullRequestOverview({ pr }: Props) {
               <Text color="fg">{detail.author}</Text>
             </HStack>
             <Text>wants to merge into</Text>
-            <Badge variant="outline">{detail.baseRef}</Badge>
+            <BaseBranchSelect detail={detail} />
             <Text>from</Text>
             <Badge variant="outline">{detail.headRef}</Badge>
           </HStack>

@@ -56,6 +56,12 @@ export interface IpcApi {
     prNumber: number,
     state: "open" | "closed",
   ): Promise<void>;
+  // Retarget an open PR onto a different base branch.
+  setPullRequestBase(
+    repo: string,
+    prNumber: number,
+    base: string,
+  ): Promise<void>;
   // Same data as getPullRequest but without the background repo warm-up —
   // for bulk refreshes (e.g. the recently-viewed panel).
   peekPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
@@ -230,6 +236,7 @@ export const ipcChannels = [
   "getPullRequest",
   "getReviewDecision",
   "setPullRequestState",
+  "setPullRequestBase",
   "peekPullRequest",
   "listPullRequestFiles",
   "listPullRequestCommits",
