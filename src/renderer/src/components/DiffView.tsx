@@ -113,18 +113,16 @@ export default function DiffView({
             (from {file.previousPath})
           </Text>
         )}
+        <HStack gap="1.5" fontFamily="mono" fontSize="2xs">
+          <Text as="span" color="green.fg">
+            +{file.additions}
+          </Text>
+          <Text as="span" color="red.fg">
+            −{file.deletions}
+          </Text>
+        </HStack>
+
         <HStack gap="2" flexShrink="0" ml="auto">
-          {canReadFile && (
-            <Button
-              size="2xs"
-              variant="ghost"
-              color="fg.muted"
-              onClick={() => setShowFullFile(!showFullFile)}
-            >
-              {showFullFile ? <LuFileDiff /> : <LuFileCode />}
-              {showFullFile ? "View diff" : "View file"}
-            </Button>
-          )}
           {viewed !== undefined && onToggleViewed && (
             <Button
               size="2xs"
@@ -136,14 +134,18 @@ export default function DiffView({
               {viewed && <LuCheck />} Viewed
             </Button>
           )}
-          <HStack gap="1.5" fontFamily="mono" fontSize="2xs">
-            <Text as="span" color="green.fg">
-              +{file.additions}
-            </Text>
-            <Text as="span" color="red.fg">
-              −{file.deletions}
-            </Text>
-          </HStack>
+
+          {canReadFile && (
+            <Button
+              size="2xs"
+              variant="ghost"
+              color="fg.muted"
+              onClick={() => setShowFullFile(!showFullFile)}
+            >
+              {showFullFile ? <LuFileDiff /> : <LuFileCode />}
+              {showFullFile ? "View diff" : "View file"}
+            </Button>
+          )}
         </HStack>
       </HStack>
 
