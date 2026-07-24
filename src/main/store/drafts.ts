@@ -1,49 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
-import { join } from "node:path";
 import type { DraftReviewComment, NewReviewComment } from "../../shared/types";
+import { createJsonStore } from "./jsonStore";
 
 // Inline comments drafted for a batch review, keyed by repo#number.
 // Disk-backed so a half-written review survives app restarts.
-const configDir = join(homedir(), ".pr-reviewer");
-const draftsPath = join(configDir, "drafts.json");
-
-let cache: Map<string, DraftReviewComment[]> | null = null;
+const drafts = createJsonStore<DraftReviewComment[]>("drafts.json");
 
 function draftsKey(repo: string, prNumber: number): string {
   return `${repo}#${prNumber}`;
-}
-
-async function loadDrafts(): Promise<Map<string, DraftReviewComment[]>> {
-  if (cache) return cache;
-  try {
-    const raw = JSON.parse(await readFile(draftsPath, "utf8")) as Record<
-      string,
-      DraftReviewComment[]
-    >;
-    cache = new Map(Object.entries(raw));
-  } catch {
-    cache = new Map();
-  }
-  return cache;
-}
-
-async function persist(
-  store: Map<string, DraftReviewComment[]>,
-): Promise<void> {
-  await mkdir(configDir, { recursive: true });
-  await writeFile(
-    draftsPath,
-    JSON.stringify(Object.fromEntries(store), null, 2),
-  );
 }
 
 export async function listDraftComments(
   repo: string,
   prNumber: number,
 ): Promise<DraftReviewComment[]> {
-  const store = await loadDrafts();
+  const store = await drafts.load();
   return store.get(draftsKey(repo, prNumber)) ?? [];
 }
 
@@ -52,7 +23,7 @@ export async function addDraftComment(
   prNumber: number,
   comment: NewReviewComment,
 ): Promise<DraftReviewComment> {
-  const store = await loadDrafts();
+  const store = await drafts.load();
   const draft: DraftReviewComment = {
     id: randomUUID(),
     path: comment.path,
@@ -64,7 +35,7 @@ export async function addDraftComment(
   };
   const key = draftsKey(repo, prNumber);
   store.set(key, [...(store.get(key) ?? []), draft]);
-  await persist(store);
+  await drafts.persist(store);
   return draft;
 }
 
@@ -74,7 +45,7 @@ export async function updateDraftComment(
   draftId: string,
   body: string,
 ): Promise<DraftReviewComment> {
-  const store = await loadDrafts();
+  const store = await drafts.load();
   const draft = store
     .get(draftsKey(repo, prNumber))
     ?.find((entry) => entry.id === draftId);
@@ -82,7 +53,7 @@ export async function updateDraftComment(
     throw new Error("This draft comment no longer exists.");
   }
   draft.body = body;
-  await persist(store);
+  await drafts.persist(store);
   return draft;
 }
 
@@ -91,21 +62,21 @@ export async function deleteDraftComment(
   prNumber: number,
   draftId: string,
 ): Promise<void> {
-  const store = await loadDrafts();
+  const store = await drafts.load();
   const key = draftsKey(repo, prNumber);
   const remaining = (store.get(key) ?? []).filter(
     (entry) => entry.id !== draftId,
   );
   if (remaining.length > 0) store.set(key, remaining);
   else store.delete(key);
-  await persist(store);
+  await drafts.persist(store);
 }
 
 export async function clearDraftComments(
   repo: string,
   prNumber: number,
 ): Promise<void> {
-  const store = await loadDrafts();
+  const store = await drafts.load();
   store.delete(draftsKey(repo, prNumber));
-  await persist(store);
+  await drafts.persist(store);
 }
