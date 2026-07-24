@@ -2,7 +2,7 @@ import { Badge, Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LuCircleCheck, LuCircleDashed, LuCircleX } from "react-icons/lu";
 import type { PullRequestReview } from "../../../shared/types";
-import { formatDate } from "../lib/formatDate";
+import RelativeTime from "./RelativeTime";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
@@ -76,9 +76,11 @@ export default function ReviewSummary({ reviews, requestedReviewers }: Props) {
                 {meta.icon}
                 {meta.label}
               </Badge>
-              <Text color="fg.subtle" fontSize="xs">
-                {formatDate(decision.submittedAt)}
-              </Text>
+              <RelativeTime
+                iso={decision.submittedAt}
+                color="fg.subtle"
+                fontSize="xs"
+              />
             </HStack>
           );
         })}

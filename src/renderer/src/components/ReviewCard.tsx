@@ -2,8 +2,8 @@ import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LuCircleCheck, LuCircleX, LuMessageSquare } from "react-icons/lu";
 import type { PullRequestReview } from "../../../shared/types";
-import { formatDate } from "../lib/formatDate";
 import Markdown from "./Markdown";
+import RelativeTime from "./RelativeTime";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
@@ -59,9 +59,11 @@ export default function ReviewCard({ review }: Props) {
             {meta.phrase}
           </Text>
         </Text>
-        <Text fontSize="xs" color="fg.subtle">
-          {formatDate(review.submittedAt)}
-        </Text>
+        <RelativeTime
+          iso={review.submittedAt}
+          fontSize="xs"
+          color="fg.subtle"
+        />
       </HStack>
       {hasBody && (
         <Box px="4" py="3">

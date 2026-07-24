@@ -54,10 +54,15 @@ export default function PullRequestCard({
       px="5"
       py="4"
       cursor="pointer"
-      transition="backgrounds"
+      transition="background 0.12s, border-color 0.12s"
       bg={selected ? "bg.subtle" : undefined}
-      borderColor={selected ? "colorPalette.muted" : undefined}
-      _hover={{ bg: "bg.subtle", borderColor: "colorPalette.muted" }}
+      // Accent border on the card whose PR is open in the preview panel,
+      // distinct from the muted hover border.
+      borderColor={selected ? "colorPalette.solid" : undefined}
+      _hover={{
+        bg: "bg.subtle",
+        borderColor: selected ? "colorPalette.solid" : "colorPalette.muted",
+      }}
     >
       <HStack justifyContent="space-between" gap="4" alignItems="flex-start">
         <VStack gap="1" alignItems="flex-start" minW="0">

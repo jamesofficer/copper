@@ -15,18 +15,21 @@ import { LuGitCommitHorizontal } from "react-icons/lu";
 import type {
   PullRequest,
   PullRequestComment,
+  PullRequestCommit,
   PullRequestReview,
   ReviewComment,
 } from "../../../shared/types";
-import { formatDate } from "../lib/formatDate";
 import { labelPalette } from "../lib/labelColor";
 import { listReviewThreads, type ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import BaseBranchSelect from "./BaseBranchSelect";
+import ClosePullRequestButton from "./ClosePullRequestButton";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
+import CommitTimelineGroup from "./CommitTimelineGroup";
 import Markdown from "./Markdown";
 import PrStateBadge from "./PrStateBadge";
+import RelativeTime from "./RelativeTime";
 import ReviewCard from "./ReviewCard";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
 import ReviewSummary from "./ReviewSummary";
@@ -35,21 +38,32 @@ import UserAvatar from "./UserAvatar";
 
 interface Props {
   pr: PullRequest;
+  // PR actions (close/reopen) only show in the full review screen, not the
+  // home-screen preview panel.
+  showActions?: boolean;
 }
 
 type TimelineItem =
   | { kind: "comment"; date: string; comment: PullRequestComment }
   | { kind: "review"; date: string; review: PullRequestReview }
-  | { kind: "thread"; date: string; thread: ReviewThread };
+  | { kind: "thread"; date: string; thread: ReviewThread }
+  | { kind: "commit"; date: string; commit: PullRequestCommit };
 
-// Merge conversation comments, meaningful review events, and inline review
-// threads into one oldest-first thread. Reviews only appear when they carry
+// Consecutive commits in the timeline are collapsed into one grouped block,
+// like GitHub.
+type RenderItem =
+  | Exclude<TimelineItem, { kind: "commit" }>
+  | { kind: "commits"; commits: PullRequestCommit[] };
+
+// Merge conversation comments, meaningful review events, inline review threads,
+// and commits into one oldest-first thread. Reviews only appear when they carry
 // a verdict or a written comment — bare "commented" reviews and dismissals
 // are noise here.
 function buildTimeline(
   comments: PullRequestComment[],
   reviews: PullRequestReview[],
   reviewComments: ReviewComment[],
+  commits: PullRequestCommit[],
 ): TimelineItem[] {
   const items: TimelineItem[] = comments.map((comment) => ({
     kind: "comment",
@@ -71,10 +85,33 @@ function buildTimeline(
     items.push({ kind: "thread", date: thread.root.createdAt, thread });
   }
 
+  for (const commit of commits) {
+    items.push({ kind: "commit", date: commit.date, commit });
+  }
+
   return items.sort((a, b) => Date.parse(a.date) - Date.parse(b.date));
 }
 
-export default function PullRequestOverview({ pr }: Props) {
+// Collapse runs of consecutive commits in the sorted timeline into single
+// grouped blocks.
+function groupTimeline(items: TimelineItem[]): RenderItem[] {
+  const grouped: RenderItem[] = [];
+  for (const item of items) {
+    const last = grouped[grouped.length - 1];
+    if (item.kind === "commit") {
+      if (last?.kind === "commits") {
+        last.commits.push(item.commit);
+      } else {
+        grouped.push({ kind: "commits", commits: [item.commit] });
+      }
+    } else {
+      grouped.push(item);
+    }
+  }
+  return grouped;
+}
+
+export default function PullRequestOverview({ pr, showActions }: Props) {
   const detailQuery = useQuery({
     queryKey: ["pullRequest", pr.repo, pr.number],
     queryFn: () => window.api.getPullRequest(pr.repo, pr.number),
@@ -97,6 +134,12 @@ export default function PullRequestOverview({ pr }: Props) {
     queryFn: () => window.api.listReviewComments(pr.repo, pr.number),
   });
   const reviewComments = reviewCommentsQuery.data ?? [];
+
+  const commitsQuery = useQuery({
+    queryKey: ["pullRequestCommits", pr.repo, pr.number],
+    queryFn: () => window.api.listPullRequestCommits(pr.repo, pr.number),
+  });
+  const commits = commitsQuery.data ?? [];
 
   // Resolution comes from a separate GraphQL lookup; if it fails, threads
   // simply all show as unresolved.
@@ -131,8 +174,13 @@ export default function PullRequestOverview({ pr }: Props) {
 
   const detail = detailQuery.data;
   const timeline = comments
-    ? buildTimeline(comments, reviews, reviewComments)
+    ? buildTimeline(comments, reviews, reviewComments, commits)
     : [];
+  const rendered = groupTimeline(timeline);
+  // The header count reflects discussion, not commits.
+  const discussionCount = timeline.filter(
+    (item) => item.kind !== "commit",
+  ).length;
 
   return (
     <Box h="full" overflowY="auto" css={scrollbar}>
@@ -248,10 +296,10 @@ export default function PullRequestOverview({ pr }: Props) {
                 letterSpacing="wider"
                 mb="3"
               >
-                Conversation ({timeline.length})
+                Conversation ({discussionCount})
               </Heading>
               <VStack gap="3" alignItems="stretch">
-                {timeline.map((item) =>
+                {rendered.map((item) =>
                   item.kind === "comment" ? (
                     <CommentCard
                       key={`comment-${item.comment.id}`}
@@ -262,13 +310,19 @@ export default function PullRequestOverview({ pr }: Props) {
                       key={`review-${item.review.id}`}
                       review={item.review}
                     />
-                  ) : (
+                  ) : item.kind === "thread" ? (
                     <ReviewThreadCard
                       key={`thread-${item.thread.root.id}`}
                       thread={item.thread}
                       repo={pr.repo}
                       prNumber={pr.number}
                       resolved={resolvedIds.has(item.thread.root.id)}
+                    />
+                  ) : (
+                    <CommitTimelineGroup
+                      key={`commits-${item.commits[0].sha}`}
+                      repo={pr.repo}
+                      commits={item.commits}
                     />
                   ),
                 )}
@@ -291,9 +345,22 @@ export default function PullRequestOverview({ pr }: Props) {
 
         <Separator />
 
-        <HStack fontSize="xs" color="fg.subtle" gap="4" flexWrap="wrap">
-          <Text>Opened {formatDate(detail.createdAt)}</Text>
-          <Text>Updated {formatDate(detail.updatedAt)}</Text>
+        <HStack
+          fontSize="xs"
+          color="fg.subtle"
+          gap="4"
+          flexWrap="wrap"
+          justifyContent="space-between"
+        >
+          <HStack gap="4" flexWrap="wrap">
+            <Text>
+              Opened <RelativeTime iso={detail.createdAt} />
+            </Text>
+            <Text>
+              Updated <RelativeTime iso={detail.updatedAt} />
+            </Text>
+          </HStack>
+          {showActions && <ClosePullRequestButton detail={detail} />}
         </HStack>
       </VStack>
     </Box>

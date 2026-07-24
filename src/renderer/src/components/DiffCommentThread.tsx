@@ -11,9 +11,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuTrash2 } from "react-icons/lu";
 import type { ReviewComment } from "../../../shared/types";
-import { formatDate } from "../lib/formatDate";
 import type { ReviewThread } from "../lib/reviewComments";
 import Markdown from "./Markdown";
+import RelativeTime from "./RelativeTime";
 import UserAvatar from "./UserAvatar";
 import { toaster } from "./ui/toaster";
 
@@ -147,9 +147,11 @@ export default function DiffCommentThread({
             <Text fontSize="sm" fontWeight="medium">
               {comment.author}
             </Text>
-            <Text fontSize="xs" color="fg.subtle">
-              {formatDate(comment.createdAt)}
-            </Text>
+            <RelativeTime
+              iso={comment.createdAt}
+              fontSize="xs"
+              color="fg.subtle"
+            />
             {viewer === comment.author &&
               (confirmingId === comment.id ? (
                 <HStack gap="1" ml="auto">

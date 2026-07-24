@@ -59,7 +59,7 @@ export default function ClosePullRequestButton({ detail }: Props) {
   if (closed) {
     return (
       <Button
-        size="xs"
+        size="2xs"
         variant="outline"
         loading={mutation.isPending}
         onClick={() => mutation.mutate()}
@@ -73,7 +73,7 @@ export default function ClosePullRequestButton({ detail }: Props) {
     return (
       <HStack gap="1">
         <Button
-          size="xs"
+          size="2xs"
           colorPalette="red"
           loading={mutation.isPending}
           onClick={() => mutation.mutate()}
@@ -81,7 +81,7 @@ export default function ClosePullRequestButton({ detail }: Props) {
           Confirm close
         </Button>
         <Button
-          size="xs"
+          size="2xs"
           variant="ghost"
           disabled={mutation.isPending}
           onClick={() => setConfirming(false)}
@@ -94,7 +94,7 @@ export default function ClosePullRequestButton({ detail }: Props) {
 
   return (
     <Button
-      size="xs"
+      size="2xs"
       variant="outline"
       colorPalette="red"
       onClick={() => setConfirming(true)}

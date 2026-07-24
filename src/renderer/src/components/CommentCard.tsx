@@ -1,7 +1,7 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { PullRequestComment } from "../../../shared/types";
-import { formatDate } from "../lib/formatDate";
 import Markdown from "./Markdown";
+import RelativeTime from "./RelativeTime";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
@@ -16,9 +16,7 @@ export default function CommentCard({ comment }: Props) {
         <Text fontSize="sm" fontWeight="medium">
           {comment.author}
         </Text>
-        <Text fontSize="xs" color="fg.subtle">
-          {formatDate(comment.createdAt)}
-        </Text>
+        <RelativeTime iso={comment.createdAt} fontSize="xs" color="fg.subtle" />
       </HStack>
       <Box px="4" py="3">
         {comment.body.trim() ? (
