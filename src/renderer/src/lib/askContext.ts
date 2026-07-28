@@ -5,7 +5,9 @@ import type { AnalysisClaim, DiffAnchor } from "../../../shared/types";
 // by buildQuestionWithContext, recognised again by parseQuestion — so the
 // main process needs no changes and stored history stays self-describing.
 export interface AskContext {
-  label: "risk" | "behavior change";
+  // "risk" survives only for parsing chats recorded before the unified
+  // issues list; new clicks use "issue" or "behavior change".
+  label: "risk" | "behavior change" | "issue";
   title: string;
   text: string;
   anchors: DiffAnchor[];
@@ -23,6 +25,11 @@ export interface AskRequest {
 
 export const suggestedQuestions: Record<AskContext["label"], string[]> = {
   risk: [
+    "Is this a real problem or theoretical?",
+    "How likely is this to bite in practice?",
+    "How would you fix it?",
+  ],
+  issue: [
     "Is this a real problem or theoretical?",
     "How likely is this to bite in practice?",
     "How would you fix it?",
@@ -73,7 +80,7 @@ export interface ParsedQuestion {
 }
 
 const contextPattern =
-  /^\[About the (risk|behavior change) "([\s\S]+?)"\]\n[\s\S]*?\n\[\/About\]\n\n([\s\S]*)$/;
+  /^\[About the (risk|behavior change|issue) "([\s\S]+?)"\]\n[\s\S]*?\n\[\/About\]\n\n([\s\S]*)$/;
 
 // Splits a stored user message back into its attached-context tag and the
 // question the user actually typed, for compact rendering in the chat.

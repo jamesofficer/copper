@@ -13,6 +13,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuRefreshCw } from "react-icons/lu";
 import type { PullRequest, ReviewPersonality } from "../../../shared/types";
+import { getFindIssuesOnAnalyse } from "../lib/findIssuesOnAnalyse";
 import {
   getReviewPersonality,
   personalityOptions,
@@ -45,6 +46,22 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
     queryFn: () => window.api.getAnalysis(pr.repo, pr.number),
   });
 
+  // The chained findings re-run, keyed the same as ReviewPanel's so every
+  // Issues loading state sees it.
+  const findIssues = useMutation({
+    mutationKey: ["findIssues", pr.repo, pr.number],
+    mutationFn: () => window.api.findIssues(pr.repo, pr.number, true),
+    onSuccess: (result) => {
+      queryClient.setQueryData(["findings", pr.repo, pr.number], result);
+    },
+    onError: () => {
+      // Bring the previous findings back rather than leaving them wiped.
+      void queryClient.invalidateQueries({
+        queryKey: ["findings", pr.repo, pr.number],
+      });
+    },
+  });
+
   const reanalyze = useMutation({
     mutationKey: ["analyzePr", pr.repo, pr.number],
     mutationFn: async () => {
@@ -61,12 +78,18 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
       // analysing state instead of showing stale content.
       queryClient.setQueryData(["analysis", pr.repo, pr.number], null);
       queryClient.setQueryData(["chatHistory", pr.repo, pr.number], []);
+      // The old findings verify the old analysis's risks; wipe them too when
+      // a fresh run is about to replace them.
+      if (getFindIssuesOnAnalyse()) {
+        queryClient.setQueryData(["findings", pr.repo, pr.number], null);
+      }
     },
     onSuccess: (result) => {
       queryClient.setQueryData(["analysis", pr.repo, pr.number], result);
       void queryClient.invalidateQueries({
         queryKey: ["analyzedPullRequests"],
       });
+      if (getFindIssuesOnAnalyse()) findIssues.mutate();
     },
     onError: (cause) => {
       toaster.create({
@@ -78,6 +101,9 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
       // Bring the previous analysis back rather than leaving a blank tab.
       void queryClient.invalidateQueries({
         queryKey: ["analysis", pr.repo, pr.number],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["findings", pr.repo, pr.number],
       });
     },
   });
@@ -122,8 +148,8 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
               <VStack alignItems="stretch" gap="4">
                 <Text fontSize="sm" color="fg.muted">
                   This runs a fresh analysis of the current commit and clears
-                  the review chat. The existing summary and conversation will be
-                  replaced.
+                  the review chat. The existing summary, issues, and
+                  conversation will be replaced.
                 </Text>
                 <Field.Root>
                   <Field.Label>Personality</Field.Label>

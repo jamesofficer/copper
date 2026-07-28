@@ -272,6 +272,13 @@ export type RiskSeverity = "low" | "medium" | "high";
 export interface RiskClaim extends AnalysisClaim {
   // Optional: analyses cached before severity classification existed lack it.
   severity?: RiskSeverity;
+  // Stable content id (title + first anchor), so a dismissal survives a
+  // re-analysis that reports the same risk. Optional: analyses cached before
+  // the unified issues list lack it — backfilled at read time.
+  id?: string;
+  // Filled by the main process from the shared resolution store (same store
+  // as findings); never persisted inside the cached analysis.
+  resolution?: FindingResolution;
 }
 
 export interface AnalysisUsage {
@@ -330,9 +337,23 @@ export interface ReviewFinding {
   line: number;
   // Ready-to-post comment text, phrased for the PR author.
   suggestion: string;
+  // 1-based index of the analysis risk (lead) this finding confirms, as
+  // reported by the model. Used to build FindingsResult.leadVerdicts.
+  lead?: number | null;
   // Filled by the main process from the saved resolution set; never persisted
   // inside the run itself.
   resolution?: FindingResolution;
+}
+
+// What the findings pass concluded about one of the analysis's risks after
+// investigating it with the repo tools. "confirmed" = it became a real
+// finding (findingId points at it); "cleared" = checked and looks fine.
+// Risks with no verdict stay unverified.
+export interface LeadVerdict {
+  riskId: string;
+  status: "confirmed" | "cleared";
+  note?: string;
+  findingId?: string;
 }
 
 // The outcome of a findings run, cached by head SHA like an analysis.
@@ -344,6 +365,8 @@ export interface FindingsResult {
   ranAt: string;
   usage?: AnalysisUsage;
   findings: ReviewFinding[];
+  // Absent on runs from before risks were fed in as leads.
+  leadVerdicts?: LeadVerdict[];
 }
 
 // A pointer to a cached analysis — just enough to look up the PR it belongs

@@ -26,6 +26,12 @@ export interface RawFinding {
   path?: string;
   line?: number;
   suggestion?: string;
+  lead?: number | null;
+}
+
+// Short stable hash used for finding and risk identities.
+export function contentId(input: string): string {
+  return createHash("sha1").update(input).digest("hex").slice(0, 12);
 }
 
 // The set of new-file line numbers that actually appear in a file's diff
@@ -75,10 +81,7 @@ function findingId(
   path: string,
   line: number,
 ): string {
-  return createHash("sha1")
-    .update(`${category}|${path}|${line}`)
-    .digest("hex")
-    .slice(0, 12);
+  return contentId(`${category}|${path}|${line}`);
 }
 
 // Validates every finding against the diff: the path must be a changed file
@@ -123,6 +126,8 @@ export function normalizeFindings(
       path,
       line,
       suggestion: item.suggestion?.trim() || body,
+      // Not part of the identity hash, so a re-run keeps stable ids.
+      lead: typeof item.lead === "number" ? item.lead : null,
     });
   }
 

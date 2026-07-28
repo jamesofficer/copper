@@ -1,4 +1,10 @@
-import type { AnalysisUsage, FindingsResult } from "../../shared/types";
+import type {
+  AnalysisUsage,
+  FindingsResult,
+  LeadVerdict,
+  ReviewFinding,
+  RiskClaim,
+} from "../../shared/types";
 import { chatTools, runTool, type ToolContext } from "../agent/tools";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { runFindingsAgentQuery } from "../llm/claudeCode";
@@ -9,17 +15,24 @@ import {
   setCachedFindings,
 } from "../store/findings";
 import { getSecret } from "../store/secrets";
+import { getCachedAnalysis } from "./cache";
 import {
   FINDING_CATEGORIES,
   normalizeFindings,
   type RawFinding,
 } from "./findingsNormalize";
-import { buildPullRequestContext } from "./pipeline";
+import { buildPullRequestContext, riskId } from "./pipeline";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MAX_OUTPUT_TOKENS = 8192;
-// Tool-use rounds before the model is forced to report what it has.
+// API path: tool-use rounds before the model is forced to report what it
+// has (each round can hold several tool calls).
 const MAX_ITERATIONS = 10;
+// Claude Code path: SDK turns are counted per assistant message, so the
+// same investigation needs a much larger number — and unlike the API loop,
+// the SDK can't force report_findings at the end, so running out of turns
+// loses the whole run. Sized for a big PR plus a list of leads to verify.
+const MAX_AGENT_TURNS = 30;
 
 const PRICING: Record<string, { input: number; output: number }> = {
   "claude-fable-5": { input: 10, output: 50 },
@@ -48,7 +61,20 @@ For each finding provide:
 - path + line: the anchor, in the diff, new-file numbering.
 - suggestion: the review comment text as you'd post it to the author — direct, specific, actionable. Markdown.
 
-Report every finding through the report_findings tool. If there is nothing worth flagging, call it with an empty list.`;
+Report every finding through the report_findings tool. If there is nothing worth flagging, call it with an empty list.
+
+Work within a limited tool budget: batch related tool calls, don't re-read files you've already seen, and stop investigating a thread once you know enough to judge it. ALWAYS end by calling report_findings — reporting what you have is better than running out of turns with nothing reported.
+
+The prompt may end with a numbered list of LEADS — unverified concerns from an earlier diff-only pass. Handle every lead you can:
+- Investigate it with the tools before judging — read the surrounding code, check the callers. If it's a real problem, report it as a normal finding with its "lead" field set to the lead's number, and say in the body what you checked.
+- If you investigated it and it's fine, put it in clearedLeads with a one-line note saying how you know.
+- If you couldn't check it, leave it out of both — never confirm or clear a lead you didn't investigate.
+Findings unrelated to any lead use lead: null.`;
+
+interface RawClearedLead {
+  lead?: number;
+  note?: string;
+}
 
 const findingItemSchema = {
   type: "object",
@@ -72,6 +98,11 @@ const findingItemSchema = {
       type: "string",
       description: "Ready-to-post review comment text for the author",
     },
+    lead: {
+      anyOf: [{ type: "integer" }, { type: "null" }],
+      description:
+        "The 1-based number of the lead this finding confirms, or null when it isn't tied to a lead",
+    },
   },
   required: [
     "category",
@@ -81,6 +112,7 @@ const findingItemSchema = {
     "path",
     "line",
     "suggestion",
+    "lead",
   ],
   additionalProperties: false,
 };
@@ -89,8 +121,25 @@ const findingsSchema = {
   type: "object",
   properties: {
     findings: { type: "array", items: findingItemSchema },
+    clearedLeads: {
+      type: "array",
+      description:
+        "Leads you investigated and found to be fine — not real problems",
+      items: {
+        type: "object",
+        properties: {
+          lead: { type: "integer", description: "1-based lead number" },
+          note: {
+            type: "string",
+            description: "One line: how you verified it's fine",
+          },
+        },
+        required: ["lead", "note"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ["findings"],
+  required: ["findings", "clearedLeads"],
   additionalProperties: false,
 };
 
@@ -114,6 +163,56 @@ export async function getExistingFindings(
   return current ?? (await getLatestFindings(repo, prNumber)) ?? null;
 }
 
+// The analysis's risks, rendered as numbered leads for the model to verify.
+function buildLeadsSection(leads: RiskClaim[]): string {
+  const lines = [
+    "LEADS — unverified concerns from an earlier diff-only pass. Investigate each with the repo tools; confirm it as a finding (with its lead number) or clear it:",
+  ];
+  leads.forEach((risk, index) => {
+    const anchors = risk.anchors
+      .map((a) => (a.line === null ? a.path : `${a.path}:${a.line}`))
+      .join(", ");
+    lines.push(
+      `${index + 1}. [${risk.severity ?? "medium"}] ${risk.title}`,
+      `   ${risk.text.replace(/\n/g, "\n   ")}`,
+    );
+    if (anchors) lines.push(`   Lines: ${anchors}`);
+  });
+  return lines.join("\n");
+}
+
+// Turns the model's lead references into verdicts keyed by risk id, so the
+// renderer can join them back onto the analysis's risks. A confirming
+// finding outranks a clear of the same lead.
+function buildLeadVerdicts(
+  leadIds: string[],
+  findings: ReviewFinding[],
+  cleared: RawClearedLead[],
+): LeadVerdict[] {
+  const verdicts = new Map<string, LeadVerdict>();
+  for (const finding of findings) {
+    if (typeof finding.lead !== "number") continue;
+    const id = leadIds[finding.lead - 1];
+    if (!id || verdicts.has(id)) continue;
+    verdicts.set(id, {
+      riskId: id,
+      status: "confirmed",
+      findingId: finding.id,
+    });
+  }
+  for (const entry of cleared) {
+    if (typeof entry.lead !== "number") continue;
+    const id = leadIds[entry.lead - 1];
+    if (!id || verdicts.has(id)) continue;
+    verdicts.set(id, {
+      riskId: id,
+      status: "cleared",
+      note: entry.note?.trim() || undefined,
+    });
+  }
+  return [...verdicts.values()];
+}
+
 export async function findIssues(
   repo: string,
   prNumber: number,
@@ -126,16 +225,25 @@ export async function findIssues(
   }
 
   const files = await listPullRequestFiles(repo, prNumber);
-  const context = buildPullRequestContext(detail, files);
+  // The same-commit analysis feeds its risks in as leads to verify. No
+  // analysis (or an older-commit one) just means a lead-less run.
+  const analysis = await getCachedAnalysis(repo, prNumber, detail.headSha);
+  const leads = analysis?.risks ?? [];
+  const leadIds = leads.map((risk) => risk.id ?? riskId(risk));
+
+  let context = buildPullRequestContext(detail, files);
+  if (leads.length > 0) context += `\n\n${buildLeadsSection(leads)}`;
+
   const ctx: ToolContext = { repo, prNumber, headSha: detail.headSha };
   const provider = await getEffectiveLlmProvider();
   const model = await getLlmModel("analysis");
 
-  const { raw, usage } =
+  const { raw, cleared, usage } =
     provider === "claude-code"
       ? await runViaClaudeCode(model, context, ctx)
       : await runViaApi(model, context, ctx);
 
+  const findings = normalizeFindings(raw, files);
   const result: FindingsResult = {
     repo,
     prNumber,
@@ -143,7 +251,8 @@ export async function findIssues(
     model,
     ranAt: new Date().toISOString(),
     usage,
-    findings: normalizeFindings(raw, files),
+    findings,
+    leadVerdicts: buildLeadVerdicts(leadIds, findings, cleared),
   };
   return setCachedFindings(result);
 }
@@ -152,16 +261,21 @@ async function runViaClaudeCode(
   model: string,
   context: string,
   ctx: ToolContext,
-): Promise<{ raw: RawFinding[]; usage: AnalysisUsage }> {
-  const { findings, usage } = await runFindingsAgentQuery({
+): Promise<{
+  raw: RawFinding[];
+  cleared: RawClearedLead[];
+  usage: AnalysisUsage;
+}> {
+  const { findings, clearedLeads, usage } = await runFindingsAgentQuery({
     model,
     systemPrompt: SYSTEM_PROMPT,
     prompt: context,
     toolContext: ctx,
-    maxTurns: MAX_ITERATIONS,
+    maxTurns: MAX_AGENT_TURNS,
   });
   return {
     raw: findings as RawFinding[],
+    cleared: clearedLeads as RawClearedLead[],
     usage: { inputTokens: usage.inputTokens, outputTokens: usage.outputTokens },
   };
 }
@@ -188,7 +302,11 @@ async function runViaApi(
   model: string,
   context: string,
   ctx: ToolContext,
-): Promise<{ raw: RawFinding[]; usage: AnalysisUsage | undefined }> {
+): Promise<{
+  raw: RawFinding[];
+  cleared: RawClearedLead[];
+  usage: AnalysisUsage | undefined;
+}> {
   const apiKey = await getSecret("anthropic");
   if (!apiKey) {
     throw new Error(
@@ -256,8 +374,15 @@ async function runViaApi(
       (block) => block.type === "tool_use" && block.name === "report_findings",
     );
     if (report?.input) {
-      const raw = (report.input as { findings?: RawFinding[] }).findings ?? [];
-      return { raw, usage: buildUsage(model, inputTokens, outputTokens) };
+      const input = report.input as {
+        findings?: RawFinding[];
+        clearedLeads?: RawClearedLead[];
+      };
+      return {
+        raw: input.findings ?? [],
+        cleared: input.clearedLeads ?? [],
+        usage: buildUsage(model, inputTokens, outputTokens),
+      };
     }
 
     const toolUses = message.content.filter(
@@ -266,7 +391,11 @@ async function runViaApi(
     );
     if (toolUses.length === 0) {
       // Model answered in text without reporting — nothing to show.
-      return { raw: [], usage: buildUsage(model, inputTokens, outputTokens) };
+      return {
+        raw: [],
+        cleared: [],
+        usage: buildUsage(model, inputTokens, outputTokens),
+      };
     }
 
     messages.push({ role: "assistant", content: message.content });
@@ -291,7 +420,11 @@ async function runViaApi(
     messages.push({ role: "user", content: results });
   }
 
-  return { raw: [], usage: buildUsage(model, inputTokens, outputTokens) };
+  return {
+    raw: [],
+    cleared: [],
+    usage: buildUsage(model, inputTokens, outputTokens),
+  };
 }
 
 function buildUsage(

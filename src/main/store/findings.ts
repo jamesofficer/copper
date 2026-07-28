@@ -58,6 +58,15 @@ async function persist(path: string, store: Map<string, unknown>) {
   await writeFile(path, JSON.stringify(Object.fromEntries(store), null, 2));
 }
 
+// The PR's saved resolutions, keyed by issue id. Shared by findings and the
+// analysis's risks — both join their resolution from here at read time.
+export async function getResolutions(
+  repo: string,
+  prNumber: number,
+): Promise<Record<string, FindingResolution>> {
+  return (await loadResolutions()).get(prKey(repo, prNumber)) ?? {};
+}
+
 // Joins a stored run with the PR's resolutions, so each finding carries what
 // the user did with it. A run never stores resolutions itself — they live per
 // PR and outlast any single run.
@@ -82,8 +91,7 @@ export async function getCachedFindings(
   const store = await loadRuns();
   const run = store.get(runKey(repo, prNumber, headSha));
   if (!run) return undefined;
-  const resolved = (await loadResolutions()).get(prKey(repo, prNumber)) ?? {};
-  return withResolutions(run, resolved);
+  return withResolutions(run, await getResolutions(repo, prNumber));
 }
 
 // The newest run for a PR regardless of commit — surfaces a stale-but-useful
@@ -99,8 +107,7 @@ export async function getLatestFindings(
     if (!latest || run.ranAt > latest.ranAt) latest = run;
   }
   if (!latest) return undefined;
-  const resolved = (await loadResolutions()).get(prKey(repo, prNumber)) ?? {};
-  return withResolutions(latest, resolved);
+  return withResolutions(latest, await getResolutions(repo, prNumber));
 }
 
 export async function setCachedFindings(
@@ -120,9 +127,10 @@ export async function setCachedFindings(
   }
   await persist(runsPath, store);
 
-  const resolved =
-    (await loadResolutions()).get(prKey(result.repo, result.prNumber)) ?? {};
-  return withResolutions(result, resolved);
+  return withResolutions(
+    result,
+    await getResolutions(result.repo, result.prNumber),
+  );
 }
 
 // Sets or clears a finding's resolution. "open" clears it (a restore); the

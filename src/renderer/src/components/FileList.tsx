@@ -4,6 +4,7 @@ import type { PullRequestFile } from "../../../shared/types";
 import { useFilePathDisplay } from "../lib/filePathDisplay";
 import { statusMeta } from "../lib/fileStatus";
 import CommentCountBadge from "./CommentCountBadge";
+import ExplanationCountBadge from "./ExplanationCountBadge";
 
 interface Props {
   files: PullRequestFile[];
@@ -14,6 +15,8 @@ interface Props {
   viewedPaths?: Set<string>;
   // Review comments per file path; undefined hides the chips.
   commentCounts?: Map<string, number>;
+  // Local AI explanations per file path; undefined hides the chips.
+  explanationCounts?: Map<string, number>;
 }
 
 export default function FileList({
@@ -22,6 +25,7 @@ export default function FileList({
   onSelect,
   viewedPaths,
   commentCounts,
+  explanationCounts,
 }: Props) {
   const display = useFilePathDisplay();
 
@@ -32,6 +36,7 @@ export default function FileList({
         const selected = file.path === selectedPath;
         const viewed = viewedPaths?.has(file.path) ?? false;
         const comments = commentCounts?.get(file.path) ?? 0;
+        const explanations = explanationCounts?.get(file.path) ?? 0;
         const slash = file.path.lastIndexOf("/");
         const dir = slash === -1 ? "" : file.path.slice(0, slash + 1);
         const name = slash === -1 ? file.path : file.path.slice(slash + 1);
@@ -83,6 +88,7 @@ export default function FileList({
               </Box>
               <HStack gap="1.5" fontFamily="mono" fontSize="2xs" flexShrink="0">
                 <CommentCountBadge count={comments} />
+                <ExplanationCountBadge count={explanations} />
                 <Text as="span" color="green.fg">
                   +{file.additions}
                 </Text>

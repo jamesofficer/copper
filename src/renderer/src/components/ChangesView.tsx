@@ -182,6 +182,14 @@ export default function ChangesView({ pr }: Props) {
     }
     return map;
   }, [explanationsQuery.data]);
+  // The file list's sparkle chip, mirroring the comment-count chip.
+  const explanationCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const [path, list] of explanationsByPath) {
+      counts.set(path, list.length);
+    }
+    return counts;
+  }, [explanationsByPath]);
 
   // Resolution comes from a separate GraphQL lookup; if it fails, threads
   // simply all show as unresolved.
@@ -335,6 +343,7 @@ export default function ChangesView({ pr }: Props) {
                 onSelect={setSelectedPath}
                 viewedPaths={selectedCommit === null ? viewedPaths : undefined}
                 commentCounts={commentCounts}
+                explanationCounts={explanationCounts}
               />
             ) : (
               <Text fontSize="sm" color="fg.muted" px="1">
