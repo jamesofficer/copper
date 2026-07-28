@@ -28,6 +28,11 @@ import {
   TAIL_GAP,
 } from "../lib/diffParser";
 import { useDiffViewMode } from "../lib/diffViewMode";
+import {
+  type AnchoredLine,
+  type ResolvedExplanation,
+  resolveExplanation,
+} from "../lib/explanationStatus";
 import type { ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
@@ -133,7 +138,7 @@ interface CommentContext {
   anchorOf(line: DiffLine): CommentAnchor | undefined;
   threadsFor(line: DiffLine): ReviewThread[];
   draftsFor(line: DiffLine): DraftReviewComment[];
-  explanationsFor(line: DiffLine): Explanation[];
+  explanationsFor(line: DiffLine): ResolvedExplanation[];
   // Whether an existing thread's range covers this line — marks the lines a
   // comment was left on.
   isCommented(line: DiffLine): boolean;
@@ -316,7 +321,7 @@ function CommentBands({
   ctx: CommentContext;
   threads: ReviewThread[];
   drafts: DraftReviewComment[];
-  explanations: Explanation[];
+  explanations: ResolvedExplanation[];
   composerHere: boolean;
 }) {
   return (
@@ -340,10 +345,10 @@ function CommentBands({
           />
         </CommentBand>
       ))}
-      {explanations.map((explanation) => (
-        <CommentBand key={explanation.id}>
+      {explanations.map((resolved) => (
+        <CommentBand key={resolved.explanation.id}>
           <AiExplanationCard
-            explanation={explanation}
+            resolved={resolved}
             repo={ctx.repo}
             prNumber={ctx.prNumber}
           />
@@ -511,7 +516,7 @@ interface SplitSegment {
   rows: SplitRow[];
   threads: ReviewThread[];
   drafts: DraftReviewComment[];
-  explanations: Explanation[];
+  explanations: ResolvedExplanation[];
   composer: boolean;
 }
 
@@ -767,16 +772,37 @@ function DiffLines({ file, commenting, expansion }: Props) {
     return map;
   }, [commenting?.drafts]);
 
+  // Every line an explanation could anchor to, with its current text — the
+  // input to re-validating anchors written against an earlier commit.
+  const anchoredLines = useMemo(() => {
+    const result: AnchoredLine[] = [];
+    for (const line of displayLines) {
+      const anchor = anchors.get(line);
+      if (anchor) {
+        result.push({ side: anchor.side, line: anchor.line, text: line.text });
+      }
+    }
+    return result;
+  }, [displayLines, anchors]);
+
+  // Explanations carry the commit they were written against, so each one is
+  // re-anchored against the diff on screen: unchanged code that merely moved
+  // snaps to its new line, genuinely changed code gets flagged stale.
   const explanationsByKey = useMemo(() => {
-    const map = new Map<string, Explanation[]>();
+    const map = new Map<string, ResolvedExplanation[]>();
     for (const explanation of commenting?.explanations ?? []) {
-      const key = `${explanation.side}:${explanation.line}`;
+      const resolved = resolveExplanation(
+        explanation,
+        commenting?.commitId ?? "",
+        anchoredLines,
+      );
+      const key = `${explanation.side}:${resolved.line}`;
       const list = map.get(key);
-      if (list) list.push(explanation);
-      else map.set(key, [explanation]);
+      if (list) list.push(resolved);
+      else map.set(key, [resolved]);
     }
     return map;
-  }, [commenting?.explanations]);
+  }, [commenting?.explanations, commenting?.commitId, anchoredLines]);
 
   // Every side:line an existing thread's or draft's range covers, so those
   // lines can be marked in the gutter.
@@ -900,7 +926,7 @@ function DiffLines({ file, commenting, expansion }: Props) {
         return result;
       },
       explanationsFor: (line) => {
-        const result: Explanation[] = [];
+        const result: ResolvedExplanation[] = [];
         if (line.oldNumber !== null) {
           result.push(
             ...(explanationsByKey.get(`LEFT:${line.oldNumber}`) ?? []),
