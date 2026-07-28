@@ -4,6 +4,7 @@ import type {
   NewPullRequest,
   NewReviewComment,
   PullRequest,
+  PullRequestActivity,
   PullRequestComment,
   PullRequestCommit,
   PullRequestDetail,
@@ -369,6 +370,54 @@ export async function getPullRequest(
     updatedAt: pull.updated_at,
     url: pull.html_url,
   };
+}
+
+// ETag per PR so unchanged polls answer 304 — which GitHub doesn't count
+// against the rate limit — and reuse the last snapshot.
+const activityCache = new Map<
+  string,
+  { etag: string; activity: PullRequestActivity }
+>();
+
+// The refresh-button poll. Best-effort by design: any failure (no token,
+// network, API error) returns null so the caller just skips the highlight.
+export async function peekPullRequestActivity(
+  repo: string,
+  prNumber: number,
+): Promise<PullRequestActivity | null> {
+  const token = await getGitHubToken();
+  if (!token) return null;
+
+  const key = `${repo}#${prNumber}`;
+  const cached = activityCache.get(key);
+
+  try {
+    const res = await fetch(`${API}/repos/${repo}/pulls/${prNumber}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "pr-reviewer",
+        "X-GitHub-Api-Version": "2022-11-28",
+        ...(cached ? { "If-None-Match": cached.etag } : {}),
+      },
+    });
+
+    if (res.status === 304 && cached) return cached.activity;
+    if (!res.ok) return null;
+
+    const pull = (await res.json()) as GitHubPullDetail;
+    const activity: PullRequestActivity = {
+      updatedAt: pull.updated_at,
+      headSha: pull.head.sha,
+      commits: pull.commits,
+      comments: pull.comments + pull.review_comments,
+    };
+    const etag = res.headers.get("etag");
+    if (etag) activityCache.set(key, { etag, activity });
+    return activity;
+  } catch {
+    return null;
+  }
 }
 
 interface GitHubFile {

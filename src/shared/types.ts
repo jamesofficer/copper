@@ -62,6 +62,17 @@ export interface PullRequestDetail {
   url: string;
 }
 
+// A lightweight snapshot of a PR's activity signals, for the background poll
+// that lights up the refresh button. `comments` matches PullRequestDetail's
+// combined count (conversation + inline review comments) so the two compare
+// directly.
+export interface PullRequestActivity {
+  updatedAt: string;
+  headSha: string;
+  commits: number;
+  comments: number;
+}
+
 // What the new-PR dialog needs to prefill itself: the repo's branches on
 // GitHub (the only valid heads — a branch must be pushed to be one), plus
 // the registered local checkout's current branch for smart defaults.

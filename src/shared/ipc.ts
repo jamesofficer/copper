@@ -15,6 +15,7 @@ import type {
   NewPullRequest,
   NewReviewComment,
   PullRequest,
+  PullRequestActivity,
   PullRequestComment,
   PullRequestCommit,
   PullRequestDetail,
@@ -67,6 +68,13 @@ export interface IpcApi {
   // Same data as getPullRequest but without the background repo warm-up —
   // for bulk refreshes (e.g. the recently-viewed panel).
   peekPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
+  // Best-effort activity snapshot for the refresh-button highlight — an ETag
+  // conditional request (a 304 is free against the rate limit). Null when
+  // there's no token or the check fails; polling must never surface errors.
+  peekPullRequestActivity(
+    repo: string,
+    prNumber: number,
+  ): Promise<PullRequestActivity | null>;
   listPullRequestFiles(
     repo: string,
     prNumber: number,
@@ -254,6 +262,7 @@ export const ipcChannels = [
   "setPullRequestState",
   "setPullRequestBase",
   "peekPullRequest",
+  "peekPullRequestActivity",
   "listPullRequestFiles",
   "listPullRequestCommits",
   "listCommitFiles",
