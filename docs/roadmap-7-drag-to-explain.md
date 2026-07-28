@@ -3,9 +3,14 @@
 Status: **planned, not started.** Captured 2026-07-24 after a codebase exploration. We may
 tackle other work before this — this doc is the pick-up-where-we-left-off reference.
 
-**Progress:** the shared JSON-store helper (`main/store/jsonStore.ts`) landed 2026-07-24 as a
-warm-up, and `store/drafts.ts` was refactored onto it. `explanations.ts` will use the same
-helper. See "What's actually new" #1.
+**Progress:**
+- The shared JSON-store helper (`main/store/jsonStore.ts`) landed 2026-07-24 as a warm-up, and
+  `store/drafts.ts` was refactored onto it.
+- **Phase 1 (core loop) is built** on branch `jo/feat/drag-to-explain` (2026-07-24). Drag a
+  range on the Changes-tab diff → the composer now offers **Explain** alongside Comment → the
+  agent answers one-shot (not saved to chat) → a local-only "AI explanation" card renders under
+  the lines as a third band, with delete. Typecheck + build pass; not yet manually run.
+  Phases 2 (staleness) and 3 (bridges) are still to do.
 
 See the roadmap item 7 description in `CLAUDE.md` for the product intent. This doc records
 the implementation findings and the build plan.
@@ -81,10 +86,13 @@ easy follow-ups. That leaves SQLite as an optional later consolidation, not a bl
 
 ## Build order (three phases)
 
-### Phase 1 — core loop (read-only, delivers the feature on its own)
+### Phase 1 — core loop (read-only, delivers the feature on its own) — DONE
 Selection → "Explain" → ephemeral agent call → inline AI explanation card → persist to
-`explanations.json` → render as the third band. Show a **spinner** ("Thinking…", pattern at
-`ChatPanel.tsx:230-234`) rather than token-streaming for v1 — see the streaming note below.
+`explanations.json` → render as the third band. Built as described; the "spinner" is a loading
+state on the composer's Explain button (the composer stays open until the answer returns, then
+the card appears) — no token-streaming for v1, so it never collides with the chat stream. The
+agent path (`askViaApi`/`askViaClaudeCode`) was refactored to take an `onText` callback;
+`explainSelection` passes a no-op so it produces no chat chunks at all.
 
 ### Phase 2 — staleness
 On load, re-validate each anchor against the current diff and compare the code snapshot; if

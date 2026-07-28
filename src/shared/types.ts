@@ -194,6 +194,35 @@ export interface DraftReviewComment {
   createdAt: string;
 }
 
+// What the "Explain" action sends to generate an AI explanation of a diff
+// range. Same anchor shape as a review comment, plus the exact code selected.
+export interface ExplainRequest {
+  path: string;
+  side: DiffSide;
+  line: number;
+  startLine: number | null;
+  // The selected lines' text, quoted to the agent and snapshotted on the
+  // result for staleness checks.
+  code: string;
+}
+
+// A local-only AI explanation of a selected diff range — never posted to
+// GitHub. Anchored to the diff like a review comment; carries the head SHA it
+// was generated against and a snapshot of the explained code, so a later
+// commit can tell whether the explained lines have since changed.
+export interface Explanation {
+  id: string;
+  path: string;
+  side: DiffSide;
+  line: number;
+  startLine: number | null;
+  code: string;
+  // The agent's answer, in markdown.
+  body: string;
+  headSha: string;
+  createdAt: string;
+}
+
 export interface PullRequestCommit {
   sha: string;
   subject: string;

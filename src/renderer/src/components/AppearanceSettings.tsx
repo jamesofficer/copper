@@ -21,6 +21,12 @@ import {
   colorModeSettings,
   getColorMode,
 } from "../lib/colorMode";
+import {
+  type FilePathDisplay,
+  filePathDisplays,
+  setFilePathDisplay,
+  useFilePathDisplay,
+} from "../lib/filePathDisplay";
 
 const modeLabels: Record<ColorModeSetting, string> = {
   light: "Light",
@@ -43,6 +49,19 @@ const modeCollection = createListCollection({
 
 const accentCollection = createListCollection({
   items: accentPalettes.map((palette) => ({ label: palette, value: palette })),
+});
+
+const pathDisplayLabels: Record<FilePathDisplay, string> = {
+  inline: "Full path",
+  filename: "File name only",
+  stacked: "File name, path below",
+};
+
+const pathDisplayCollection = createListCollection({
+  items: filePathDisplays.map((value) => ({
+    label: pathDisplayLabels[value],
+    value,
+  })),
 });
 
 function Swatch({ palette }: { palette: string }) {
@@ -69,6 +88,7 @@ function SettingHeader({
 }
 
 export default function AppearanceSettings() {
+  const pathDisplay = useFilePathDisplay();
   const [mode, setMode] = useState<ColorModeSetting>(getColorMode);
   const [accent, setAccent] = useState<AccentPalette>(getAccent);
 
@@ -160,6 +180,42 @@ export default function AppearanceSettings() {
                     <Swatch palette={item.value} />
                     <Text textTransform="capitalize">{item.label}</Text>
                   </HStack>
+                  <Select.ItemIndicator />
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Positioner>
+        </Select.Root>
+      </Stack>
+
+      <Stack gap="3">
+        <SettingHeader
+          title="File paths"
+          description="How file paths are written in the Changes tab's file list."
+        />
+        <Select.Root
+          collection={pathDisplayCollection}
+          value={[pathDisplay]}
+          onValueChange={(event) =>
+            setFilePathDisplay(event.value[0] as FilePathDisplay)
+          }
+          size="sm"
+          maxW="56"
+        >
+          <Select.HiddenSelect />
+          <Select.Control>
+            <Select.Trigger cursor="pointer">
+              <Select.ValueText />
+            </Select.Trigger>
+            <Select.IndicatorGroup>
+              <Select.Indicator />
+            </Select.IndicatorGroup>
+          </Select.Control>
+          <Select.Positioner>
+            <Select.Content>
+              {pathDisplayCollection.items.map((item) => (
+                <Select.Item item={item} key={item.value}>
+                  <Text flex="1">{item.label}</Text>
                   <Select.ItemIndicator />
                 </Select.Item>
               ))}

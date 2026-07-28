@@ -3,6 +3,8 @@ import type {
   AnalyzedPullRequest,
   ChatMessage,
   DraftReviewComment,
+  ExplainRequest,
+  Explanation,
   FindingResolution,
   FindingsResult,
   KeyTestResult,
@@ -170,6 +172,20 @@ export interface IpcApi {
     findingId: string,
     resolution: FindingResolution | "open",
   ): Promise<void>;
+  // Local-only AI explanations of a selected diff range. explainSelection runs
+  // the agent one-shot (not saved to the chat) and persists the result; nothing
+  // is ever posted to GitHub.
+  listExplanations(repo: string, prNumber: number): Promise<Explanation[]>;
+  explainSelection(
+    repo: string,
+    prNumber: number,
+    request: ExplainRequest,
+  ): Promise<Explanation>;
+  deleteExplanation(
+    repo: string,
+    prNumber: number,
+    explanationId: string,
+  ): Promise<void>;
   listAnalyzedPullRequests(): Promise<AnalyzedPullRequest[]>;
   analyzePullRequest(
     repo: string,
@@ -262,6 +278,9 @@ export const ipcChannels = [
   "getFindings",
   "findIssues",
   "setFindingResolution",
+  "listExplanations",
+  "explainSelection",
+  "deleteExplanation",
   "listAnalyzedPullRequests",
   "analyzePullRequest",
   "askQuestion",

@@ -6,6 +6,8 @@ import { type ChatChunk, chatChunkChannel } from "../../shared/ipc";
 import type {
   AnalysisResult,
   ChatMessage,
+  ExplainRequest,
+  Explanation,
   PullRequestDetail,
   PullRequestFile,
 } from "../../shared/types";
@@ -14,6 +16,7 @@ import { buildPullRequestContext } from "../analysis/pipeline";
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { runChatQuery } from "../llm/claudeCode";
 import { getEffectiveLlmProvider, getLlmModel } from "../llm/settings";
+import { addExplanation } from "../store/explanations";
 import { getSecret } from "../store/secrets";
 import { chatTools, runTool, type ToolContext } from "./tools";
 
@@ -310,6 +313,23 @@ function moveCacheBreakpoint(messages: ApiMessage[]): void {
   if (last) last.cache_control = { type: "ephemeral" };
 }
 
+// Runs the agent for one question and returns its full answer. Text deltas go
+// to onText as they stream — the chat forwards them to the renderer; a one-shot
+// explanation passes a no-op so it stays out of the chat stream.
+async function generateAnswer(
+  session: Session,
+  ctx: ToolContext,
+  history: ChatMessage[],
+  question: string,
+  onText: (text: string) => void,
+): Promise<string> {
+  const provider = await getEffectiveLlmProvider();
+  const model = await getLlmModel("chat");
+  return provider === "claude-code"
+    ? askViaClaudeCode(model, session, ctx, history, question, onText)
+    : askViaApi(model, session, ctx, history, question, onText);
+}
+
 export async function askQuestion(
   repo: string,
   prNumber: number,
@@ -319,21 +339,10 @@ export async function askQuestion(
   const store = await loadHistories();
   const history = store.get(chatKey(repo, prNumber)) ?? [];
   const ctx: ToolContext = { repo, prNumber, headSha: session.headSha };
-  const provider = await getEffectiveLlmProvider();
-  const model = await getLlmModel("chat");
 
-  const answer =
-    provider === "claude-code"
-      ? await askViaClaudeCode(
-          model,
-          repo,
-          prNumber,
-          session,
-          ctx,
-          history,
-          question,
-        )
-      : await askViaApi(model, repo, prNumber, session, ctx, history, question);
+  const answer = await generateAnswer(session, ctx, history, question, (text) =>
+    sendChunk({ repo, prNumber, text }),
+  );
 
   const finalAnswer =
     answer || "I couldn't produce an answer — please try asking again.";
@@ -346,6 +355,51 @@ export async function askQuestion(
   await saveHistories(store);
 
   return finalAnswer;
+}
+
+function buildExplainPrompt(request: ExplainRequest): string {
+  const range =
+    request.startLine !== null
+      ? `${request.path}:${request.startLine}-${request.line}`
+      : `${request.path}:${request.line}`;
+  const version = request.side === "LEFT" ? " (from the old version)" : "";
+  return [
+    `Explain these selected lines from the diff — ${range}${version}:`,
+    "",
+    "```",
+    request.code,
+    "```",
+    "",
+    "Explain what this code does and why it's here in the context of this pull request. Be concise. If it introduces a risk or changes behavior worth noting, say so briefly. Reference specific lines where it helps.",
+  ].join("\n");
+}
+
+// Explains a selected diff range with the Q&A agent, one-shot: the answer is
+// NOT written to the chat history and doesn't stream into the chat. The result
+// is saved to the local explanations store — never posted to GitHub.
+export async function explainSelection(
+  repo: string,
+  prNumber: number,
+  request: ExplainRequest,
+): Promise<Explanation> {
+  const session = await getSession(repo, prNumber);
+  const ctx: ToolContext = { repo, prNumber, headSha: session.headSha };
+  const answer = await generateAnswer(
+    session,
+    ctx,
+    [],
+    buildExplainPrompt(request),
+    () => {},
+  );
+  return addExplanation(repo, prNumber, {
+    path: request.path,
+    side: request.side,
+    line: request.line,
+    startLine: request.startLine,
+    code: request.code,
+    body: answer || "I couldn't produce an explanation — please try again.",
+    headSha: session.headSha,
+  });
 }
 
 // Claude Code queries are single-shot, so earlier turns ride along as text in
@@ -361,12 +415,11 @@ function renderHistory(history: ChatMessage[]): string {
 
 async function askViaClaudeCode(
   model: string,
-  repo: string,
-  prNumber: number,
   session: Session,
   ctx: ToolContext,
   history: ChatMessage[],
   question: string,
+  onText: (text: string) => void,
 ): Promise<string> {
   const recent = history.slice(-MAX_HISTORY);
   const prompt =
@@ -380,18 +433,17 @@ async function askViaClaudeCode(
     prompt,
     toolContext: ctx,
     maxTurns: MAX_ITERATIONS,
-    onText: (text) => sendChunk({ repo, prNumber, text }),
+    onText,
   });
 }
 
 async function askViaApi(
   model: string,
-  repo: string,
-  prNumber: number,
   session: Session,
   ctx: ToolContext,
   history: ChatMessage[],
   question: string,
+  onText: (text: string) => void,
 ): Promise<string> {
   const apiKey = await getSecret("anthropic");
   if (!apiKey) {
@@ -434,7 +486,7 @@ async function askViaApi(
         tools: useTools ? chatTools : undefined,
         messages,
       },
-      (text) => sendChunk({ repo, prNumber, text }),
+      onText,
     );
 
     if (turn.text) answer += (answer ? "\n\n" : "") + turn.text;
@@ -468,7 +520,7 @@ async function askViaApi(
     moveCacheBreakpoint(messages);
 
     // Visual break in the streamed bubble between pre-tool and post-tool text.
-    if (turn.text) sendChunk({ repo, prNumber, text: "\n\n" });
+    if (turn.text) onText("\n\n");
   }
 
   return answer;

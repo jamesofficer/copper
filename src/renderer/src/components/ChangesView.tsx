@@ -14,7 +14,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { LuChevronRight, LuSearch } from "react-icons/lu";
 import { useDebounce } from "use-debounce";
-import type { DraftReviewComment, PullRequest } from "../../../shared/types";
+import type {
+  DraftReviewComment,
+  Explanation,
+  PullRequest,
+} from "../../../shared/types";
 import { buildReviewThreads } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import { usePanelWidth } from "../lib/usePanelWidth";
@@ -96,6 +100,15 @@ export default function ChangesView({ pr }: Props) {
     () => buildReviewThreads(reviewCommentsQuery.data ?? []),
     [reviewCommentsQuery.data],
   );
+  // Every inline comment on a file, replies and outdated ones included — the
+  // file list's chip counts the discussion, not just the anchored threads.
+  const commentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const comment of reviewCommentsQuery.data ?? []) {
+      counts.set(comment.path, (counts.get(comment.path) ?? 0) + 1);
+    }
+    return counts;
+  }, [reviewCommentsQuery.data]);
 
   // Viewed state is GitHub's own per-file checkbox (GraphQL), toggled
   // optimistically — like the state itself, it only applies to the full
@@ -155,6 +168,21 @@ export default function ChangesView({ pr }: Props) {
   }, [draftsQuery.data]);
   const reviewStarted = (draftsQuery.data?.length ?? 0) > 0;
 
+  // Local-only AI explanations — a third band on the diff, like drafts.
+  const explanationsQuery = useQuery({
+    queryKey: ["explanations", pr.repo, pr.number],
+    queryFn: () => window.api.listExplanations(pr.repo, pr.number),
+  });
+  const explanationsByPath = useMemo(() => {
+    const map = new Map<string, Explanation[]>();
+    for (const explanation of explanationsQuery.data ?? []) {
+      const list = map.get(explanation.path);
+      if (list) list.push(explanation);
+      else map.set(explanation.path, [explanation]);
+    }
+    return map;
+  }, [explanationsQuery.data]);
+
   // Resolution comes from a separate GraphQL lookup; if it fails, threads
   // simply all show as unresolved.
   const resolvedQuery = useQuery({
@@ -189,6 +217,7 @@ export default function ChangesView({ pr }: Props) {
             resolvedRootIds,
             drafts: draftsByPath.get(selectedFile.path) ?? [],
             reviewStarted,
+            explanations: explanationsByPath.get(selectedFile.path) ?? [],
           }
         : undefined,
     [
@@ -199,6 +228,7 @@ export default function ChangesView({ pr }: Props) {
       resolvedRootIds,
       draftsByPath,
       reviewStarted,
+      explanationsByPath,
       pr.repo,
       pr.number,
     ],
@@ -304,6 +334,7 @@ export default function ChangesView({ pr }: Props) {
                 selectedPath={selectedFile?.path ?? null}
                 onSelect={setSelectedPath}
                 viewedPaths={selectedCommit === null ? viewedPaths : undefined}
+                commentCounts={commentCounts}
               />
             ) : (
               <Text fontSize="sm" color="fg.muted" px="1">

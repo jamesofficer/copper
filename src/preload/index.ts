@@ -89,6 +89,12 @@ const api: WindowApi = {
       findingId,
       resolution,
     ),
+  listExplanations: (repo, prNumber) =>
+    ipcRenderer.invoke("listExplanations", repo, prNumber),
+  explainSelection: (repo, prNumber, request) =>
+    ipcRenderer.invoke("explainSelection", repo, prNumber, request),
+  deleteExplanation: (repo, prNumber, explanationId) =>
+    ipcRenderer.invoke("deleteExplanation", repo, prNumber, explanationId),
   listAnalyzedPullRequests: () =>
     ipcRenderer.invoke("listAnalyzedPullRequests"),
   analyzePullRequest: (repo, prNumber, personality, force) =>
