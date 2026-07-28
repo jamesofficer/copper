@@ -1,7 +1,10 @@
 import { Box, HStack, Icon, Stack, Text } from "@chakra-ui/react";
 import { LuCheck } from "react-icons/lu";
 import type { PullRequestFile } from "../../../shared/types";
+import { useFilePathDisplay } from "../lib/filePathDisplay";
 import { statusMeta } from "../lib/fileStatus";
+import CommentCountBadge from "./CommentCountBadge";
+import ExplanationCountBadge from "./ExplanationCountBadge";
 
 interface Props {
   files: PullRequestFile[];
@@ -10,6 +13,10 @@ interface Props {
   // Undefined hides viewed indicators (commit-by-commit views — viewed state
   // is scoped to the full PR changelist).
   viewedPaths?: Set<string>;
+  // Review comments per file path; undefined hides the chips.
+  commentCounts?: Map<string, number>;
+  // Local AI explanations per file path; undefined hides the chips.
+  explanationCounts?: Map<string, number>;
 }
 
 export default function FileList({
@@ -17,13 +24,19 @@ export default function FileList({
   selectedPath,
   onSelect,
   viewedPaths,
+  commentCounts,
+  explanationCounts,
 }: Props) {
+  const display = useFilePathDisplay();
+
   return (
     <Stack gap="0.5">
       {files.map((file) => {
         const meta = statusMeta[file.status];
         const selected = file.path === selectedPath;
         const viewed = viewedPaths?.has(file.path) ?? false;
+        const comments = commentCounts?.get(file.path) ?? 0;
+        const explanations = explanationCounts?.get(file.path) ?? 0;
         const slash = file.path.lastIndexOf("/");
         const dir = slash === -1 ? "" : file.path.slice(0, slash + 1);
         const name = slash === -1 ? file.path : file.path.slice(slash + 1);
@@ -52,13 +65,30 @@ export default function FileList({
               >
                 {meta.label}
               </Text>
-              <Text as="span" fontSize="xs" flex="1" truncate title={file.path}>
-                <Text as="span" color="fg.muted">
-                  {dir}
+              <Box flex="1" minW="0" title={file.path}>
+                <Text as="span" fontSize="xs" display="block" truncate>
+                  {display === "inline" && (
+                    <Text as="span" color="fg.muted">
+                      {dir}
+                    </Text>
+                  )}
+                  {name}
                 </Text>
-                {name}
-              </Text>
+                {display === "stacked" && dir !== "" && (
+                  <Text
+                    as="span"
+                    display="block"
+                    fontSize="2xs"
+                    color="fg.muted"
+                    truncate
+                  >
+                    {dir.slice(0, -1)}
+                  </Text>
+                )}
+              </Box>
               <HStack gap="1.5" fontFamily="mono" fontSize="2xs" flexShrink="0">
+                <CommentCountBadge count={comments} />
+                <ExplanationCountBadge count={explanations} />
                 <Text as="span" color="green.fg">
                   +{file.additions}
                 </Text>

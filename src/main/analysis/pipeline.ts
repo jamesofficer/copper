@@ -5,6 +5,7 @@ import type {
   ChangeGroup,
   ChangeGroupRisk,
   DiffAnchor,
+  FindingResolution,
   PullRequestDetail,
   PullRequestFile,
   ReviewPersonality,
@@ -14,12 +15,14 @@ import type {
 import { getPullRequest, listPullRequestFiles } from "../github/client";
 import { runStructuredQuery } from "../llm/claudeCode";
 import { getEffectiveLlmProvider, getLlmModel } from "../llm/settings";
+import { getResolutions } from "../store/findings";
 import { getSecret } from "../store/secrets";
 import {
   getCachedAnalysis,
   getLatestAnalysis,
   setCachedAnalysis,
 } from "./cache";
+import { contentId } from "./findingsNormalize";
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MAX_OUTPUT_TOKENS = 16_384;
@@ -243,6 +246,31 @@ function toList(value: unknown, field: string): unknown[] {
   );
 }
 
+// A risk's stable identity: title + first anchor. Survives a re-analysis
+// that reports the same risk, so its dismissal sticks — like finding ids.
+export function riskId(risk: AnalysisClaim): string {
+  const anchor = risk.anchors[0];
+  return contentId(
+    `risk|${risk.title}|${anchor?.path ?? ""}|${anchor?.line ?? ""}`,
+  );
+}
+
+// Backfills ids on risks from analyses cached before ids existed, and joins
+// each risk's resolution from the shared store (same one findings use).
+// Applied at read time — resolutions are never persisted inside the cache.
+function withRiskMeta(
+  result: AnalysisResult,
+  resolved: Record<string, FindingResolution>,
+): AnalysisResult {
+  return {
+    ...result,
+    risks: result.risks.map((risk) => {
+      const id = risk.id ?? riskId(risk);
+      return { ...risk, id, resolution: resolved[id] };
+    }),
+  };
+}
+
 // Cheap lookup used by the renderer to decide between showing a cached
 // analysis and the "Analyse PR" empty state. Never calls the model. When the
 // branch has moved since the last analysis, the newest analysis of an older
@@ -253,8 +281,11 @@ export async function getExistingAnalysis(
   prNumber: number,
 ): Promise<AnalysisResult | null> {
   const detail = await getPullRequest(repo, prNumber);
-  const current = await getCachedAnalysis(repo, prNumber, detail.headSha);
-  return current ?? (await getLatestAnalysis(repo, prNumber)) ?? null;
+  const result =
+    (await getCachedAnalysis(repo, prNumber, detail.headSha)) ??
+    (await getLatestAnalysis(repo, prNumber));
+  if (!result) return null;
+  return withRiskMeta(result, await getResolutions(repo, prNumber));
 }
 
 export async function analyzePullRequest(
@@ -266,7 +297,9 @@ export async function analyzePullRequest(
   const detail = await getPullRequest(repo, prNumber);
   if (!force) {
     const cached = await getCachedAnalysis(repo, prNumber, detail.headSha);
-    if (cached) return cached;
+    if (cached) {
+      return withRiskMeta(cached, await getResolutions(repo, prNumber));
+    }
   }
 
   const files = await listPullRequestFiles(repo, prNumber);
@@ -279,7 +312,7 @@ export async function analyzePullRequest(
       : await requestAnalysisViaApi(model, context, personality);
   const result = toAnalysisResult(raw, detail, files, model, usage);
   await setCachedAnalysis(result);
-  return result;
+  return withRiskMeta(result, await getResolutions(repo, prNumber));
 }
 
 async function requestAnalysisViaApi(
@@ -511,12 +544,15 @@ function toSeverity(value: string | undefined): RiskSeverity {
 function normalizeRisks(value: unknown, validPaths: Set<string>): RiskClaim[] {
   return (toList(value, "risks") as RawClaim[])
     .filter((claim) => claim.text?.trim())
-    .map((claim) => ({
-      title: claim.title?.trim() || fallbackTitle(claim.text as string),
-      text: (claim.text as string).trim(),
-      anchors: normalizeAnchors(claim.anchors, validPaths),
-      severity: toSeverity(claim.severity),
-    }));
+    .map((claim) => {
+      const risk: RiskClaim = {
+        title: claim.title?.trim() || fallbackTitle(claim.text as string),
+        text: (claim.text as string).trim(),
+        anchors: normalizeAnchors(claim.anchors, validPaths),
+        severity: toSeverity(claim.severity),
+      };
+      return { ...risk, id: riskId(risk) };
+    });
 }
 
 // The model occasionally leaks the groups JSON into the end of the summary

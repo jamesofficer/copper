@@ -1,5 +1,6 @@
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";
 import type { PullRequestCommit } from "../../../shared/types";
+import RelativeTime from "./RelativeTime";
 
 interface Props {
   commits: PullRequestCommit[];
@@ -41,7 +42,8 @@ export default function CommitList({ commits, selectedSha, onSelect }: Props) {
           All changes
         </Text>
       </CommitRow>
-      {commits.map((commit) => (
+      {/* The API returns oldest first; show newest at the top. */}
+      {[...commits].reverse().map((commit) => (
         <CommitRow
           key={commit.sha}
           selected={commit.sha === selectedSha}
@@ -61,6 +63,12 @@ export default function CommitList({ commits, selectedSha, onSelect }: Props) {
             <Text as="span" fontSize="xs" flex="1" truncate>
               {commit.subject}
             </Text>
+            <RelativeTime
+              iso={commit.date}
+              fontSize="2xs"
+              color="fg.subtle"
+              flexShrink="0"
+            />
           </HStack>
         </CommitRow>
       ))}

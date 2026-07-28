@@ -22,6 +22,7 @@ import {
   buildQuestionWithContext,
   parseQuestion,
 } from "../lib/askContext";
+import { cleanIpcError } from "../lib/ipcError";
 import { scrollbar } from "../lib/scrollbar";
 import Markdown from "./Markdown";
 
@@ -36,13 +37,6 @@ interface Props {
 }
 
 type UiMessage = ChatMessage & { id: string; failed?: boolean };
-
-function cleanIpcError(message: string): string {
-  return message.replace(
-    /^Error invoking remote method '[^']+': (Error: )?/,
-    "",
-  );
-}
 
 export default function ChatPanel({
   pr,

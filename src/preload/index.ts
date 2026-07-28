@@ -30,6 +30,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("setPullRequestBase", repo, prNumber, base),
   peekPullRequest: (repo, prNumber) =>
     ipcRenderer.invoke("peekPullRequest", repo, prNumber),
+  peekPullRequestActivity: (repo, prNumber) =>
+    ipcRenderer.invoke("peekPullRequestActivity", repo, prNumber),
   listPullRequestFiles: (repo, prNumber) =>
     ipcRenderer.invoke("listPullRequestFiles", repo, prNumber),
   listPullRequestCommits: (repo, prNumber) =>
@@ -89,6 +91,12 @@ const api: WindowApi = {
       findingId,
       resolution,
     ),
+  listExplanations: (repo, prNumber) =>
+    ipcRenderer.invoke("listExplanations", repo, prNumber),
+  explainSelection: (repo, prNumber, request) =>
+    ipcRenderer.invoke("explainSelection", repo, prNumber, request),
+  deleteExplanation: (repo, prNumber, explanationId) =>
+    ipcRenderer.invoke("deleteExplanation", repo, prNumber, explanationId),
   listAnalyzedPullRequests: () =>
     ipcRenderer.invoke("listAnalyzedPullRequests"),
   analyzePullRequest: (repo, prNumber, personality, force) =>

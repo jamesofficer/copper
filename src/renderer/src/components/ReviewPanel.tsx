@@ -17,12 +17,11 @@ import {
 } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { LuPanelRightOpen, LuSparkles, LuTriangleAlert } from "react-icons/lu";
-import type {
-  PullRequest,
-  RiskClaim,
-  RiskSeverity,
-} from "../../../shared/types";
+import type { PullRequest } from "../../../shared/types";
 import type { AskContext, AskRequest } from "../lib/askContext";
+import { getFindIssuesOnAnalyse } from "../lib/findIssuesOnAnalyse";
+import { cleanIpcError } from "../lib/ipcError";
+import { buildIssues } from "../lib/issues";
 import { getReviewPersonality } from "../lib/reviewPersonality";
 import { scrollbar } from "../lib/scrollbar";
 import { usePanelWidth } from "../lib/usePanelWidth";
@@ -36,22 +35,6 @@ interface Props {
 }
 
 const CHAT_COLLAPSED_KEY = "chatPanelCollapsed";
-
-const severityRank: Record<RiskSeverity, number> = {
-  high: 0,
-  medium: 1,
-  low: 2,
-};
-
-// Sort is stable, so risks without a severity (older cached analyses) keep
-// the model's order; classified ones rank high → medium → low.
-function sortRisksBySeverity(risks: RiskClaim[]): RiskClaim[] {
-  return [...risks].sort(
-    (a, b) =>
-      severityRank[a.severity ?? "medium"] -
-      severityRank[b.severity ?? "medium"],
-  );
-}
 
 export default function ReviewPanel({ pr }: Props) {
   const [selection, setSelection] = useState<AnalysisSelection>({
@@ -84,11 +67,7 @@ export default function ReviewPanel({ pr }: Props) {
     queryKey: ["analysis", pr.repo, pr.number],
     queryFn: () => window.api.getAnalysis(pr.repo, pr.number),
   });
-  const analysis = useMemo(() => {
-    const data = analysisQuery.data;
-    if (!data) return data;
-    return { ...data, risks: sortRisksBySeverity(data.risks) };
-  }, [analysisQuery.data]);
+  const analysis = analysisQuery.data;
 
   const filesQuery = useQuery({
     queryKey: ["pullRequestFiles", pr.repo, pr.number],
@@ -96,8 +75,8 @@ export default function ReviewPanel({ pr }: Props) {
     enabled: Boolean(analysis),
   });
 
-  // The pre-review agent pass. Cache-only here (never auto-runs); the
-  // FindingsPane triggers the model when the user asks.
+  // The findings pass. The query is cache-only; the model runs through the
+  // mutation below — automatically after an analysis, or from the nav.
   const findingsQuery = useQuery({
     queryKey: ["findings", pr.repo, pr.number],
     queryFn: () => window.api.getFindings(pr.repo, pr.number),
@@ -120,6 +99,17 @@ export default function ReviewPanel({ pr }: Props) {
     analysis && currentHeadSha && analysis.headSha !== currentHeadSha,
   );
 
+  // Runs the findings pass. Shares its mutation key with ReanalyzeButton's
+  // chained run, so useIsMutating sees both.
+  const findIssuesMutation = useMutation({
+    mutationKey: ["findIssues", pr.repo, pr.number],
+    mutationFn: (force: boolean) =>
+      window.api.findIssues(pr.repo, pr.number, force),
+    onSuccess: (result) => {
+      queryClient.setQueryData(["findings", pr.repo, pr.number], result);
+    },
+  });
+
   const analyzeMutation = useMutation({
     mutationKey: ["analyzePr", pr.repo, pr.number],
     mutationFn: () =>
@@ -129,12 +119,27 @@ export default function ReviewPanel({ pr }: Props) {
       void queryClient.invalidateQueries({
         queryKey: ["analyzedPullRequests"],
       });
+      // The headline output: chase the analysis with the findings pass, which
+      // picks up its risks as leads to verify. Forced, so a lead-less run
+      // cached for this commit is replaced.
+      if (getFindIssuesOnAnalyse()) findIssuesMutation.mutate(true);
     },
   });
 
   // Covers both this button and the header's Re-analyse, which share the key.
   const analyzing =
     useIsMutating({ mutationKey: ["analyzePr", pr.repo, pr.number] }) > 0;
+  const checking =
+    useIsMutating({ mutationKey: ["findIssues", pr.repo, pr.number] }) > 0;
+
+  const findings = findingsQuery.data ?? null;
+  const issues = useMemo(
+    () =>
+      analysis
+        ? buildIssues(analysis, findings, checking)
+        : { open: [], resolved: [] },
+    [analysis, findings, checking],
+  );
 
   // A new analysis replaces the old items; start reading from the summary.
   const analyzedAt = analysis?.analyzedAt;
@@ -175,8 +180,8 @@ export default function ReviewPanel({ pr }: Props) {
           <Heading size="md">Analyse this pull request</Heading>
           <Text fontSize="sm" color="fg.muted">
             Claude reads the full diff and builds a guided review: a summary,
-            the risks, and the changes grouped into a reading order — every
-            claim tied to the code it came from.
+            candidate issues for you to verify, and the changes grouped into a
+            reading order — every claim tied to the code it came from.
           </Text>
           <Button
             onClick={() => analyzeMutation.mutate()}
@@ -240,7 +245,17 @@ export default function ReviewPanel({ pr }: Props) {
         >
           <AnalysisNav
             analysis={analysis}
-            findings={findingsQuery.data ?? null}
+            issues={issues}
+            hasFindings={Boolean(findings)}
+            checking={checking}
+            issuesError={
+              findIssuesMutation.isError
+                ? findIssuesMutation.error instanceof Error
+                  ? cleanIpcError(findIssuesMutation.error.message)
+                  : "The findings run failed."
+                : null
+            }
+            onFindIssues={() => findIssuesMutation.mutate(Boolean(findings))}
             selection={selection}
             onSelect={setSelection}
           />
@@ -250,11 +265,12 @@ export default function ReviewPanel({ pr }: Props) {
           <AnalysisDetail
             pr={pr}
             analysis={analysis}
-            findings={findingsQuery.data ?? null}
+            findings={findings}
+            issues={issues}
             files={filesQuery.data}
             currentHeadSha={currentHeadSha}
-            claudeCode={llmQuery.data?.effective === "claude-code"}
             selection={selection}
+            onSelect={setSelection}
             onAskAbout={askAbout}
           />
         </Box>

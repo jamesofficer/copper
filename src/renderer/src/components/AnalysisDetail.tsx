@@ -1,20 +1,5 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Group,
-  Heading,
-  HStack,
-  IconButton,
-  Menu,
-  Portal,
-  Spinner,
-  Text,
-  VStack,
-  Wrap,
-} from "@chakra-ui/react";
+import { Box, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { LuChevronDown, LuMessageCircleQuestion } from "react-icons/lu";
 import type {
   AnalysisClaim,
   AnalysisResult,
@@ -24,114 +9,32 @@ import type {
   PullRequest,
   PullRequestFile,
 } from "../../../shared/types";
-import {
-  type AskContext,
-  claimAskContext,
-  suggestedQuestions,
-} from "../lib/askContext";
+import type { AskContext } from "../lib/askContext";
+import type { IssueSets } from "../lib/issues";
 import type { AnalysisSelection } from "./AnalysisNav";
-import FileDiffCard from "./FileDiffCard";
-import FindingsPane from "./FindingsPane";
+import {
+  AnchorChips,
+  AskAboutButton,
+  DiffCards,
+  type FileMap,
+  LoadingDiffs,
+  SectionHeading,
+} from "./AnalysisShared";
+import IssuePane from "./IssuePane";
 import Markdown from "./Markdown";
+import ResolvedIssuesPane from "./ResolvedIssuesPane";
 import RiskBadge from "./RiskBadge";
-import RiskSeverityBadge from "./RiskSeverityBadge";
 
 interface Props {
   pr: PullRequest;
   analysis: AnalysisResult;
   findings: FindingsResult | null;
+  issues: IssueSets;
   files: PullRequestFile[] | undefined;
   currentHeadSha: string | undefined;
-  claudeCode: boolean;
   selection: AnalysisSelection;
+  onSelect(selection: AnalysisSelection): void;
   onAskAbout(context: AskContext, question?: string): void;
-}
-
-type FileMap = Map<string, PullRequestFile>;
-
-function SectionHeading({ children }: { children: ReactNode }) {
-  return (
-    <Heading
-      size="xs"
-      color="fg.muted"
-      textTransform="uppercase"
-      letterSpacing="wider"
-    >
-      {children}
-    </Heading>
-  );
-}
-
-function LoadingDiffs() {
-  return (
-    <HStack color="fg.muted">
-      <Spinner size="sm" />
-      <Text fontSize="sm">Loading diffs…</Text>
-    </HStack>
-  );
-}
-
-function fileName(path: string): string {
-  const slash = path.lastIndexOf("/");
-  return slash === -1 ? path : path.slice(slash + 1);
-}
-
-function scrollToFile(path: string): void {
-  document
-    .getElementById(`diff-${path}`)
-    ?.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-// A claim's anchors as clickable file:line chips that jump to the file's
-// embedded diff below.
-function AnchorChips({ claim }: { claim: AnalysisClaim }) {
-  if (claim.anchors.length === 0) return null;
-  return (
-    <Wrap gap="1.5">
-      {claim.anchors.map((anchor) => (
-        <Badge
-          key={`${anchor.path}:${anchor.line}`}
-          as="button"
-          onClick={() => scrollToFile(anchor.path)}
-          fontFamily="mono"
-          variant="surface"
-          cursor="pointer"
-          _hover={{ bg: "bg.emphasized" }}
-          title={anchor.path}
-        >
-          {fileName(anchor.path)}
-          {anchor.line === null ? "" : `:${anchor.line}`}
-        </Badge>
-      ))}
-    </Wrap>
-  );
-}
-
-function DiffCards({
-  paths,
-  fileByPath,
-  defaultOpen = true,
-}: {
-  paths: string[];
-  fileByPath: FileMap;
-  defaultOpen?: boolean;
-}) {
-  return (
-    <VStack alignItems="stretch" gap="2">
-      {paths.map((path) => {
-        const file = fileByPath.get(path);
-        if (!file) return null;
-        return (
-          <FileDiffCard
-            key={path}
-            id={`diff-${path}`}
-            file={file}
-            defaultOpen={defaultOpen}
-          />
-        );
-      })}
-    </VStack>
-  );
 }
 
 function SummaryPane({ analysis }: { analysis: AnalysisResult }) {
@@ -175,14 +78,12 @@ function formatCost(usage: AnalysisUsage): string {
 function ClaimPane({
   claim,
   label,
-  badge,
   files,
   fileByPath,
   onAskAbout,
 }: {
   claim: AnalysisClaim;
   label: AskContext["label"];
-  badge?: ReactNode;
   files: PullRequestFile[] | undefined;
   fileByPath: FileMap;
   onAskAbout(context: AskContext, question?: string): void;
@@ -193,47 +94,11 @@ function ClaimPane({
       <VStack alignItems="stretch" gap="4" maxW="3xl">
         <HStack gap="3" alignItems="baseline">
           <Heading size="md">{claim.title}</Heading>
-          {badge}
         </HStack>
         <Markdown fontSize="md">{claim.text}</Markdown>
         <AnchorChips claim={claim} />
         <Box>
-          <Group attached>
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => onAskAbout(claimAskContext(label, claim))}
-            >
-              <LuMessageCircleQuestion /> Ask about this
-            </Button>
-            <Menu.Root
-              positioning={{ placement: "bottom-start" }}
-              onSelect={(details) =>
-                onAskAbout(claimAskContext(label, claim), details.value)
-              }
-            >
-              <Menu.Trigger asChild>
-                <IconButton
-                  aria-label="Suggested questions"
-                  size="xs"
-                  variant="outline"
-                >
-                  <LuChevronDown />
-                </IconButton>
-              </Menu.Trigger>
-              <Portal>
-                <Menu.Positioner>
-                  <Menu.Content>
-                    {suggestedQuestions[label].map((suggestion) => (
-                      <Menu.Item key={suggestion} value={suggestion}>
-                        {suggestion}
-                      </Menu.Item>
-                    ))}
-                  </Menu.Content>
-                </Menu.Positioner>
-              </Portal>
-            </Menu.Root>
-          </Group>
+          <AskAboutButton label={label} claim={claim} onAskAbout={onAskAbout} />
         </Box>
       </VStack>
       {paths.length > 0 && (
@@ -295,42 +160,53 @@ export default function AnalysisDetail({
   pr,
   analysis,
   findings,
+  issues,
   files,
   currentHeadSha,
-  claudeCode,
   selection,
+  onSelect,
   onAskAbout,
 }: Props) {
   const fileByPath: FileMap = new Map(
     (files ?? []).map((file) => [file.path, file] as const),
   );
 
+  // Draft anchors come from the findings run; block drafting when it's
+  // behind the PR's current commit (the line may have moved).
+  const findingsOutdated = Boolean(
+    findings && currentHeadSha && findings.headSha !== currentHeadSha,
+  );
+  const commitId = currentHeadSha ?? findings?.headSha ?? analysis.headSha;
+
   function resolve(): ReactNode {
-    if (selection.kind === "findings") {
-      return (
-        <FindingsPane
-          pr={pr}
-          findings={findings}
-          files={files}
-          currentHeadSha={currentHeadSha}
-          claudeCode={claudeCode}
-        />
+    if (selection.kind === "issue") {
+      const issue = [...issues.open, ...issues.resolved].find(
+        (entry) => entry.id === selection.id,
       );
-    }
-    if (selection.kind === "risk") {
-      const claim = analysis.risks[selection.index];
-      if (claim) {
+      if (issue) {
         return (
-          <ClaimPane
-            claim={claim}
-            label="risk"
-            badge={<RiskSeverityBadge severity={claim.severity} />}
+          <IssuePane
+            issue={issue}
+            repo={pr.repo}
+            prNumber={pr.number}
+            commitId={commitId}
+            canDraft={!findingsOutdated}
             files={files}
             fileByPath={fileByPath}
             onAskAbout={onAskAbout}
           />
         );
       }
+    }
+    if (selection.kind === "resolvedIssues") {
+      return (
+        <ResolvedIssuesPane
+          issues={issues.resolved}
+          repo={pr.repo}
+          prNumber={pr.number}
+          onSelect={(issueId) => onSelect({ kind: "issue", id: issueId })}
+        />
+      );
     }
     if (selection.kind === "behavior") {
       const claim = analysis.behaviorChanges[selection.index];

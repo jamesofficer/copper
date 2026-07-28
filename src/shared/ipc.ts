@@ -3,6 +3,8 @@ import type {
   AnalyzedPullRequest,
   ChatMessage,
   DraftReviewComment,
+  ExplainRequest,
+  Explanation,
   FindingResolution,
   FindingsResult,
   KeyTestResult,
@@ -13,6 +15,7 @@ import type {
   NewPullRequest,
   NewReviewComment,
   PullRequest,
+  PullRequestActivity,
   PullRequestComment,
   PullRequestCommit,
   PullRequestDetail,
@@ -65,6 +68,13 @@ export interface IpcApi {
   // Same data as getPullRequest but without the background repo warm-up —
   // for bulk refreshes (e.g. the recently-viewed panel).
   peekPullRequest(repo: string, prNumber: number): Promise<PullRequestDetail>;
+  // Best-effort activity snapshot for the refresh-button highlight — an ETag
+  // conditional request (a 304 is free against the rate limit). Null when
+  // there's no token or the check fails; polling must never surface errors.
+  peekPullRequestActivity(
+    repo: string,
+    prNumber: number,
+  ): Promise<PullRequestActivity | null>;
   listPullRequestFiles(
     repo: string,
     prNumber: number,
@@ -170,6 +180,20 @@ export interface IpcApi {
     findingId: string,
     resolution: FindingResolution | "open",
   ): Promise<void>;
+  // Local-only AI explanations of a selected diff range. explainSelection runs
+  // the agent one-shot (not saved to the chat) and persists the result; nothing
+  // is ever posted to GitHub.
+  listExplanations(repo: string, prNumber: number): Promise<Explanation[]>;
+  explainSelection(
+    repo: string,
+    prNumber: number,
+    request: ExplainRequest,
+  ): Promise<Explanation>;
+  deleteExplanation(
+    repo: string,
+    prNumber: number,
+    explanationId: string,
+  ): Promise<void>;
   listAnalyzedPullRequests(): Promise<AnalyzedPullRequest[]>;
   analyzePullRequest(
     repo: string,
@@ -238,6 +262,7 @@ export const ipcChannels = [
   "setPullRequestState",
   "setPullRequestBase",
   "peekPullRequest",
+  "peekPullRequestActivity",
   "listPullRequestFiles",
   "listPullRequestCommits",
   "listCommitFiles",
@@ -262,6 +287,9 @@ export const ipcChannels = [
   "getFindings",
   "findIssues",
   "setFindingResolution",
+  "listExplanations",
+  "explainSelection",
+  "deleteExplanation",
   "listAnalyzedPullRequests",
   "analyzePullRequest",
   "askQuestion",

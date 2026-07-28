@@ -1,6 +1,11 @@
 import { ipcMain } from "electron";
 import type { IpcApi } from "../../shared/ipc";
-import { askQuestion, clearChat, getChatHistory } from "../agent/session";
+import {
+  askQuestion,
+  clearChat,
+  explainSelection,
+  getChatHistory,
+} from "../agent/session";
 import { listAnalyzedPullRequests } from "../analysis/cache";
 import { findIssues, getExistingFindings } from "../analysis/findings";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
@@ -27,6 +32,7 @@ import {
   listReviewRequests,
   listViewedFiles,
   mergePullRequest,
+  peekPullRequestActivity,
   replyToReviewComment,
   setFileViewed,
   setPullRequestBase,
@@ -49,6 +55,7 @@ import {
   listDraftComments,
   updateDraftComment,
 } from "../store/drafts";
+import { deleteExplanation, listExplanations } from "../store/explanations";
 import { setFindingResolution } from "../store/findings";
 
 const handlers: IpcApi = {
@@ -74,6 +81,8 @@ const handlers: IpcApi = {
   setPullRequestBase: (repo, prNumber, base) =>
     setPullRequestBase(repo, prNumber, base),
   peekPullRequest: (repo, prNumber) => getPullRequest(repo, prNumber),
+  peekPullRequestActivity: (repo, prNumber) =>
+    peekPullRequestActivity(repo, prNumber),
   listPullRequestFiles: (repo, prNumber) =>
     listPullRequestFiles(repo, prNumber),
   listPullRequestCommits: (repo, prNumber) =>
@@ -113,6 +122,11 @@ const handlers: IpcApi = {
   findIssues: (repo, prNumber, force) => findIssues(repo, prNumber, force),
   setFindingResolution: (repo, prNumber, findingId, resolution) =>
     setFindingResolution(repo, prNumber, findingId, resolution),
+  listExplanations: (repo, prNumber) => listExplanations(repo, prNumber),
+  explainSelection: (repo, prNumber, request) =>
+    explainSelection(repo, prNumber, request),
+  deleteExplanation: (repo, prNumber, explanationId) =>
+    deleteExplanation(repo, prNumber, explanationId),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
   analyzePullRequest: (repo, prNumber, personality, force) =>
     analyzePullRequest(repo, prNumber, personality, force),

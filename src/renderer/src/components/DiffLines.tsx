@@ -12,6 +12,7 @@ import { LuChevronsUpDown, LuPlus } from "react-icons/lu";
 import type {
   DiffSide,
   DraftReviewComment,
+  Explanation,
   PullRequestFile,
 } from "../../../shared/types";
 import {
@@ -30,6 +31,7 @@ import { useDiffViewMode } from "../lib/diffViewMode";
 import type { ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
+import AiExplanationCard from "./AiExplanationCard";
 import DiffCommentComposer from "./DiffCommentComposer";
 import DiffCommentThread from "./DiffCommentThread";
 import DraftCommentCard from "./DraftCommentCard";
@@ -49,6 +51,9 @@ export interface DiffCommenting {
   // True once ANY draft exists on the PR — a review is in progress, which
   // changes the composer's buttons.
   reviewStarted: boolean;
+  // The file's local-only AI explanations, rendered as a third band under the
+  // lines they anchor to.
+  explanations: Explanation[];
 }
 
 // Access to the full file at the diff's commit. Enables "expand hidden
@@ -116,12 +121,19 @@ interface CommentContext {
   prNumber: number;
   commitId: string;
   path: string;
-  composer: { side: DiffSide; line: number; startLine: number | null } | null;
+  composer: {
+    side: DiffSide;
+    line: number;
+    startLine: number | null;
+    // The selected lines' text, for the composer's "Explain" action.
+    code: string;
+  } | null;
   resolvedIds: Set<number>;
   reviewStarted: boolean;
   anchorOf(line: DiffLine): CommentAnchor | undefined;
   threadsFor(line: DiffLine): ReviewThread[];
   draftsFor(line: DiffLine): DraftReviewComment[];
+  explanationsFor(line: DiffLine): Explanation[];
   // Whether an existing thread's range covers this line — marks the lines a
   // comment was left on.
   isCommented(line: DiffLine): boolean;
@@ -298,11 +310,13 @@ function CommentBands({
   ctx,
   threads,
   drafts,
+  explanations,
   composerHere,
 }: {
   ctx: CommentContext;
   threads: ReviewThread[];
   drafts: DraftReviewComment[];
+  explanations: Explanation[];
   composerHere: boolean;
 }) {
   return (
@@ -326,6 +340,15 @@ function CommentBands({
           />
         </CommentBand>
       ))}
+      {explanations.map((explanation) => (
+        <CommentBand key={explanation.id}>
+          <AiExplanationCard
+            explanation={explanation}
+            repo={ctx.repo}
+            prNumber={ctx.prNumber}
+          />
+        </CommentBand>
+      ))}
       {composerHere && ctx.composer && (
         <CommentBand>
           <DiffCommentComposer
@@ -336,6 +359,7 @@ function CommentBands({
             side={ctx.composer.side}
             line={ctx.composer.line}
             startLine={ctx.composer.startLine}
+            code={ctx.composer.code}
             reviewStarted={ctx.reviewStarted}
             onClose={ctx.closeComposer}
           />
@@ -404,6 +428,7 @@ function InlineRows({
                 ctx={ctx}
                 threads={ctx.threadsFor(line)}
                 drafts={ctx.draftsFor(line)}
+                explanations={ctx.explanationsFor(line)}
                 composerHere={ctx.isComposerLine(line)}
               />
             )}
@@ -486,6 +511,7 @@ interface SplitSegment {
   rows: SplitRow[];
   threads: ReviewThread[];
   drafts: DraftReviewComment[];
+  explanations: Explanation[];
   composer: boolean;
 }
 
@@ -511,16 +537,30 @@ function SplitRows({
     const cells = row.left === row.right ? [row.left] : [row.left, row.right];
     const threads = cells.flatMap((cell) => (cell ? ctx.threadsFor(cell) : []));
     const drafts = cells.flatMap((cell) => (cell ? ctx.draftsFor(cell) : []));
+    const explanations = cells.flatMap((cell) =>
+      cell ? ctx.explanationsFor(cell) : [],
+    );
     const composer = cells.some(
       (cell) => cell !== null && ctx.isComposerLine(cell),
     );
-    if (threads.length > 0 || drafts.length > 0 || composer) {
-      segments.push({ rows: current, threads, drafts, composer });
+    if (
+      threads.length > 0 ||
+      drafts.length > 0 ||
+      explanations.length > 0 ||
+      composer
+    ) {
+      segments.push({ rows: current, threads, drafts, explanations, composer });
       current = [];
     }
   }
   if (current.length > 0 || segments.length === 0) {
-    segments.push({ rows: current, threads: [], drafts: [], composer: false });
+    segments.push({
+      rows: current,
+      threads: [],
+      drafts: [],
+      explanations: [],
+      composer: false,
+    });
   }
 
   return (
@@ -558,6 +598,7 @@ function SplitRows({
               ctx={ctx}
               threads={segment.threads}
               drafts={segment.drafts}
+              explanations={segment.explanations}
               composerHere={segment.composer}
             />
           )}
@@ -726,6 +767,17 @@ function DiffLines({ file, commenting, expansion }: Props) {
     return map;
   }, [commenting?.drafts]);
 
+  const explanationsByKey = useMemo(() => {
+    const map = new Map<string, Explanation[]>();
+    for (const explanation of commenting?.explanations ?? []) {
+      const key = `${explanation.side}:${explanation.line}`;
+      const list = map.get(key);
+      if (list) list.push(explanation);
+      else map.set(key, [explanation]);
+    }
+    return map;
+  }, [commenting?.explanations]);
+
   // Every side:line an existing thread's or draft's range covers, so those
   // lines can be marked in the gutter.
   const commentedKeys = useMemo(() => {
@@ -792,6 +844,24 @@ function DiffLines({ file, commenting, expansion }: Props) {
   if (commenting) {
     const low = selection ? Math.min(selection.start, selection.end) : 0;
     const high = selection ? Math.max(selection.start, selection.end) : 0;
+    // The text of the currently selected lines, in diff order — quoted to the
+    // agent by the composer's "Explain" action.
+    const selectedCode = (): string => {
+      if (!selection) return "";
+      const texts: string[] = [];
+      for (const line of displayLines) {
+        const anchor = anchors.get(line);
+        if (
+          anchor &&
+          anchor.side === selection.side &&
+          anchor.line >= low &&
+          anchor.line <= high
+        ) {
+          texts.push(line.text);
+        }
+      }
+      return texts.join("\n");
+    };
     ctx = {
       repo: commenting.repo,
       prNumber: commenting.prNumber,
@@ -805,6 +875,7 @@ function DiffLines({ file, commenting, expansion }: Props) {
               side: selection.side,
               line: high,
               startLine: low < high ? low : null,
+              code: selectedCode(),
             }
           : null,
       anchorOf: (line) => anchors.get(line),
@@ -825,6 +896,20 @@ function DiffLines({ file, commenting, expansion }: Props) {
         }
         if (line.newNumber !== null) {
           result.push(...(draftsByKey.get(`RIGHT:${line.newNumber}`) ?? []));
+        }
+        return result;
+      },
+      explanationsFor: (line) => {
+        const result: Explanation[] = [];
+        if (line.oldNumber !== null) {
+          result.push(
+            ...(explanationsByKey.get(`LEFT:${line.oldNumber}`) ?? []),
+          );
+        }
+        if (line.newNumber !== null) {
+          result.push(
+            ...(explanationsByKey.get(`RIGHT:${line.newNumber}`) ?? []),
+          );
         }
         return result;
       },

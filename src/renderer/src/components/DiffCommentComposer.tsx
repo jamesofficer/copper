@@ -1,9 +1,11 @@
 import { Box, Button, HStack, Text, Textarea } from "@chakra-ui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { LuSparkles } from "react-icons/lu";
 import type {
   DiffSide,
   DraftReviewComment,
+  Explanation,
   ReviewComment,
 } from "../../../shared/types";
 import { toaster } from "./ui/toaster";
@@ -17,6 +19,8 @@ interface Props {
   line: number;
   // Set when the comment covers a range ending at `line`.
   startLine: number | null;
+  // The selected lines' text — sent to the agent by the "Explain" action.
+  code: string;
   // True once any draft exists on the PR — a review is in progress, so the
   // single-comment escape hatch is hidden (GitHub does the same).
   reviewStarted: boolean;
@@ -31,6 +35,7 @@ export default function DiffCommentComposer({
   side,
   line,
   startLine,
+  code,
   reviewStarted,
   onClose,
 }: Props) {
@@ -81,7 +86,35 @@ export default function DiffCommentComposer({
     },
   });
 
-  const busy = submit.isPending || saveDraft.isPending;
+  // Asks the agent to explain the selected lines — a local-only card, never
+  // posted to GitHub. Ignores the comment textarea.
+  const explain = useMutation({
+    mutationFn: () =>
+      window.api.explainSelection(repo, prNumber, {
+        path,
+        side,
+        line,
+        startLine,
+        code,
+      }),
+    onSuccess: (created) => {
+      queryClient.setQueryData<Explanation[]>(
+        ["explanations", repo, prNumber],
+        (existing) => [...(existing ?? []), created],
+      );
+      onClose();
+    },
+    onError: (cause) => {
+      toaster.create({
+        type: "error",
+        title: "Couldn’t explain selection",
+        description: cause instanceof Error ? cause.message : String(cause),
+        closable: true,
+      });
+    },
+  });
+
+  const busy = submit.isPending || saveDraft.isPending || explain.isPending;
   const canSubmit = body.trim().length > 0 && !busy;
 
   function handleKeyDown(event: React.KeyboardEvent) {
@@ -118,14 +151,19 @@ export default function DiffCommentComposer({
         onChange={(event) => setBody(event.target.value)}
         onKeyDown={handleKeyDown}
       />
-      <HStack
-        justifyContent="flex-end"
-        gap="2"
-        px="3"
-        py="2"
-        borderTopWidth="1px"
-      >
-        <Button size="xs" variant="ghost" onClick={onClose}>
+      <HStack gap="2" px="3" py="2" borderTopWidth="1px">
+        <Button
+          size="xs"
+          variant="ghost"
+          color="colorPalette.fg"
+          disabled={busy}
+          loading={explain.isPending}
+          onClick={() => explain.mutate()}
+          title="Ask the AI to explain the selected lines"
+        >
+          <LuSparkles /> Explain
+        </Button>
+        <Button size="xs" variant="ghost" ml="auto" onClick={onClose}>
           Cancel
         </Button>
         {!reviewStarted && (

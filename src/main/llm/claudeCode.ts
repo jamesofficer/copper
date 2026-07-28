@@ -59,7 +59,7 @@ function toUsage(result: SDKResultMessage): ClaudeCodeUsage {
 
 function describeFailure(result: SDKResultMessage): string {
   if (result.subtype === "error_max_turns") {
-    return "Claude Code stopped at the tool-use limit before finishing. Try asking again.";
+    return "Claude Code hit its tool-use limit before it could report. Run it again — a fresh run usually gets there.";
   }
   const detail =
     result.subtype === "success"
@@ -121,7 +121,19 @@ const findingShape = {
   path: z.string(),
   line: z.number(),
   suggestion: z.string(),
+  lead: z
+    .number()
+    .nullable()
+    .optional()
+    .describe(
+      "The 1-based number of the lead this finding confirms, or null when it isn't tied to a lead",
+    ),
 };
+
+const clearedLeadShape = z.object({
+  lead: z.number().describe("1-based lead number"),
+  note: z.string().describe("One line: how you verified it's fine"),
+});
 
 // The pre-review findings pass on the Claude Code provider. The model
 // investigates with the repo tools (callers, history — that's how blast
@@ -136,18 +148,32 @@ export async function runFindingsAgentQuery(params: {
   prompt: string;
   toolContext: ToolContext;
   maxTurns: number;
-}): Promise<{ findings: unknown[]; usage: ClaudeCodeUsage }> {
+}): Promise<{
+  findings: unknown[];
+  clearedLeads: unknown[];
+  usage: ClaudeCodeUsage;
+}> {
   let captured: unknown[] = [];
+  let capturedCleared: unknown[] = [];
   const reportServer = createSdkMcpServer({
     name: "report",
     version: "1.0.0",
     tools: [
       tool(
         "report_findings",
-        "Report the candidate issues found in the pull request for the reviewer to verify. Call this exactly once when your investigation is complete, with every finding (an empty list if there is nothing to flag).",
-        { findings: z.array(z.object(findingShape)) },
+        "Report the candidate issues found in the pull request for the reviewer to verify. Call this exactly once when your investigation is complete, with every finding (an empty list if there is nothing to flag) and every lead you checked and cleared.",
+        {
+          findings: z.array(z.object(findingShape)),
+          clearedLeads: z
+            .array(clearedLeadShape)
+            .optional()
+            .describe(
+              "Leads you investigated and found to be fine — not real problems",
+            ),
+        },
         async (args) => {
           captured = args.findings ?? [];
+          capturedCleared = args.clearedLeads ?? [];
           return {
             content: [{ type: "text" as const, text: "Findings recorded." }],
           };
@@ -174,7 +200,11 @@ export async function runFindingsAgentQuery(params: {
   if (result.subtype !== "success" && captured.length === 0) {
     throw new Error(describeFailure(result));
   }
-  return { findings: captured, usage: toUsage(result) };
+  return {
+    findings: captured,
+    clearedLeads: capturedCleared,
+    usage: toUsage(result),
+  };
 }
 
 // The chat's repo tools, exposed to Claude Code as an in-process MCP server.
