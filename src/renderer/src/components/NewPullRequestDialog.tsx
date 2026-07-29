@@ -4,22 +4,24 @@ import {
   Button,
   Checkbox,
   CloseButton,
-  createListCollection,
+  Combobox,
   Dialog,
   Field,
   HStack,
   Input,
   Portal,
-  Select,
   Spinner,
   Text,
+  useFilter,
+  useListCollection,
   VStack,
 } from "@chakra-ui/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { LuArrowLeft, LuGitPullRequestCreate } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import MarkdownEditor, { type MarkdownEditorMode } from "./MarkdownEditor";
+import RelativeTime from "./RelativeTime";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -118,26 +120,38 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
     title.trim().length > 0 &&
     !create.isPending;
 
-  // Stable references so the memoized selects skip re-rendering while the
+  // Stable references so the memoized pickers skip re-rendering while the
   // user types in the title/description — the branch lists can be huge.
-  const headBranches = useMemo(
+  // getBranchInfo returns them newest-commit-first; that order is preserved
+  // here and each branch's date is shown in the list.
+  const allBranches = useMemo<BranchItem[]>(
     () =>
-      info ? info.branches.filter((branch) => branch !== selectedBase) : [],
-    [info, selectedBase],
+      info
+        ? info.branches.map((branch) => ({
+            label: branch,
+            value: branch,
+            date: info.branchDates?.[branch],
+          }))
+        : [],
+    [info],
+  );
+  const headBranches = useMemo(
+    () => allBranches.filter((item) => item.value !== selectedBase),
+    [allBranches, selectedBase],
   );
   const baseBranches = useMemo(
-    () =>
-      info ? info.branches.filter((branch) => branch !== selectedHead) : [],
-    [info, selectedHead],
+    () => allBranches.filter((item) => item.value !== selectedHead),
+    [allBranches, selectedHead],
   );
 
   return (
     <Dialog.Root
       open={open}
       onOpenChange={(event) => handleOpenChange(event.open)}
-      size="lg"
+      size="xl"
       lazyMount
       unmountOnExit
+      scrollBehavior="inside"
     >
       <Dialog.Trigger asChild>
         <Button size="xs" variant="outline">
@@ -223,7 +237,7 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
                         value={bodyValue}
                         mode={mode}
                         placeholder="Describe the change (markdown supported)"
-                        rows={6}
+                        rows={16}
                         onChange={setBody}
                         onModeChange={setMode}
                         onSubmit={() => canCreate && create.mutate()}
@@ -270,67 +284,109 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
   );
 }
 
+interface BranchItem {
+  label: string;
+  value: string;
+  // The branch's last commit date — shown so the newest-first order is
+  // visible. Undefined for a cached response from before dates were fetched.
+  date?: string;
+}
+
 interface BranchSelectProps {
   label: string;
-  branches: string[];
+  branches: BranchItem[];
   value: string;
   onChange(value: string): void;
 }
 
-// memo: the dialog re-renders on every title/description keystroke; with
-// hundreds of branches per select, those renders are what made typing lag.
+// A searchable branch picker — repos can have hundreds of branches, so typing
+// to filter beats scrolling. memo: the dialog re-renders on every
+// title/description keystroke, and those renders are what made typing lag.
 const BranchSelect = memo(function BranchSelect({
   label,
   branches,
   value,
   onChange,
 }: BranchSelectProps) {
-  const collection = useMemo(
-    () =>
-      createListCollection({
-        items: branches.map((branch) => ({ value: branch, label: branch })),
-      }),
-    [branches],
-  );
+  const { contains } = useFilter({ sensitivity: "base" });
+  const { collection, filter, set } = useListCollection<BranchItem>({
+    initialItems: [],
+    filter: contains,
+  });
+  // The input is controlled so it always shows either the chosen branch or
+  // what's being typed — the selection arrives asynchronously, after the
+  // branch list loads.
+  const [inputValue, setInputValue] = useState(value);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: set is a stable store setter
+  useEffect(() => {
+    set(branches);
+  }, [branches]);
+
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
   return (
     <Field.Root flex="1" minW="0">
       <Field.Label>{label}</Field.Label>
-      <Select.Root
+      <Combobox.Root
         collection={collection}
         value={value ? [value] : []}
+        inputValue={inputValue}
         onValueChange={(event) => onChange(event.value[0] ?? "")}
+        onInputValueChange={(event) => {
+          setInputValue(event.inputValue);
+          filter(event.inputValue);
+        }}
+        onOpenChange={(event) => {
+          // Selecting a branch sets the input to its name, which also filters
+          // the list down to it — so clear the filter on open, or reopening
+          // would show only the branch already chosen. On close, drop any
+          // abandoned filter text that would look like a selection.
+          filter("");
+          if (!event.open) setInputValue(value);
+        }}
+        openOnClick
+        selectionBehavior="replace"
         size="sm"
-        lazyMount
-        unmountOnExit
+        width="full"
       >
-        <Select.HiddenSelect />
-        <Select.Control>
-          <Select.Trigger cursor="pointer">
-            <Select.ValueText placeholder="Select branch" fontFamily="mono" />
-          </Select.Trigger>
-          <Select.IndicatorGroup>
-            <Select.Indicator />
-          </Select.IndicatorGroup>
-        </Select.Control>
+        <Combobox.Control>
+          <Combobox.Input
+            placeholder="Select branch"
+            fontFamily="mono"
+            fontSize="sm"
+          />
+          <Combobox.IndicatorGroup>
+            <Combobox.Trigger />
+          </Combobox.IndicatorGroup>
+        </Combobox.Control>
         {/* Not portalled: inside a dialog the menu must stay in the dialog's
             stacking context or it renders underneath it. */}
-        <Select.Positioner>
-          <Select.Content>
+        <Combobox.Positioner>
+          <Combobox.Content maxH="280px" overflowY="auto">
+            <Combobox.Empty>No branches match.</Combobox.Empty>
             {collection.items.map((item) => (
-              <Select.Item
-                item={item}
-                key={item.value}
-                _checked={{ bg: "bg.emphasized" }}
-              >
-                <Select.ItemText fontFamily="mono">
+              <Combobox.Item item={item} key={item.value}>
+                <Text fontFamily="mono" fontSize="sm" truncate flex="1">
                   {item.label}
-                </Select.ItemText>
-                <Select.ItemIndicator />
-              </Select.Item>
+                </Text>
+                {item.date && (
+                  <RelativeTime
+                    iso={item.date}
+                    fontSize="2xs"
+                    color="fg.subtle"
+                    flexShrink="0"
+                    mr="1"
+                  />
+                )}
+                <Combobox.ItemIndicator />
+              </Combobox.Item>
             ))}
-          </Select.Content>
-        </Select.Positioner>
-      </Select.Root>
+          </Combobox.Content>
+        </Combobox.Positioner>
+      </Combobox.Root>
     </Field.Root>
   );
 });

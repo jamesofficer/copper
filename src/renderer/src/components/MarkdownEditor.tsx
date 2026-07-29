@@ -29,6 +29,10 @@ export default function MarkdownEditor({
   onSubmit,
   footer,
 }: Props) {
+  // Tracks the textarea's height, so switching to Preview doesn't resize the
+  // editor under the cursor.
+  const previewMinHeight = `${rows * 25 + 2}px`;
+
   function handleKeyDown(event: KeyboardEvent) {
     if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
       onSubmit?.();
@@ -62,7 +66,7 @@ export default function MarkdownEditor({
           onKeyDown={handleKeyDown}
         />
       ) : (
-        <Box px="4" py="3" minH="102px">
+        <Box px="4" py="3" minH={previewMinHeight}>
           {value.trim() ? (
             <Markdown>{value}</Markdown>
           ) : (

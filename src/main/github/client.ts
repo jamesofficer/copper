@@ -798,6 +798,41 @@ export async function setPullRequestBase(
   });
 }
 
+// Take a draft PR out of draft — GitHub's "Ready for review". GraphQL only;
+// there's no REST endpoint for it.
+export async function setPullRequestReady(
+  repo: string,
+  prNumber: number,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to update pull requests.",
+    );
+  }
+
+  const pullRequestId = await getPullRequestNodeId(token, repo, prNumber);
+  const result = await githubFetch<{ errors?: Array<{ message: string }> }>(
+    token,
+    "/graphql",
+    {
+      method: "POST",
+      body: {
+        query: `
+          mutation ($pullRequestId: ID!) {
+            markPullRequestReadyForReview(input: { pullRequestId: $pullRequestId }) {
+              pullRequest { id }
+            }
+          }`,
+        variables: { pullRequestId },
+      },
+    },
+  );
+  if (result.errors?.length) {
+    throw new Error(`GitHub: ${result.errors[0].message}`);
+  }
+}
+
 const reviewEvents: Record<ReviewVerdict, string> = {
   comment: "COMMENT",
   approve: "APPROVE",
@@ -1198,7 +1233,10 @@ interface GraphQlBranches {
       defaultBranchRef: { name: string } | null;
       refs: {
         pageInfo: { hasNextPage: boolean; endCursor: string | null };
-        nodes: Array<{ name: string }>;
+        nodes: Array<{
+          name: string;
+          target: { committedDate?: string } | null;
+        }>;
       } | null;
     } | null;
   };
@@ -1276,14 +1314,18 @@ export async function getBranchInfo(repo: string): Promise<RepoBranchInfo> {
       repository(owner: $owner, name: $name) {
         defaultBranchRef { name }
         refs(refPrefix: "refs/heads/", first: 100, after: $cursor,
-             orderBy: { field: TAG_COMMIT_DATE, direction: DESC }) {
+             orderBy: { field: ALPHABETICAL, direction: ASC }) {
           pageInfo { hasNextPage endCursor }
-          nodes { name }
+          nodes {
+            name
+            target { ... on Commit { committedDate } }
+          }
         }
       }
     }`;
 
   const branches: string[] = [];
+  const branchDates: Record<string, string> = {};
   let defaultBranch = "";
   let cursor: string | null = null;
   do {
@@ -1298,13 +1340,31 @@ export async function getBranchInfo(repo: string): Promise<RepoBranchInfo> {
     const repository = response.data?.repository;
     if (!repository?.refs) break;
     defaultBranch = repository.defaultBranchRef?.name ?? defaultBranch;
-    branches.push(...repository.refs.nodes.map((node) => node.name));
-    // Cap at 500 branches — plenty for a picker.
+    for (const node of repository.refs.nodes) {
+      branches.push(node.name);
+      const date = node.target?.committedDate;
+      if (date) branchDates[node.name] = date;
+    }
+    // Cap at 500 branches — plenty for a picker. Paging is alphabetical, so a
+    // repo over the cap is truncated by name before the sort below sees it.
     cursor =
       repository.refs.pageInfo.hasNextPage && branches.length < 500
         ? repository.refs.pageInfo.endCursor
         : null;
   } while (cursor);
+
+  // Sort by last commit here rather than in the query: GitHub's only
+  // date-ish RefOrder field is TAG_COMMIT_DATE, and for refs/heads it's
+  // ignored — asking for it DESC just returns reverse alphabetical. Branches
+  // whose target isn't a commit (so carry no date) sort last.
+  branches.sort((a, b) => {
+    const dateA = branchDates[a];
+    const dateB = branchDates[b];
+    if (!dateA && !dateB) return a.localeCompare(b);
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+    return dateB.localeCompare(dateA);
+  });
 
   const localBranch = await getLocalCheckoutBranch(repo);
   if (localBranch) {
@@ -1329,7 +1389,13 @@ export async function getBranchInfo(repo: string): Promise<RepoBranchInfo> {
     pullRequestTemplate = null;
   }
 
-  return { branches, defaultBranch, localBranch, pullRequestTemplate };
+  return {
+    branches,
+    branchDates,
+    defaultBranch,
+    localBranch,
+    pullRequestTemplate,
+  };
 }
 
 export async function createPullRequest(

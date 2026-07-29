@@ -26,6 +26,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("getReviewDecision", repo, prNumber),
   setPullRequestState: (repo, prNumber, state) =>
     ipcRenderer.invoke("setPullRequestState", repo, prNumber, state),
+  setPullRequestReady: (repo, prNumber) =>
+    ipcRenderer.invoke("setPullRequestReady", repo, prNumber),
   setPullRequestBase: (repo, prNumber, base) =>
     ipcRenderer.invoke("setPullRequestBase", repo, prNumber, base),
   peekPullRequest: (repo, prNumber) =>

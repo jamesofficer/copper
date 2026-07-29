@@ -36,6 +36,7 @@ import {
   replyToReviewComment,
   setFileViewed,
   setPullRequestBase,
+  setPullRequestReady,
   setPullRequestState,
   setReviewThreadResolved,
   submitReview,
@@ -78,6 +79,7 @@ const handlers: IpcApi = {
   getReviewDecision: (repo, prNumber) => getReviewDecision(repo, prNumber),
   setPullRequestState: (repo, prNumber, state) =>
     setPullRequestState(repo, prNumber, state),
+  setPullRequestReady: (repo, prNumber) => setPullRequestReady(repo, prNumber),
   setPullRequestBase: (repo, prNumber, base) =>
     setPullRequestBase(repo, prNumber, base),
   peekPullRequest: (repo, prNumber) => getPullRequest(repo, prNumber),

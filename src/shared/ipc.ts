@@ -59,6 +59,8 @@ export interface IpcApi {
     prNumber: number,
     state: "open" | "closed",
   ): Promise<void>;
+  // Take a draft PR out of draft ("Ready for review").
+  setPullRequestReady(repo: string, prNumber: number): Promise<void>;
   // Retarget an open PR onto a different base branch.
   setPullRequestBase(
     repo: string,
@@ -260,6 +262,7 @@ export const ipcChannels = [
   "getPullRequest",
   "getReviewDecision",
   "setPullRequestState",
+  "setPullRequestReady",
   "setPullRequestBase",
   "peekPullRequest",
   "peekPullRequestActivity",

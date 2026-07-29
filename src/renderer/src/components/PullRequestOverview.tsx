@@ -28,6 +28,7 @@ import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import CommitTimelineGroup from "./CommitTimelineGroup";
 import Markdown from "./Markdown";
+import MarkReadyButton from "./MarkReadyButton";
 import PrStateBadge from "./PrStateBadge";
 import RelativeTime from "./RelativeTime";
 import ReviewCard from "./ReviewCard";
@@ -360,7 +361,12 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
               Updated <RelativeTime iso={detail.updatedAt} />
             </Text>
           </HStack>
-          {showActions && <ClosePullRequestButton detail={detail} />}
+          {showActions && (
+            <HStack gap="1.5">
+              <MarkReadyButton detail={detail} />
+              <ClosePullRequestButton detail={detail} />
+            </HStack>
+          )}
         </HStack>
       </VStack>
     </Box>

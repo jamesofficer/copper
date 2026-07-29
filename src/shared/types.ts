@@ -80,6 +80,10 @@ export interface RepoBranchInfo {
   // Newest commit first, with the local checkout's branch pinned to the top
   // when it's on GitHub.
   branches: string[];
+  // Branch name → its last commit's date, so pickers can show how recently
+  // each branch moved. Optional: a cached response from before this existed
+  // simply shows no dates.
+  branchDates?: Record<string, string>;
   defaultBranch: string;
   // The local checkout's current branch — null when the repo isn't
   // registered locally or HEAD is detached.
