@@ -25,6 +25,7 @@ import type {
   PullRequestDetail,
 } from "../../../shared/types";
 import ChangesView from "../components/ChangesView";
+import CopyPrLinkButton from "../components/CopyPrLinkButton";
 import DiffViewModeSelect from "../components/DiffViewModeSelect";
 import MergeDialog from "../components/MergeDialog";
 import PullRequestOverview from "../components/PullRequestOverview";
@@ -155,6 +156,7 @@ export default function Review({ pr, onBack }: Props) {
             <LuExternalLink /> Open in GitHub
           </a>
         </Button>
+        <CopyPrLinkButton url={pr.url} />
         <ReanalyzeButton pr={pr} />
         <SubmitReviewDialog pr={pr} disabled={detail?.merged} />
         {detail && <MergeDialog detail={detail} />}
