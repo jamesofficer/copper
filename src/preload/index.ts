@@ -30,6 +30,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("setPullRequestReady", repo, prNumber),
   setPullRequestBase: (repo, prNumber, base) =>
     ipcRenderer.invoke("setPullRequestBase", repo, prNumber, base),
+  setPullRequestBody: (repo, prNumber, body) =>
+    ipcRenderer.invoke("setPullRequestBody", repo, prNumber, body),
   peekPullRequest: (repo, prNumber) =>
     ipcRenderer.invoke("peekPullRequest", repo, prNumber),
   peekPullRequestActivity: (repo, prNumber) =>

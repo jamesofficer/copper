@@ -27,9 +27,9 @@ import ClosePullRequestButton from "./ClosePullRequestButton";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import CommitTimelineGroup from "./CommitTimelineGroup";
-import Markdown from "./Markdown";
 import MarkReadyButton from "./MarkReadyButton";
 import PrStateBadge from "./PrStateBadge";
+import PullRequestDescription from "./PullRequestDescription";
 import RelativeTime from "./RelativeTime";
 import ReviewCard from "./ReviewCard";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
@@ -267,24 +267,7 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
 
         <Separator />
 
-        <Box>
-          <Heading
-            size="xs"
-            color="fg.muted"
-            textTransform="uppercase"
-            letterSpacing="wider"
-            mb="3"
-          >
-            Description
-          </Heading>
-          {detail.body?.trim() ? (
-            <Markdown>{detail.body}</Markdown>
-          ) : (
-            <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-              No description provided.
-            </Text>
-          )}
-        </Box>
+        <PullRequestDescription detail={detail} editable={showActions} />
 
         {comments && (
           <>

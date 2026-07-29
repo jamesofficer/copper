@@ -61,6 +61,12 @@ export interface IpcApi {
   ): Promise<void>;
   // Take a draft PR out of draft ("Ready for review").
   setPullRequestReady(repo: string, prNumber: number): Promise<void>;
+  // Rewrite a pull request's description.
+  setPullRequestBody(
+    repo: string,
+    prNumber: number,
+    body: string,
+  ): Promise<void>;
   // Retarget an open PR onto a different base branch.
   setPullRequestBase(
     repo: string,
@@ -264,6 +270,7 @@ export const ipcChannels = [
   "setPullRequestState",
   "setPullRequestReady",
   "setPullRequestBase",
+  "setPullRequestBody",
   "peekPullRequest",
   "peekPullRequestActivity",
   "listPullRequestFiles",

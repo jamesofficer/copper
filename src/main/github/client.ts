@@ -798,6 +798,24 @@ export async function setPullRequestBase(
   });
 }
 
+export async function setPullRequestBody(
+  repo: string,
+  prNumber: number,
+  body: string,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to update pull requests.",
+    );
+  }
+
+  await githubFetch(token, `/repos/${repo}/pulls/${prNumber}`, {
+    method: "PATCH",
+    body: { body },
+  });
+}
+
 // Take a draft PR out of draft — GitHub's "Ready for review". GraphQL only;
 // there's no REST endpoint for it.
 export async function setPullRequestReady(
