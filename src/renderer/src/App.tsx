@@ -60,6 +60,14 @@ export default function App() {
     setSelected(pr);
   }
 
+  // Picking a repo means "show me this repo's open pull requests", so it leaves
+  // the review screen. Any preview belonged to the old repo, so it goes too.
+  function selectRepo(path: string) {
+    setActivePath(path);
+    setSelected(null);
+    setPreview(null);
+  }
+
   function clearRecent() {
     clearRecentPullRequests();
     setRecent([]);
@@ -72,7 +80,7 @@ export default function App() {
           repositories={repos.repositories}
           reposPending={repos.reposPending}
           activePath={activeRepo?.path ?? null}
-          onSelectRepo={setActivePath}
+          onSelectRepo={selectRepo}
           onAddRepo={repos.addRepository}
           onRemoveRepo={repos.removeRepository}
           onReorderRepos={repos.reorderRepositories}
