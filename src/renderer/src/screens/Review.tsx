@@ -32,6 +32,7 @@ import PullRequestActionsMenu from "../components/PullRequestActionsMenu";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReanalyzeButton from "../components/ReanalyzeButton";
 import ReviewPanel from "../components/ReviewPanel";
+import { dragRegion, trafficLightSpace } from "../lib/titleBar";
 
 interface Props {
   pr: PullRequest;
@@ -109,11 +110,13 @@ export default function Review({ pr, onBack }: Props) {
     <Flex direction="column" h="100vh">
       <HStack
         gap="3"
-        px="4"
+        pl={trafficLightSpace}
+        pr="4"
         py="3"
         borderBottomWidth="1px"
         flexShrink="0"
         align="center"
+        css={dragRegion}
       >
         <Button variant="outline" size="xs" onClick={onBack}>
           <LuArrowLeft /> Back

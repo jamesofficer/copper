@@ -1,4 +1,9 @@
-import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
+import {
+  createSystem,
+  defaultConfig,
+  defineConfig,
+  type SystemStyleObject,
+} from "@chakra-ui/react";
 import { accentPalettes, defaultAccent } from "./lib/accent";
 
 // One rule per palette: whichever data-accent <html> carries wins. applyAccent
@@ -20,6 +25,12 @@ const config = defineConfig({
       bg: "bg",
       color: "fg",
     },
+    // The app's top bars are window drag regions (lib/titleBar.ts), and a drag
+    // region swallows clicks on whatever sits inside it — so anything meant to
+    // be clicked opts out, wherever it is.
+    "button, a, input, textarea, select, [role='button']": {
+      "-webkit-app-region": "no-drag",
+    } as SystemStyleObject,
   },
   theme: {
     tokens: {

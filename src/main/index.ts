@@ -25,6 +25,15 @@ function createWindow(): void {
   const window = new BrowserWindow({
     width: 1440,
     height: 900,
+    // No system title bar on macOS — the app draws its own top bar and the
+    // traffic lights sit inside it. The renderer leaves room for them and
+    // marks those bars as drag regions.
+    ...(process.platform === "darwin"
+      ? {
+          titleBarStyle: "hidden" as const,
+          trafficLightPosition: { x: 18, y: 14 },
+        }
+      : {}),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
     },

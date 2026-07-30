@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Collapsible,
   Flex,
@@ -32,6 +33,7 @@ import {
 import { type RecentPullRequest, timeAgo } from "../lib/recentPrs";
 import { scrollbar } from "../lib/scrollbar";
 import { setSectionOpen, useCollapsedSections } from "../lib/sidebarSections";
+import { dragRegion, titleBarHeight } from "../lib/titleBar";
 import AnalyzedSidebarList from "./AnalyzedSidebarList";
 import CommentCountBadge from "./CommentCountBadge";
 import RepositoryList from "./RepositoryList";
@@ -104,6 +106,16 @@ export default function HomeSidebar({
       minH="0"
       borderRightWidth="1px"
     >
+      {/* Room for the window's traffic lights, which macOS draws over this
+          corner. Its height matches the main column's header so the two line
+          up, and it doubles as the window's drag handle. */}
+      <Box
+        h={titleBarHeight}
+        flexShrink="0"
+        borderBottomWidth="1px"
+        css={dragRegion}
+      />
+
       <Stack
         flex="1"
         minH="0"

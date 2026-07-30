@@ -27,6 +27,7 @@ import {
   listRecentPullRequests,
 } from "../lib/recentPrs";
 import { scrollbar } from "../lib/scrollbar";
+import { dragRegion, titleBarHeight } from "../lib/titleBar";
 
 interface Props {
   onSelect(pr: PullRequest): void;
@@ -150,11 +151,12 @@ export default function Welcome({
       <Flex direction="column" flex="1" minW="0">
         <HStack
           flexShrink="0"
+          h={titleBarHeight}
           px="4"
-          py="2.5"
           gap="2"
           borderBottomWidth="1px"
           color="fg.muted"
+          css={dragRegion}
         >
           <LuGitPullRequest />
           <Heading size="sm">Open pull requests</Heading>
