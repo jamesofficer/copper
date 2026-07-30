@@ -1,5 +1,6 @@
-import { Button, CloseButton, Dialog, Portal, Tabs } from "@chakra-ui/react";
+import { Box, CloseButton, Dialog, Flex, Portal, Tabs } from "@chakra-ui/react";
 import { LuBrain, LuKeyRound, LuPalette, LuSparkles } from "react-icons/lu";
+import { scrollbar } from "../lib/scrollbar";
 import ApiKeysSettings from "./ApiKeysSettings";
 import AppearanceSettings from "./AppearanceSettings";
 import ModelSettings from "./ModelSettings";
@@ -10,61 +11,104 @@ interface Props {
   onOpenChange(open: boolean): void;
 }
 
+const TABS = [
+  { value: "appearance", label: "Appearance", icon: <LuPalette /> },
+  { value: "review", label: "Review", icon: <LuSparkles /> },
+  { value: "models", label: "Models", icon: <LuBrain /> },
+  { value: "keys", label: "Connections", icon: <LuKeyRound /> },
+];
+
 export default function SettingsDialog({ open, onOpenChange }: Props) {
   return (
     <Dialog.Root
       open={open}
       onOpenChange={(event) => onOpenChange(event.open)}
       placement="center"
-      size="lg"
+      size="xl"
+      lazyMount
+      unmountOnExit
     >
       <Portal>
-        <Dialog.Backdrop />
+        <Dialog.Backdrop backdropFilter="blur(2px)" />
         <Dialog.Positioner>
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title>Settings</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <Tabs.Root
-                defaultValue="appearance"
-                orientation="vertical"
-                variant="subtle"
-                minH="sm"
+          <Dialog.Content
+            maxW="4xl"
+            w="full"
+            h="min(40rem, 86vh)"
+            overflow="hidden"
+            p="0"
+          >
+            <Tabs.Root
+              defaultValue="appearance"
+              orientation="vertical"
+              variant="subtle"
+              h="full"
+              minH="0"
+            >
+              <Flex
+                direction="column"
+                w="56"
+                flexShrink="0"
+                gap="3"
+                p="3"
+                borderRightWidth="1px"
+                bg="bg.subtle"
               >
-                <Tabs.List gap="1" minW="36" flexShrink="0">
-                  <Tabs.Trigger value="appearance" justifyContent="flex-start">
-                    <LuPalette /> Appearance
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="review" justifyContent="flex-start">
-                    <LuSparkles /> Review
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="models" justifyContent="flex-start">
-                    <LuBrain /> Models
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="keys" justifyContent="flex-start">
-                    <LuKeyRound /> Connections
-                  </Tabs.Trigger>
+                <Dialog.Title
+                  px="2"
+                  pt="1"
+                  fontSize="xs"
+                  fontWeight="semibold"
+                  textTransform="uppercase"
+                  letterSpacing="wider"
+                  color="fg.muted"
+                >
+                  Settings
+                </Dialog.Title>
+                <Tabs.List
+                  gap="1"
+                  w="full"
+                  border="none"
+                  flexDirection="column"
+                  alignItems="stretch"
+                >
+                  {TABS.map((tab) => (
+                    <Tabs.Trigger
+                      key={tab.value}
+                      value={tab.value}
+                      justifyContent="flex-start"
+                      cursor="pointer"
+                      fontSize="sm"
+                    >
+                      {tab.icon} {tab.label}
+                    </Tabs.Trigger>
+                  ))}
                 </Tabs.List>
-                <Tabs.Content value="appearance" pl="6" py="0" flex="1">
+              </Flex>
+
+              <Box
+                flex="1"
+                minW="0"
+                minH="0"
+                overflowY="auto"
+                css={scrollbar}
+                p="6"
+              >
+                <Tabs.Content value="appearance" p="0">
                   <AppearanceSettings />
                 </Tabs.Content>
-                <Tabs.Content value="review" pl="6" py="0" flex="1">
+                <Tabs.Content value="review" p="0">
                   <ReviewSettings />
                 </Tabs.Content>
-                <Tabs.Content value="models" pl="6" py="0" flex="1">
+                <Tabs.Content value="models" p="0">
                   <ModelSettings />
                 </Tabs.Content>
-                <Tabs.Content value="keys" pl="6" py="0" flex="1">
+                <Tabs.Content value="keys" p="0">
                   <ApiKeysSettings open={open} />
                 </Tabs.Content>
-              </Tabs.Root>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Dialog.ActionTrigger asChild>
-                <Button variant="outline">Done</Button>
-              </Dialog.ActionTrigger>
-            </Dialog.Footer>
+              </Box>
+            </Tabs.Root>
+
             <Dialog.CloseTrigger asChild>
               <CloseButton size="sm" />
             </Dialog.CloseTrigger>

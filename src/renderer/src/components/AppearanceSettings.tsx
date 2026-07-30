@@ -3,7 +3,6 @@ import {
   createListCollection,
   HStack,
   Select,
-  Stack,
   Text,
 } from "@chakra-ui/react";
 import type { ReactNode } from "react";
@@ -27,6 +26,7 @@ import {
   setFilePathDisplay,
   useFilePathDisplay,
 } from "../lib/filePathDisplay";
+import { SettingRow, SettingsGroup, SettingsPanel } from "./SettingsLayout";
 
 const modeLabels: Record<ColorModeSetting, string> = {
   light: "Light",
@@ -70,23 +70,6 @@ function Swatch({ palette }: { palette: string }) {
   );
 }
 
-function SettingHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
-  return (
-    <Box>
-      <Text fontWeight="medium">{title}</Text>
-      <Text fontSize="sm" color="fg.muted">
-        {description}
-      </Text>
-    </Box>
-  );
-}
-
 export default function AppearanceSettings() {
   const pathDisplay = useFilePathDisplay();
   const [mode, setMode] = useState<ColorModeSetting>(getColorMode);
@@ -103,126 +86,128 @@ export default function AppearanceSettings() {
   }
 
   return (
-    <Stack gap="6">
-      <Stack gap="3">
-        <SettingHeader
+    <SettingsPanel
+      title="Appearance"
+      description="How the app looks: its theme, accent colour, and the way file paths are written."
+    >
+      <SettingsGroup>
+        <SettingRow
           title="Theme"
           description="Light, dark, or follow your system setting."
-        />
-        <Select.Root
-          collection={modeCollection}
-          value={[mode]}
-          onValueChange={(event) =>
-            selectMode(event.value[0] as ColorModeSetting)
-          }
-          size="sm"
-          maxW="56"
         >
-          <Select.HiddenSelect />
-          <Select.Control>
-            <Select.Trigger cursor="pointer">
-              <HStack gap="2" minW="0">
-                {modeIcons[mode]}
-                <Select.ValueText />
-              </HStack>
-            </Select.Trigger>
-            <Select.IndicatorGroup>
-              <Select.Indicator />
-            </Select.IndicatorGroup>
-          </Select.Control>
-          <Select.Positioner>
-            <Select.Content>
-              {modeCollection.items.map((item) => (
-                <Select.Item item={item} key={item.value}>
-                  <HStack gap="2" flex="1" minW="0">
-                    {modeIcons[item.value]}
-                    <Text>{item.label}</Text>
-                  </HStack>
-                  <Select.ItemIndicator />
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Positioner>
-        </Select.Root>
-      </Stack>
+          <Select.Root
+            collection={modeCollection}
+            value={[mode]}
+            onValueChange={(event) =>
+              selectMode(event.value[0] as ColorModeSetting)
+            }
+            size="sm"
+            w="52"
+          >
+            <Select.HiddenSelect />
+            <Select.Control>
+              <Select.Trigger cursor="pointer">
+                <HStack gap="2" minW="0">
+                  {modeIcons[mode]}
+                  <Select.ValueText />
+                </HStack>
+              </Select.Trigger>
+              <Select.IndicatorGroup>
+                <Select.Indicator />
+              </Select.IndicatorGroup>
+            </Select.Control>
+            <Select.Positioner>
+              <Select.Content>
+                {modeCollection.items.map((item) => (
+                  <Select.Item item={item} key={item.value}>
+                    <HStack gap="2" flex="1" minW="0">
+                      {modeIcons[item.value]}
+                      <Text>{item.label}</Text>
+                    </HStack>
+                    <Select.ItemIndicator />
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Positioner>
+          </Select.Root>
+        </SettingRow>
 
-      <Stack gap="3">
-        <SettingHeader
+        <SettingRow
           title="Accent colour"
           description="Used for buttons, tabs, links, and highlights across the app."
-        />
-        <Select.Root
-          collection={accentCollection}
-          value={[accent]}
-          onValueChange={(event) =>
-            selectAccent(event.value[0] as AccentPalette)
-          }
-          size="sm"
-          maxW="56"
         >
-          <Select.HiddenSelect />
-          <Select.Control>
-            <Select.Trigger cursor="pointer">
-              <HStack gap="2" minW="0">
-                <Swatch palette={accent} />
-                <Select.ValueText textTransform="capitalize" />
-              </HStack>
-            </Select.Trigger>
-            <Select.IndicatorGroup>
-              <Select.Indicator />
-            </Select.IndicatorGroup>
-          </Select.Control>
-          <Select.Positioner>
-            <Select.Content>
-              {accentCollection.items.map((item) => (
-                <Select.Item item={item} key={item.value}>
-                  <HStack gap="2" flex="1" minW="0">
-                    <Swatch palette={item.value} />
-                    <Text textTransform="capitalize">{item.label}</Text>
-                  </HStack>
-                  <Select.ItemIndicator />
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Positioner>
-        </Select.Root>
-      </Stack>
+          <Select.Root
+            collection={accentCollection}
+            value={[accent]}
+            onValueChange={(event) =>
+              selectAccent(event.value[0] as AccentPalette)
+            }
+            size="sm"
+            w="52"
+          >
+            <Select.HiddenSelect />
+            <Select.Control>
+              <Select.Trigger cursor="pointer">
+                <HStack gap="2" minW="0">
+                  <Swatch palette={accent} />
+                  <Select.ValueText textTransform="capitalize" />
+                </HStack>
+              </Select.Trigger>
+              <Select.IndicatorGroup>
+                <Select.Indicator />
+              </Select.IndicatorGroup>
+            </Select.Control>
+            <Select.Positioner>
+              <Select.Content>
+                {accentCollection.items.map((item) => (
+                  <Select.Item item={item} key={item.value}>
+                    <HStack gap="2" flex="1" minW="0">
+                      <Swatch palette={item.value} />
+                      <Text textTransform="capitalize">{item.label}</Text>
+                    </HStack>
+                    <Select.ItemIndicator />
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Positioner>
+          </Select.Root>
+        </SettingRow>
 
-      <Stack gap="3">
-        <SettingHeader
+        <SettingRow
           title="File paths"
           description="How file paths are written in the Changes tab's file list."
-        />
-        <Select.Root
-          collection={pathDisplayCollection}
-          value={[pathDisplay]}
-          onValueChange={(event) =>
-            setFilePathDisplay(event.value[0] as FilePathDisplay)
-          }
-          size="sm"
-          maxW="56"
         >
-          <Select.HiddenSelect />
-          <Select.Control>
-            <Select.Trigger cursor="pointer">
-              <Select.ValueText />
-            </Select.Trigger>
-            <Select.IndicatorGroup>
-              <Select.Indicator />
-            </Select.IndicatorGroup>
-          </Select.Control>
-          <Select.Positioner>
-            <Select.Content>
-              {pathDisplayCollection.items.map((item) => (
-                <Select.Item item={item} key={item.value}>
-                  <Text flex="1">{item.label}</Text>
-                  <Select.ItemIndicator />
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Positioner>
-        </Select.Root>
-      </Stack>
-    </Stack>
+          <Select.Root
+            collection={pathDisplayCollection}
+            value={[pathDisplay]}
+            onValueChange={(event) =>
+              setFilePathDisplay(event.value[0] as FilePathDisplay)
+            }
+            size="sm"
+            w="52"
+          >
+            <Select.HiddenSelect />
+            <Select.Control>
+              <Select.Trigger cursor="pointer">
+                <Select.ValueText />
+              </Select.Trigger>
+              <Select.IndicatorGroup>
+                <Select.Indicator />
+              </Select.IndicatorGroup>
+            </Select.Control>
+            <Select.Positioner>
+              <Select.Content>
+                {pathDisplayCollection.items.map((item) => (
+                  <Select.Item item={item} key={item.value}>
+                    <Text flex="1">{item.label}</Text>
+                    <Select.ItemIndicator />
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Positioner>
+          </Select.Root>
+        </SettingRow>
+      </SettingsGroup>
+    </SettingsPanel>
   );
 }

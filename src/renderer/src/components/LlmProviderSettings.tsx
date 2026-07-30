@@ -1,5 +1,6 @@
-import { Field, RadioGroup, Stack, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, RadioCard, Stack, Text } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { LuCircleAlert, LuInfo } from "react-icons/lu";
 import type { LlmProviderChoice, LlmStatus } from "../../../shared/types";
 
 interface Choice {
@@ -67,40 +68,49 @@ export default function LlmProviderSettings() {
   const line = status ? statusLine(status) : null;
 
   return (
-    <Field.Root>
-      <Field.Label>Claude access</Field.Label>
-      <RadioGroup.Root
+    <Stack gap="3">
+      <RadioCard.Root
         value={status?.choice ?? "auto"}
         onValueChange={(details) => {
           if (details.value)
             mutation.mutate(details.value as LlmProviderChoice);
         }}
         disabled={!status}
+        size="sm"
+        variant="surface"
       >
-        <Stack gap="2" mt="1">
+        <HStack alignItems="stretch" gap="2">
           {CHOICES.map((choice) => (
-            <RadioGroup.Item
-              key={choice.value}
-              value={choice.value}
-              alignItems="flex-start"
-            >
-              <RadioGroup.ItemHiddenInput />
-              <RadioGroup.ItemIndicator mt="1" />
-              <VStack gap="0" alignItems="flex-start">
-                <RadioGroup.ItemText>{choice.label}</RadioGroup.ItemText>
-                <Text fontSize="xs" color="fg.muted">
-                  {choice.description}
-                </Text>
-              </VStack>
-            </RadioGroup.Item>
+            <RadioCard.Item key={choice.value} value={choice.value} flex="1">
+              <RadioCard.ItemHiddenInput />
+              <RadioCard.ItemControl cursor="pointer">
+                <RadioCard.ItemContent>
+                  <RadioCard.ItemText fontSize="sm">
+                    {choice.label}
+                  </RadioCard.ItemText>
+                  <RadioCard.ItemDescription fontSize="xs" lineHeight="1.4">
+                    {choice.description}
+                  </RadioCard.ItemDescription>
+                </RadioCard.ItemContent>
+              </RadioCard.ItemControl>
+            </RadioCard.Item>
           ))}
-        </Stack>
-      </RadioGroup.Root>
+        </HStack>
+      </RadioCard.Root>
       {line && (
-        <Text fontSize="sm" color={line.warn ? "orange.fg" : "fg.muted"}>
-          {line.text}
-        </Text>
+        <HStack
+          gap="2"
+          alignItems="flex-start"
+          color={line.warn ? "orange.fg" : "fg.muted"}
+        >
+          <Box mt="0.5" flexShrink="0">
+            {line.warn ? <LuCircleAlert size={14} /> : <LuInfo size={14} />}
+          </Box>
+          <Text fontSize="xs" lineHeight="1.5">
+            {line.text}
+          </Text>
+        </HStack>
       )}
-    </Field.Root>
+    </Stack>
   );
 }

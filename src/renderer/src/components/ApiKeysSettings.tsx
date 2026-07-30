@@ -1,17 +1,9 @@
-import {
-  Badge,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Separator,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
+import { Badge, Button, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import type { KeyTestResult, SecretProvider } from "../../../shared/types";
 import LlmProviderSettings from "./LlmProviderSettings";
+import { SettingRow, SettingsGroup, SettingsPanel } from "./SettingsLayout";
 
 interface Props {
   open: boolean;
@@ -88,65 +80,88 @@ export default function ApiKeysSettings({ open }: Props) {
   }
 
   return (
-    <Stack gap="7">
-      <LlmProviderSettings />
-      <Separator />
-      {PROVIDERS.map((provider) => {
-        const configured = status?.[provider.id] ?? false;
-        const result = results[provider.id];
-        return (
-          <Field.Root key={provider.id}>
-            <HStack justifyContent="space-between" w="full">
-              <Field.Label>{provider.label}</Field.Label>
-              <Badge
-                colorPalette={configured ? "green" : "gray"}
-                variant="surface"
-                size="xs"
-              >
-                {configured ? "Configured" : "Not set"}
-              </Badge>
-            </HStack>
-            <HStack w="full">
-              <Input
-                type="password"
-                fontFamily="mono"
-                placeholder={configured ? "••••••••" : provider.placeholder}
-                value={values[provider.id]}
-                onChange={(event) =>
-                  setValues((prev) => ({
-                    ...prev,
-                    [provider.id]: event.target.value,
-                  }))
-                }
-              />
-              <Button
-                onClick={() => save(provider.id)}
-                loading={busy === provider.id}
-                disabled={!values[provider.id].trim()}
-              >
-                Save
-              </Button>
-              {configured && (
-                <Button
-                  variant="outline"
-                  colorPalette="red"
-                  onClick={() => clear(provider.id)}
-                  loading={busy === provider.id}
-                >
-                  Remove
-                </Button>
-              )}
-            </HStack>
-            {result ? (
-              <Text fontSize="sm" color={result.ok ? "green.fg" : "fg.error"}>
-                {result.message}
-              </Text>
-            ) : (
-              <Field.HelperText>{provider.help}</Field.HelperText>
-            )}
-          </Field.Root>
-        );
-      })}
-    </Stack>
+    <SettingsPanel
+      title="Connections"
+      description="How the app reaches Claude and GitHub. Keys are encrypted on this machine and never leave it."
+    >
+      <SettingsGroup>
+        <SettingRow
+          title="Claude access"
+          description="Run on your Claude Code login, or on an API key."
+          stacked
+        >
+          <LlmProviderSettings />
+        </SettingRow>
+      </SettingsGroup>
+
+      <SettingsGroup>
+        {PROVIDERS.map((provider) => {
+          const configured = status?.[provider.id] ?? false;
+          const result = results[provider.id];
+          return (
+            <SettingRow
+              key={provider.id}
+              title={provider.label}
+              description={provider.help}
+              stacked
+            >
+              <Stack gap="2">
+                <HStack w="full">
+                  <Input
+                    type="password"
+                    size="sm"
+                    fontFamily="mono"
+                    placeholder={configured ? "••••••••" : provider.placeholder}
+                    value={values[provider.id]}
+                    onChange={(event) =>
+                      setValues((prev) => ({
+                        ...prev,
+                        [provider.id]: event.target.value,
+                      }))
+                    }
+                  />
+                  <Button
+                    size="sm"
+                    onClick={() => save(provider.id)}
+                    loading={busy === provider.id}
+                    disabled={!values[provider.id].trim()}
+                  >
+                    Save
+                  </Button>
+                  {configured && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      colorPalette="red"
+                      onClick={() => clear(provider.id)}
+                      loading={busy === provider.id}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </HStack>
+                <HStack gap="2">
+                  <Badge
+                    colorPalette={configured ? "green" : "gray"}
+                    variant="surface"
+                    size="xs"
+                  >
+                    {configured ? "Configured" : "Not set"}
+                  </Badge>
+                  {result && (
+                    <Text
+                      fontSize="xs"
+                      color={result.ok ? "green.fg" : "fg.error"}
+                    >
+                      {result.message}
+                    </Text>
+                  )}
+                </HStack>
+              </Stack>
+            </SettingRow>
+          );
+        })}
+      </SettingsGroup>
+    </SettingsPanel>
   );
 }

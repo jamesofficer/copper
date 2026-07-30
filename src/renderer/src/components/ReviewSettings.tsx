@@ -1,5 +1,4 @@
 import {
-  Box,
   createListCollection,
   Select,
   Stack,
@@ -17,11 +16,13 @@ import {
   personalityOptions,
   setReviewPersonality,
 } from "../lib/reviewPersonality";
+import { SettingRow, SettingsGroup, SettingsPanel } from "./SettingsLayout";
 
 const personalityCollection = createListCollection({
   items: personalityOptions.map((option) => ({
     label: option.label,
     value: option.value,
+    description: option.description,
   })),
 });
 
@@ -48,76 +49,76 @@ export default function ReviewSettings() {
   }
 
   return (
-    <Stack gap="6">
-      <Stack gap="3">
-        <Box>
-          <Text fontWeight="medium">Review personality</Text>
-          <Text fontSize="sm" color="fg.muted">
-            The voice the analysis is written in. Changes the wording only —
-            never what gets reported.
-          </Text>
-        </Box>
-        <Select.Root
-          collection={personalityCollection}
-          value={[personality]}
-          onValueChange={(event) =>
-            selectPersonality(event.value[0] as ReviewPersonality)
-          }
-          size="sm"
-          maxW="56"
+    <SettingsPanel
+      title="Review"
+      description="How the agent reads a pull request, and how much of it runs on its own."
+    >
+      <SettingsGroup>
+        <SettingRow
+          title="Review personality"
+          description="The voice the analysis is written in. Changes the wording only — never what gets reported. Applies to new analyses; already-analysed PRs keep their text."
         >
-          <Select.HiddenSelect />
-          <Select.Control>
-            <Select.Trigger cursor="pointer">
-              <Select.ValueText />
-            </Select.Trigger>
-            <Select.IndicatorGroup>
-              <Select.Indicator />
-            </Select.IndicatorGroup>
-          </Select.Control>
-          <Select.Positioner>
-            <Select.Content>
-              {personalityCollection.items.map((item) => (
-                <Select.Item item={item} key={item.value}>
-                  <Text>{item.label}</Text>
-                  <Select.ItemIndicator />
-                </Select.Item>
-              ))}
-            </Select.Content>
-          </Select.Positioner>
-        </Select.Root>
-        <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-          {descriptionFor(personality)}
-        </Text>
-        <Text fontSize="xs" color="fg.subtle">
-          Applies to new analyses. Already-analysed PRs keep their existing
-          text.
-        </Text>
-      </Stack>
+          <Stack gap="1.5" alignItems="flex-end">
+            <Select.Root
+              collection={personalityCollection}
+              value={[personality]}
+              onValueChange={(event) =>
+                selectPersonality(event.value[0] as ReviewPersonality)
+              }
+              size="sm"
+              w="52"
+            >
+              <Select.HiddenSelect />
+              <Select.Control>
+                <Select.Trigger cursor="pointer">
+                  <Select.ValueText />
+                </Select.Trigger>
+                <Select.IndicatorGroup>
+                  <Select.Indicator />
+                </Select.IndicatorGroup>
+              </Select.Control>
+              <Select.Positioner>
+                <Select.Content>
+                  {personalityCollection.items.map((item) => (
+                    <Select.Item item={item} key={item.value}>
+                      <Stack gap="0" alignItems="flex-start">
+                        <Text>{item.label}</Text>
+                        <Text fontSize="xs" color="fg.muted">
+                          {item.description}
+                        </Text>
+                      </Stack>
+                      <Select.ItemIndicator />
+                    </Select.Item>
+                  ))}
+                </Select.Content>
+              </Select.Positioner>
+            </Select.Root>
+            <Text
+              fontSize="xs"
+              color="fg.subtle"
+              w="52"
+              textAlign="right"
+              lineHeight="1.4"
+            >
+              {descriptionFor(personality)}
+            </Text>
+          </Stack>
+        </SettingRow>
 
-      <Stack gap="3">
-        <Box>
-          <Text fontWeight="medium">Find issues when analysing</Text>
-          <Text fontSize="sm" color="fg.muted">
-            After each analysis, automatically run the deeper agent pass that
-            checks the repo beyond the diff and verifies the flagged risks.
-            Roughly doubles the cost of a scan.
-          </Text>
-        </Box>
-        <Switch.Root
-          checked={findIssues}
-          onCheckedChange={(event) => toggleFindIssues(event.checked)}
-          size="sm"
+        <SettingRow
+          title="Find issues when analysing"
+          description="After each analysis, run the deeper agent pass that checks the repo beyond the diff and verifies the flagged risks. Roughly doubles the cost of a scan."
         >
-          <Switch.HiddenInput />
-          <Switch.Control />
-          <Switch.Label>
-            {findIssues
-              ? "On — runs with every analysis"
-              : "Off — run it manually from the Issues section"}
-          </Switch.Label>
-        </Switch.Root>
-      </Stack>
-    </Stack>
+          <Switch.Root
+            checked={findIssues}
+            onCheckedChange={(event) => toggleFindIssues(event.checked)}
+            size="lg"
+          >
+            <Switch.HiddenInput />
+            <Switch.Control />
+          </Switch.Root>
+        </SettingRow>
+      </SettingsGroup>
+    </SettingsPanel>
   );
 }
