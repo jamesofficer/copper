@@ -86,6 +86,23 @@ export async function listAnalyzedPullRequests(): Promise<
     }));
 }
 
+// Drops every analysis of a PR — the sidebar's Analysed list is this cache, so
+// clearing a row means forgetting the saved analyses behind it.
+export async function deleteAnalyses(
+  repo: string,
+  prNumber: number,
+): Promise<void> {
+  const store = await loadCache();
+  let removed = false;
+  for (const [key, result] of store) {
+    if (result.repo === repo && result.prNumber === prNumber) {
+      store.delete(key);
+      removed = true;
+    }
+  }
+  if (removed) await persist(store);
+}
+
 export async function setCachedAnalysis(result: AnalysisResult): Promise<void> {
   const store = await loadCache();
   store.set(cacheKey(result.repo, result.prNumber, result.headSha), result);

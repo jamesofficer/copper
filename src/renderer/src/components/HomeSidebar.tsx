@@ -172,6 +172,12 @@ export default function HomeSidebar({
 
         <SectionDivider />
 
+        <Section id="analysed" title="Analysed">
+          <AnalyzedSidebarList onSelect={onSelectPullRequest} />
+        </Section>
+
+        <SectionDivider />
+
         <Section
           id="reviewRequests"
           title="Review requests"
@@ -274,12 +280,6 @@ export default function HomeSidebar({
               />
             ))
           )}
-        </Section>
-
-        <SectionDivider />
-
-        <Section id="analysed" title="Analysed">
-          <AnalyzedSidebarList onSelect={onSelectPullRequest} />
         </Section>
 
         <SectionDivider />

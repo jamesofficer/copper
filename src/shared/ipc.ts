@@ -205,6 +205,8 @@ export interface IpcApi {
     explanationId: string,
   ): Promise<void>;
   listAnalyzedPullRequests(): Promise<AnalyzedPullRequest[]>;
+  // Forgets every cached analysis of a PR, whichever commit it ran on.
+  deleteAnalyses(repo: string, prNumber: number): Promise<void>;
   analyzePullRequest(
     repo: string,
     prNumber: number,
@@ -304,6 +306,7 @@ export const ipcChannels = [
   "explainSelection",
   "deleteExplanation",
   "listAnalyzedPullRequests",
+  "deleteAnalyses",
   "analyzePullRequest",
   "askQuestion",
   "getChatHistory",

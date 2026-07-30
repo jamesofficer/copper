@@ -151,13 +151,13 @@ export default function Review({ pr, onBack }: Props) {
             <LuRefreshCw />
           </IconButton>
         )}
+        <FavouritePrButton pr={pr} />
         <Button asChild variant="outline" size="xs">
           <a href={pr.url} target="_blank" rel="noreferrer">
             <LuExternalLink /> Open in GitHub
           </a>
         </Button>
         <CopyPrLinkButton url={pr.url} />
-        <FavouritePrButton pr={pr} />
         <ReanalyzeButton pr={pr} />
         {detail && <PullRequestActionsMenu pr={pr} detail={detail} />}
       </HStack>

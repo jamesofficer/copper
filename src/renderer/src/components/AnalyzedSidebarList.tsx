@@ -1,9 +1,10 @@
-import { Box, Skeleton, Spinner, Text } from "@chakra-ui/react";
+import { Box, HStack, Skeleton, Spinner, Text } from "@chakra-ui/react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { LuGitPullRequest } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import { timeAgo } from "../lib/recentPrs";
+import ClearAnalysisButton from "./ClearAnalysisButton";
 import SidebarPullRequestRow from "./SidebarPullRequestRow";
 import UserAvatar from "./UserAvatar";
 
@@ -56,9 +57,17 @@ export default function AnalyzedSidebarList({ onSelect }: Props) {
         const detail = detailQueries[index]?.data;
         if (!detail) {
           return detailQueries[index]?.isError ? (
-            <Text key={key} fontSize="xs" color="fg.muted" px="2">
-              {key} couldn’t be loaded.
-            </Text>
+            // Still offer the clear button — an entry whose PR no longer loads
+            // is exactly the kind worth clearing.
+            <HStack key={key} px="2" gap="1">
+              <Text fontSize="xs" color="fg.muted" flex="1" truncate>
+                {key} couldn’t be loaded.
+              </Text>
+              <ClearAnalysisButton
+                repo={entry.repo}
+                prNumber={entry.prNumber}
+              />
+            </HStack>
           ) : (
             <Skeleton key={key} h="7" rounded="md" mx="2" />
           );
@@ -88,6 +97,12 @@ export default function AnalyzedSidebarList({ onSelect }: Props) {
               >
                 {timeAgo(entry.analyzedAt)}
               </Box>
+            }
+            actions={
+              <ClearAnalysisButton
+                repo={entry.repo}
+                prNumber={entry.prNumber}
+              />
             }
           />
         );

@@ -6,7 +6,7 @@ import {
   explainSelection,
   getChatHistory,
 } from "../agent/session";
-import { listAnalyzedPullRequests } from "../analysis/cache";
+import { deleteAnalyses, listAnalyzedPullRequests } from "../analysis/cache";
 import { findIssues, getExistingFindings } from "../analysis/findings";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
@@ -135,6 +135,7 @@ const handlers: IpcApi = {
   deleteExplanation: (repo, prNumber, explanationId) =>
     deleteExplanation(repo, prNumber, explanationId),
   listAnalyzedPullRequests: () => listAnalyzedPullRequests(),
+  deleteAnalyses: (repo, prNumber) => deleteAnalyses(repo, prNumber),
   analyzePullRequest: (repo, prNumber, personality, force) =>
     analyzePullRequest(repo, prNumber, personality, force),
   askQuestion: (repo, prNumber, question) =>

@@ -105,6 +105,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("deleteExplanation", repo, prNumber, explanationId),
   listAnalyzedPullRequests: () =>
     ipcRenderer.invoke("listAnalyzedPullRequests"),
+  deleteAnalyses: (repo, prNumber) =>
+    ipcRenderer.invoke("deleteAnalyses", repo, prNumber),
   analyzePullRequest: (repo, prNumber, personality, force) =>
     ipcRenderer.invoke(
       "analyzePullRequest",
