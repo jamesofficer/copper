@@ -31,6 +31,8 @@ import PullRequestActionsMenu from "../components/PullRequestActionsMenu";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReanalyzeButton from "../components/ReanalyzeButton";
 import ReviewPanel from "../components/ReviewPanel";
+import ShowSidebarButton from "../components/ShowSidebarButton";
+import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
 
 interface Props {
@@ -71,6 +73,9 @@ function describeActivity(
 export default function Review({ pr, onBack }: Props) {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
+  // With the sidebar hidden its header is gone too, so this bar takes over
+  // holding the window's traffic lights clear.
+  const collapsed = useSidebarCollapsed();
 
   // Same key as the Overview tab's query, so the two share one fetch.
   const detailQuery = useQuery({
@@ -106,12 +111,12 @@ export default function Review({ pr, onBack }: Props) {
   }
 
   return (
-    <Flex direction="column" h="100vh">
+    <Flex direction="column" flex="1" minW="0" minH="0">
       {/* One row, the same height as the home screen's bar, so the window's
           traffic lights sit centred in both. */}
       <HStack
         gap="2"
-        pl={trafficLightSpace}
+        pl={collapsed ? trafficLightSpace : "4"}
         pr="4"
         h={titleBarHeight}
         borderBottomWidth="1px"
@@ -119,6 +124,7 @@ export default function Review({ pr, onBack }: Props) {
         align="center"
         css={dragRegion}
       >
+        <ShowSidebarButton />
         <Button variant="outline" size="xs" onClick={onBack}>
           <LuArrowLeft /> Back
         </Button>

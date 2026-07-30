@@ -2,7 +2,7 @@ import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LuGitPullRequest } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
-import { sidebarHover } from "../lib/sidebarStyles";
+import { sidebarHover, sidebarSelected } from "../lib/sidebarStyles";
 
 interface Props {
   pr: PullRequest;
@@ -11,6 +11,8 @@ interface Props {
   leading?: ReactNode;
   // Row-level buttons, revealed over the meta slot while the row is hovered.
   actions?: ReactNode;
+  // Marks the PR the review screen is showing.
+  selected?: boolean;
   onSelect(pr: PullRequest): void;
 }
 
@@ -21,6 +23,7 @@ export default function SidebarPullRequestRow({
   meta,
   leading,
   actions,
+  selected,
   onSelect,
 }: Props) {
   return (
@@ -28,7 +31,8 @@ export default function SidebarPullRequestRow({
       className="group"
       gap="0"
       rounded="md"
-      _hover={sidebarHover}
+      css={selected ? sidebarSelected : undefined}
+      _hover={selected ? undefined : sidebarHover}
       title={`${pr.repo}#${pr.number} — ${pr.title}`}
     >
       <HStack

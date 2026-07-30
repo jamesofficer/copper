@@ -12,55 +12,42 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
 import { LuFolderGit2, LuFolderPlus, LuGitPullRequest } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
-import HomeSidebar from "../components/HomeSidebar";
 import NewPullRequestDialog from "../components/NewPullRequestDialog";
 import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
-import SettingsDialog from "../components/SettingsDialog";
 import SetupBanner from "../components/SetupBanner";
-import { toaster } from "../components/ui/toaster";
-import {
-  clearRecentPullRequests,
-  listRecentPullRequests,
-} from "../lib/recentPrs";
+import ShowSidebarButton from "../components/ShowSidebarButton";
 import { scrollbar } from "../lib/scrollbar";
-import { dragRegion, titleBarHeight } from "../lib/titleBar";
+import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
+import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
 
 interface Props {
+  repositories: Repository[] | undefined;
+  reposPending: boolean;
+  activeRepo: Repository | null;
+  onAddRepo(): void;
   onSelect(pr: PullRequest): void;
-  activePath: string | null;
-  onActivePathChange(path: string | null): void;
+  preview: PullRequest | null;
+  onPreviewChange(pr: PullRequest | null): void;
+  onOpenSettings(): void;
 }
 
 export default function Welcome({
+  repositories,
+  reposPending,
+  activeRepo: active,
+  onAddRepo,
   onSelect,
-  activePath,
-  onActivePathChange,
+  preview,
+  onPreviewChange,
+  onOpenSettings,
 }: Props) {
   const queryClient = useQueryClient();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [recent, setRecent] = useState(() => listRecentPullRequests());
-  // Clicking a PR anywhere on this screen previews its Overview in a right
-  // panel; the panel's "View PR" button opens the full review screen.
-  const [preview, setPreview] = useState<PullRequest | null>(null);
-
-  function clearRecent() {
-    clearRecentPullRequests();
-    setRecent([]);
-  }
-
-  const reposQuery = useQuery({
-    queryKey: ["repositories"],
-    queryFn: () => window.api.listRepositories(),
-  });
-  const repositories = reposQuery.data;
-  const active =
-    repositories?.find((repo) => repo.path === activePath) ??
-    repositories?.[0] ??
-    null;
+  // With the sidebar hidden its header is gone too, so this bar takes over
+  // holding the window's traffic lights clear.
+  const collapsed = useSidebarCollapsed();
 
   const prsQuery = useQuery({
     queryKey: ["pullRequests", active?.slug],
@@ -74,46 +61,6 @@ export default function Welcome({
       : "Couldn't load pull requests."
     : null;
 
-  async function addRepository() {
-    try {
-      const added = await window.api.addRepository();
-      if (!added) return;
-      queryClient.setQueryData<Repository[]>(["repositories"], (prev) => [
-        added,
-        ...(prev ?? []).filter((repo) => repo.path !== added.path),
-      ]);
-      // Both sidebar PR sections and the repo rows' PR counts are scoped to
-      // registered repos in the main process, so the registry changing means
-      // new results.
-      void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
-      void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
-      void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
-      onActivePathChange(added.path);
-    } catch (cause) {
-      toaster.create({
-        type: "error",
-        title: "Couldn’t add repository",
-        description:
-          cause instanceof Error
-            ? cause.message.replace(/^.*Error: /, "")
-            : String(cause),
-        closable: true,
-      });
-    }
-  }
-
-  function reorderRepositories(ordered: Repository[]) {
-    // Optimistic: show the new order immediately, then persist it. The main
-    // process returns the saved list, which wins in case they disagree.
-    queryClient.setQueryData(["repositories"], ordered);
-    window.api
-      .reorderRepositories(ordered.map((repo) => repo.path))
-      .then((saved) => queryClient.setQueryData(["repositories"], saved))
-      .catch(() =>
-        queryClient.invalidateQueries({ queryKey: ["repositories"] }),
-      );
-  }
-
   function openCreatedPullRequest(pr: PullRequest) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
     void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
@@ -121,43 +68,20 @@ export default function Welcome({
     onSelect(pr);
   }
 
-  async function removeRepository(path: string) {
-    const remaining = await window.api.removeRepository(path);
-    queryClient.setQueryData(["repositories"], remaining);
-    void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
-    void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
-    void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
-    if (activePath === path || !activePath) {
-      onActivePathChange(remaining[0]?.path ?? null);
-    }
-  }
-
   return (
-    <Flex h="100vh" minH="0">
-      <HomeSidebar
-        repositories={repositories}
-        reposPending={reposQuery.isPending}
-        activePath={active?.path ?? null}
-        onSelectRepo={onActivePathChange}
-        onAddRepo={() => void addRepository()}
-        onRemoveRepo={(path) => void removeRepository(path)}
-        onReorderRepos={reorderRepositories}
-        recent={recent}
-        onClearRecent={clearRecent}
-        onSelectPullRequest={setPreview}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
-
+    <>
       <Flex direction="column" flex="1" minW="0">
         <HStack
           flexShrink="0"
           h={titleBarHeight}
-          px="4"
+          pl={collapsed ? trafficLightSpace : "4"}
+          pr="4"
           gap="2"
           borderBottomWidth="1px"
           color="fg.muted"
           css={dragRegion}
         >
+          <ShowSidebarButton />
           <LuGitPullRequest />
           <Heading size="sm">Open pull requests</Heading>
           {active?.slug && (
@@ -181,10 +105,9 @@ export default function Welcome({
             py="4"
             css={scrollbar}
           >
-            <SetupBanner onOpenSettings={() => setSettingsOpen(true)} />
+            <SetupBanner onOpenSettings={onOpenSettings} />
 
-            {!reposQuery.isPending &&
-            (!repositories || repositories.length === 0) ? (
+            {!reposPending && (!repositories || repositories.length === 0) ? (
               <EmptyState.Root
                 borderWidth="1px"
                 borderStyle="dashed"
@@ -202,7 +125,7 @@ export default function Welcome({
                       requests.
                     </EmptyState.Description>
                   </VStack>
-                  <Button onClick={addRepository}>
+                  <Button onClick={onAddRepo}>
                     <LuFolderPlus /> Add repository
                   </Button>
                 </EmptyState.Content>
@@ -242,7 +165,7 @@ export default function Welcome({
                       key={active.slug}
                       prs={prs}
                       preview={preview}
-                      onSelect={setPreview}
+                      onSelect={onPreviewChange}
                       onOpen={onSelect}
                     />
                   ))}
@@ -256,11 +179,9 @@ export default function Welcome({
         <PullRequestPreview
           pr={preview}
           onView={onSelect}
-          onClose={() => setPreview(null)}
+          onClose={() => onPreviewChange(null)}
         />
       )}
-
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
-    </Flex>
+    </>
   );
 }

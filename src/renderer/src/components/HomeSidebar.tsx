@@ -18,6 +18,7 @@ import {
   LuEye,
   LuFolderPlus,
   LuGitPullRequest,
+  LuPanelLeftClose,
   LuSettings,
   LuStar,
   LuTrash2,
@@ -31,6 +32,7 @@ import {
 } from "../lib/hiddenReviewRequests";
 import { type RecentPullRequest, timeAgo } from "../lib/recentPrs";
 import { scrollbar } from "../lib/scrollbar";
+import { setSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { setSectionOpen, useCollapsedSections } from "../lib/sidebarSections";
 import { sidebarHover } from "../lib/sidebarStyles";
 import { dragRegion, titleBarHeight } from "../lib/titleBar";
@@ -51,6 +53,9 @@ interface Props {
   onReorderRepos(repositories: Repository[]): void;
   recent: RecentPullRequest[];
   onClearRecent(): void;
+  // The PR on the review screen, marked in the lists so you can see where you
+  // are while jumping between them. Null on the home screen.
+  openPr: PullRequest | null;
   onSelectPullRequest(pr: PullRequest): void;
   onOpenSettings(): void;
 }
@@ -65,6 +70,7 @@ export default function HomeSidebar({
   onReorderRepos,
   recent,
   onClearRecent,
+  openPr,
   onSelectPullRequest,
   onOpenSettings,
 }: Props) {
@@ -87,6 +93,10 @@ export default function HomeSidebar({
     queryKey: ["openPrCounts"],
     queryFn: () => window.api.getOpenPullRequestCounts(),
   });
+
+  function isOpenPr(pr: PullRequest): boolean {
+    return openPr?.repo === pr.repo && openPr?.number === pr.number;
+  }
 
   // Hidden keys are matched against the live list, so a request that has since
   // been merged or closed stops being counted without any cleanup pass.
@@ -144,6 +154,16 @@ export default function HomeSidebar({
         >
           <LuSettings />
         </IconButton>
+        <IconButton
+          aria-label="Hide sidebar"
+          title="Hide sidebar"
+          size="xs"
+          variant="ghost"
+          color="fg.muted"
+          onClick={() => setSidebarCollapsed(true)}
+        >
+          <LuPanelLeftClose />
+        </IconButton>
       </HStack>
 
       <Stack
@@ -188,6 +208,7 @@ export default function HomeSidebar({
               <SidebarPullRequestRow
                 key={`${pr.repo}#${pr.number}`}
                 pr={pr}
+                selected={isOpenPr(pr)}
                 onSelect={onSelectPullRequest}
                 leading={
                   <Icon size="sm" color="yellow.fg" flexShrink="0">
@@ -215,7 +236,7 @@ export default function HomeSidebar({
         <SectionDivider />
 
         <Section id="analysed" title="Analysed">
-          <AnalyzedSidebarList onSelect={onSelectPullRequest} />
+          <AnalyzedSidebarList openPr={openPr} onSelect={onSelectPullRequest} />
         </Section>
 
         <SectionDivider />
@@ -240,6 +261,7 @@ export default function HomeSidebar({
               <SidebarPullRequestRow
                 key={`${pr.repo}#${pr.number}`}
                 pr={pr}
+                selected={isOpenPr(pr)}
                 onSelect={onSelectPullRequest}
                 leading={
                   <UserAvatar
@@ -257,6 +279,7 @@ export default function HomeSidebar({
               <SidebarPullRequestRow
                 key={`hidden-${pr.repo}#${pr.number}`}
                 pr={pr}
+                selected={isOpenPr(pr)}
                 onSelect={onSelectPullRequest}
                 leading={
                   <UserAvatar
@@ -318,6 +341,7 @@ export default function HomeSidebar({
               <SidebarPullRequestRow
                 key={`${pr.repo}#${pr.number}`}
                 pr={pr}
+                selected={isOpenPr(pr)}
                 onSelect={onSelectPullRequest}
                 meta={<CommentCountBadge count={pr.comments} />}
               />
@@ -352,6 +376,7 @@ export default function HomeSidebar({
               <SidebarPullRequestRow
                 key={`${pr.repo}#${pr.number}`}
                 pr={pr}
+                selected={isOpenPr(pr)}
                 onSelect={onSelectPullRequest}
                 leading={
                   <UserAvatar

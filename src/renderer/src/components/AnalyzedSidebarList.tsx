@@ -13,13 +13,15 @@ import UserAvatar from "./UserAvatar";
 const MAX_SHOWN = 7;
 
 interface Props {
+  // The PR the review screen is showing, marked in the list.
+  openPr: PullRequest | null;
   onSelect(pr: PullRequest): void;
 }
 
 // PRs the user has run the analysis on, newest first, across every repo. The
 // main process's cache only stores repo/number/sha, so each row fetches live PR
 // detail to get its title and author.
-export default function AnalyzedSidebarList({ onSelect }: Props) {
+export default function AnalyzedSidebarList({ openPr, onSelect }: Props) {
   const analyzedQuery = useQuery({
     queryKey: ["analyzedPullRequests"],
     queryFn: () => window.api.listAnalyzedPullRequests(),
@@ -79,6 +81,9 @@ export default function AnalyzedSidebarList({ onSelect }: Props) {
           <SidebarPullRequestRow
             key={key}
             pr={detail}
+            selected={
+              openPr?.repo === entry.repo && openPr?.number === entry.prNumber
+            }
             onSelect={onSelect}
             leading={
               <UserAvatar
