@@ -135,7 +135,7 @@ export default function Review({ pr, onBack }: Props) {
           <Button
             title={`Refresh — ${newActivity}`}
             colorPalette="yellow"
-            variant="solid"
+            variant="outline"
             size="xs"
             onClick={refresh}
             loading={refreshing}

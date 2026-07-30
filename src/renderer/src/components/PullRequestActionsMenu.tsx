@@ -171,8 +171,11 @@ export default function PullRequestActionsMenu({ pr, detail }: Props) {
     isOpen && Boolean(viewer && detail.reviewers.includes(viewer));
   const canReopen = detail.state === "closed" && !detail.merged;
   const canReview = !detail.merged;
-  const { awaitingApproval, canMerge } = useMergeAvailability(detail);
+  const { awaitingApproval, canMerge, approved } = useMergeAvailability(detail);
   const showMerge = canMerge && !awaitingApproval;
+  // An approved PR is ready to go, so the merge action — and the trigger that
+  // hides it — say so in green.
+  const readyToMerge = showMerge && approved;
 
   // A merged PR can't be reviewed, reopened or changed at all.
   if (!isOpen && !canReopen && !canReview) return null;
@@ -186,6 +189,7 @@ export default function PullRequestActionsMenu({ pr, detail }: Props) {
           <Button
             variant="outline"
             size="xs"
+            colorPalette={readyToMerge ? "green" : undefined}
             loading={run.isPending || reopen.isPending}
           >
             Actions
@@ -207,7 +211,11 @@ export default function PullRequestActionsMenu({ pr, detail }: Props) {
                 </Menu.Item>
               )}
               {showMerge && (
-                <Menu.Item value="merge" onClick={() => setMergeOpen(true)}>
+                <Menu.Item
+                  value="merge"
+                  color={readyToMerge ? "green.fg" : undefined}
+                  onClick={() => setMergeOpen(true)}
+                >
                   <LuGitMerge /> Merge pull request
                 </Menu.Item>
               )}

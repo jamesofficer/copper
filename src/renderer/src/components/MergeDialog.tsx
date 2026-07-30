@@ -55,6 +55,7 @@ function hasConflicts(detail: PullRequestDetail): boolean {
 export function useMergeAvailability(detail: PullRequestDetail): {
   awaitingApproval: boolean;
   canMerge: boolean;
+  approved: boolean;
 } {
   const isOpen = detail.state === "open" && !detail.merged;
   const decisionQuery = useQuery({
@@ -70,6 +71,7 @@ export function useMergeAvailability(detail: PullRequestDetail): {
         decision === "REVIEW_REQUIRED" ||
         decision === "CHANGES_REQUESTED"),
     canMerge: isOpen && !detail.draft,
+    approved: isOpen && decision === "APPROVED",
   };
 }
 
