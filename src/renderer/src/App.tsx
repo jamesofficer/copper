@@ -1,15 +1,17 @@
 import { Flex } from "@chakra-ui/react";
+import { useHotkey } from "@tanstack/react-hotkeys";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import type { PullRequest, Repository } from "../../shared/types";
 import HomeSidebar from "./components/HomeSidebar";
 import SettingsDialog from "./components/SettingsDialog";
+import { hotkeys } from "./lib/hotkeys";
 import {
   clearRecentPullRequests,
   listRecentPullRequests,
   recordRecentPullRequest,
 } from "./lib/recentPrs";
-import { useSidebarCollapsed } from "./lib/sidebarCollapsed";
+import { toggleSidebar, useSidebarCollapsed } from "./lib/sidebarCollapsed";
 import { useRepositoryActions } from "./lib/useRepositoryActions";
 import Review from "./screens/Review";
 import Welcome from "./screens/Welcome";
@@ -28,6 +30,13 @@ export default function App() {
 
   const collapsed = useSidebarCollapsed();
   const repos = useRepositoryActions(activePath, setActivePath);
+
+  // Cmd+B / Ctrl+B hides and shows the sidebar. Registered here because the
+  // sidebar itself is gone half the time.
+  useHotkey(hotkeys.toggleSidebar, () => toggleSidebar(), {
+    meta: { name: "Toggle sidebar" },
+  });
+
   // Nothing picked yet falls back to the first repo, so the home screen always
   // has something to show.
   const activeRepo =

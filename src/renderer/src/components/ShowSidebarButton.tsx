@@ -1,5 +1,6 @@
 import { IconButton } from "@chakra-ui/react";
 import { LuPanelLeftOpen } from "react-icons/lu";
+import { hotkeyHint, hotkeys } from "../lib/hotkeys";
 import {
   setSidebarCollapsed,
   useSidebarCollapsed,
@@ -14,7 +15,7 @@ export default function ShowSidebarButton() {
   return (
     <IconButton
       aria-label="Show sidebar"
-      title="Show sidebar"
+      title={`Show sidebar (${hotkeyHint(hotkeys.toggleSidebar)})`}
       size="xs"
       variant="ghost"
       color="fg.muted"

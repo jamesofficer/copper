@@ -30,6 +30,7 @@ import {
   showReviewRequest,
   useHiddenReviewRequests,
 } from "../lib/hiddenReviewRequests";
+import { hotkeyHint, hotkeys } from "../lib/hotkeys";
 import { type RecentPullRequest, timeAgo } from "../lib/recentPrs";
 import { scrollbar } from "../lib/scrollbar";
 import { setSidebarCollapsed } from "../lib/sidebarCollapsed";
@@ -156,7 +157,7 @@ export default function HomeSidebar({
         </IconButton>
         <IconButton
           aria-label="Hide sidebar"
-          title="Hide sidebar"
+          title={`Hide sidebar (${hotkeyHint(hotkeys.toggleSidebar)})`}
           size="xs"
           variant="ghost"
           color="fg.muted"
