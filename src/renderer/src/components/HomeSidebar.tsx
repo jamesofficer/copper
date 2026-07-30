@@ -119,8 +119,8 @@ export default function HomeSidebar({
       flexShrink="0"
       minH="0"
       borderRightWidth="1px"
-      bg="black/5"
-      _dark={{ bg: "black/25" }}
+      bg="black/8"
+      _dark={{ bg: "black/40" }}
     >
       {/* The window's traffic lights are drawn over this corner, so the app's
           own buttons sit at the far end of the bar. Its height matches the main
@@ -452,7 +452,7 @@ function Section({ id, title, count, action, children }: SectionProps) {
         {action}
       </HStack>
       <Collapsible.Content>
-        <Stack gap="1" pt="1">
+        <Stack gap="1" pt="2.5">
           {children}
         </Stack>
       </Collapsible.Content>

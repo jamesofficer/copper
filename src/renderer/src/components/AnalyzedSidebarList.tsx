@@ -3,6 +3,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { LuGitPullRequest } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
+import { type AnalysisJob, useAnalysisJobs } from "../lib/analysisJobs";
 import { timeAgo } from "../lib/recentPrs";
 import ClearAnalysisButton from "./ClearAnalysisButton";
 import SidebarPullRequestRow from "./SidebarPullRequestRow";
@@ -22,6 +23,9 @@ interface Props {
 // main process's cache only stores repo/number/sha, so each row fetches live PR
 // detail to get its title and author.
 export default function AnalyzedSidebarList({ openPr, onSelect }: Props) {
+  // Analyses in flight show up here straight away, so a background run is
+  // visible from wherever you are in the app.
+  const jobs = useAnalysisJobs();
   const analyzedQuery = useQuery({
     queryKey: ["analyzedPullRequests"],
     queryFn: () => window.api.listAnalyzedPullRequests(),
@@ -40,11 +44,17 @@ export default function AnalyzedSidebarList({ openPr, onSelect }: Props) {
     })),
   });
 
+  function jobFor(repo: string, prNumber: number): AnalysisJob | undefined {
+    return jobs.find(
+      (job) => job.pr.repo === repo && job.pr.number === prNumber,
+    );
+  }
+
   if (analyzedQuery.isPending) {
     return <Spinner size="sm" color="fg.muted" alignSelf="center" my="2" />;
   }
 
-  if (analyzed.length === 0) {
+  if (analyzed.length === 0 && jobs.length === 0) {
     return (
       <Text fontSize="xs" color="fg.muted" px="2">
         Pull requests you analyse will show up here.
@@ -52,8 +62,35 @@ export default function AnalyzedSidebarList({ openPr, onSelect }: Props) {
     );
   }
 
+  // A PR being analysed for the first time isn't in the cache yet, so it gets
+  // its own row at the top until the run finishes and the list picks it up.
+  const newJobs = jobs.filter(
+    (job) =>
+      !analyzed.some(
+        (entry) =>
+          entry.repo === job.pr.repo && entry.prNumber === job.pr.number,
+      ),
+  );
+
   return (
     <>
+      {newJobs.map((job) => (
+        <SidebarPullRequestRow
+          key={`job-${job.pr.repo}#${job.pr.number}`}
+          pr={job.pr}
+          selected={
+            openPr?.repo === job.pr.repo && openPr?.number === job.pr.number
+          }
+          onSelect={onSelect}
+          leading={
+            <UserAvatar
+              username={job.pr.author}
+              fallback={<LuGitPullRequest />}
+            />
+          }
+          meta={<JobMeta job={job} />}
+        />
+      ))}
       {analyzed.map((entry, index) => {
         const key = `${entry.repo}#${entry.prNumber}`;
         const detail = detailQueries[index]?.data;
@@ -77,6 +114,7 @@ export default function AnalyzedSidebarList({ openPr, onSelect }: Props) {
         // The analysis was run against a commit that's no longer the head, so
         // what it says may no longer match the diff.
         const outdated = detail.headSha !== entry.headSha;
+        const job = jobFor(entry.repo, entry.prNumber);
         return (
           <SidebarPullRequestRow
             key={key}
@@ -92,16 +130,20 @@ export default function AnalyzedSidebarList({ openPr, onSelect }: Props) {
               />
             }
             meta={
-              <Box
-                color={outdated ? "orange.fg" : "fg.muted"}
-                title={
-                  outdated
-                    ? "Analysed an earlier commit — re-analyse for the latest"
-                    : undefined
-                }
-              >
-                {timeAgo(entry.analyzedAt)}
-              </Box>
+              job ? (
+                <JobMeta job={job} />
+              ) : (
+                <Box
+                  color={outdated ? "orange.fg" : "fg.muted"}
+                  title={
+                    outdated
+                      ? "Analysed an earlier commit — re-analyse for the latest"
+                      : undefined
+                  }
+                >
+                  {timeAgo(entry.analyzedAt)}
+                </Box>
+              )
             }
             actions={
               <ClearAnalysisButton
@@ -113,5 +155,21 @@ export default function AnalyzedSidebarList({ openPr, onSelect }: Props) {
         );
       })}
     </>
+  );
+}
+
+interface JobMetaProps {
+  job: AnalysisJob;
+}
+
+// What a running analysis shows instead of its age.
+function JobMeta({ job }: JobMetaProps) {
+  return (
+    <HStack gap="1" color="fg.muted">
+      <Spinner size="xs" />
+      <Text fontSize="xs">
+        {job.stage === "analysing" ? "Analysing" : "Checking"}
+      </Text>
+    </HStack>
   );
 }

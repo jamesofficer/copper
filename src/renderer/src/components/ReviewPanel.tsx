@@ -18,11 +18,10 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { LuPanelRightOpen, LuSparkles, LuTriangleAlert } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
+import { startAnalysis, useAnalysisJob } from "../lib/analysisJobs";
 import type { AskContext, AskRequest } from "../lib/askContext";
-import { getFindIssuesOnAnalyse } from "../lib/findIssuesOnAnalyse";
 import { cleanIpcError } from "../lib/ipcError";
 import { buildIssues } from "../lib/issues";
-import { getReviewPersonality } from "../lib/reviewPersonality";
 import { scrollbar } from "../lib/scrollbar";
 import { usePanelWidth } from "../lib/usePanelWidth";
 import AnalysisDetail from "./AnalysisDetail";
@@ -110,27 +109,14 @@ export default function ReviewPanel({ pr }: Props) {
     },
   });
 
-  const analyzeMutation = useMutation({
-    mutationKey: ["analyzePr", pr.repo, pr.number],
-    mutationFn: () =>
-      window.api.analyzePullRequest(pr.repo, pr.number, getReviewPersonality()),
-    onSuccess: (result) => {
-      queryClient.setQueryData(["analysis", pr.repo, pr.number], result);
-      void queryClient.invalidateQueries({
-        queryKey: ["analyzedPullRequests"],
-      });
-      // The headline output: chase the analysis with the findings pass, which
-      // picks up its risks as leads to verify. Forced, so a lead-less run
-      // cached for this commit is replaced.
-      if (getFindIssuesOnAnalyse()) findIssuesMutation.mutate(true);
-    },
-  });
-
-  // Covers both this button and the header's Re-analyse, which share the key.
-  const analyzing =
-    useIsMutating({ mutationKey: ["analyzePr", pr.repo, pr.number] }) > 0;
-  const checking =
+  // The analysis runs as a background job, so it keeps going — and keeps
+  // reporting — after you leave this screen. It chases itself with the
+  // findings pass when the setting is on.
+  const job = useAnalysisJob(pr.repo, pr.number);
+  const manualCheck =
     useIsMutating({ mutationKey: ["findIssues", pr.repo, pr.number] }) > 0;
+  const analyzing = job?.stage === "analysing";
+  const checking = job?.stage === "checking" || manualCheck;
 
   const findings = findingsQuery.data ?? null;
   const issues = useMemo(
@@ -184,8 +170,8 @@ export default function ReviewPanel({ pr }: Props) {
             reading order — every claim tied to the code it came from.
           </Text>
           <Button
-            onClick={() => analyzeMutation.mutate()}
-            loading={analyzing}
+            onClick={() => void startAnalysis(pr)}
+            loading={Boolean(job)}
             loadingText="Analysing…"
           >
             <LuSparkles />
@@ -198,13 +184,6 @@ export default function ReviewPanel({ pr }: Props) {
                 ? "Runs on your Claude plan through Claude Code. Results are cached per commit."
                 : "Uses your Claude API key. Results are cached per commit."}
           </Text>
-          {analyzeMutation.isError && (
-            <Text fontSize="sm" color="fg.error">
-              {analyzeMutation.error instanceof Error
-                ? analyzeMutation.error.message
-                : "Analysis failed."}
-            </Text>
-          )}
         </VStack>
       </Center>
     );
