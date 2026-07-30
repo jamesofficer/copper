@@ -13,7 +13,6 @@ import {
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { LuPenLine } from "react-icons/lu";
 import type { PullRequest, ReviewVerdict } from "../../../shared/types";
 import { toaster } from "./ui/toaster";
 
@@ -45,13 +44,13 @@ const verdictOptions: Array<{
 
 interface Props {
   pr: PullRequest;
-  // Reviewing a merged PR is pointless — the caller disables the trigger.
-  disabled?: boolean;
+  // Opened from the review header's actions menu, which owns the state.
+  open: boolean;
+  onOpenChange(open: boolean): void;
 }
 
-export default function SubmitReviewDialog({ pr, disabled }: Props) {
+export default function SubmitReviewDialog({ pr, open, onOpenChange }: Props) {
   const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [verdict, setVerdict] = useState<ReviewVerdict>("comment");
 
@@ -72,7 +71,7 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
         title: "Review submitted",
         description: `${pr.repo}#${pr.number} — ${labelFor(verdict)}.`,
       });
-      setOpen(false);
+      onOpenChange(false);
       setBody("");
       setVerdict("comment");
       // The review changes the PR's review status; refetch what shows it —
@@ -119,22 +118,11 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
   return (
     <Dialog.Root
       open={open}
-      onOpenChange={(event) => setOpen(event.open)}
+      onOpenChange={(event) => onOpenChange(event.open)}
       size="md"
       lazyMount
       unmountOnExit
     >
-      <Dialog.Trigger asChild>
-        <Button
-          size="xs"
-          variant="outline"
-          colorPalette="green"
-          disabled={disabled}
-        >
-          <LuPenLine /> Submit review
-          {drafts.length > 0 ? ` (${drafts.length})` : ""}
-        </Button>
-      </Dialog.Trigger>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -215,7 +203,7 @@ export default function SubmitReviewDialog({ pr, disabled }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => onOpenChange(false)}
               >
                 Cancel
               </Button>

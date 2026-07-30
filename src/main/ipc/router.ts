@@ -33,6 +33,7 @@ import {
   listViewedFiles,
   mergePullRequest,
   peekPullRequestActivity,
+  removeReviewRequest,
   replyToReviewComment,
   setFileViewed,
   setPullRequestBase,
@@ -85,6 +86,7 @@ const handlers: IpcApi = {
     setPullRequestBase(repo, prNumber, base),
   setPullRequestBody: (repo, prNumber, body) =>
     setPullRequestBody(repo, prNumber, body),
+  removeReviewRequest: (repo, prNumber) => removeReviewRequest(repo, prNumber),
   peekPullRequest: (repo, prNumber) => getPullRequest(repo, prNumber),
   peekPullRequestActivity: (repo, prNumber) =>
     peekPullRequestActivity(repo, prNumber),

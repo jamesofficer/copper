@@ -61,6 +61,8 @@ export interface IpcApi {
   ): Promise<void>;
   // Take a draft PR out of draft ("Ready for review").
   setPullRequestReady(repo: string, prNumber: number): Promise<void>;
+  // Take the signed-in user off a PR's requested reviewers.
+  removeReviewRequest(repo: string, prNumber: number): Promise<void>;
   // Rewrite a pull request's description.
   setPullRequestBody(
     repo: string,
@@ -271,6 +273,7 @@ export const ipcChannels = [
   "setPullRequestReady",
   "setPullRequestBase",
   "setPullRequestBody",
+  "removeReviewRequest",
   "peekPullRequest",
   "peekPullRequestActivity",
   "listPullRequestFiles",

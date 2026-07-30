@@ -1,7 +1,7 @@
 import type { PullRequest } from "../../../shared/types";
 
 const STORAGE_KEY = "recentPullRequests";
-const MAX_RECENT = 10;
+const MAX_RECENT = 7;
 
 export type RecentPullRequest = PullRequest & { viewedAt: string };
 

@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { LuRefreshCw } from "react-icons/lu";
+import { LuBot } from "react-icons/lu";
 import type { PullRequest, ReviewPersonality } from "../../../shared/types";
 import { getFindIssuesOnAnalyse } from "../lib/findIssuesOnAnalyse";
 import {
@@ -131,7 +131,7 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
           loading={reanalyze.isPending}
           loadingText="Re-analysing…"
         >
-          <LuRefreshCw /> Re-analyse
+          <LuBot /> Re-analyse
         </Button>
       </Dialog.Trigger>
       <Portal>
@@ -209,7 +209,7 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
                   reanalyze.mutate();
                 }}
               >
-                <LuRefreshCw /> Re-analyse
+                <LuBot /> Re-analyse
               </Button>
             </Dialog.Footer>
           </Dialog.Content>

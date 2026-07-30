@@ -4,23 +4,17 @@ import {
   Button,
   EmptyState,
   Flex,
+  Heading,
   HStack,
   Spinner,
   Stack,
-  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import {
-  LuFolderGit2,
-  LuFolderPlus,
-  LuGitPullRequest,
-  LuSparkles,
-} from "react-icons/lu";
+import { LuFolderGit2, LuFolderPlus, LuGitPullRequest } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
-import AnalyzedPanel from "../components/AnalyzedPanel";
 import HomeSidebar from "../components/HomeSidebar";
 import NewPullRequestDialog from "../components/NewPullRequestDialog";
 import OpenPullRequestList from "../components/OpenPullRequestList";
@@ -47,7 +41,6 @@ export default function Welcome({
 }: Props) {
   const queryClient = useQueryClient();
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [tab, setTab] = useState("open");
   const [recent, setRecent] = useState(() => listRecentPullRequests());
   // Clicking a PR anywhere on this screen previews its Overview in a right
   // panel; the panel's "View PR" button opens the full review screen.
@@ -154,21 +147,17 @@ export default function Welcome({
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      <Tabs.Root
-        value={tab}
-        onValueChange={(event) => setTab(event.value)}
-        display="flex"
-        flexDirection="column"
-        flex="1"
-        minW="0"
-      >
-        <Tabs.List flexShrink="0" px="4" alignItems="center">
-          <Tabs.Trigger value="open">
-            <LuGitPullRequest /> Open pull requests
-          </Tabs.Trigger>
-          <Tabs.Trigger value="analyzed">
-            <LuSparkles /> Analysed pull requests
-          </Tabs.Trigger>
+      <Flex direction="column" flex="1" minW="0">
+        <HStack
+          flexShrink="0"
+          px="4"
+          py="2.5"
+          gap="2"
+          borderBottomWidth="1px"
+          color="fg.muted"
+        >
+          <LuGitPullRequest />
+          <Heading size="sm">Open pull requests</Heading>
           {active?.slug && (
             <Box ml="auto">
               <NewPullRequestDialog
@@ -178,9 +167,9 @@ export default function Welcome({
               />
             </Box>
           )}
-        </Tabs.List>
+        </HStack>
 
-        <Tabs.Content value="open" flex="1" minH="0" p="0">
+        <Box flex="1" minH="0">
           <Stack
             h="full"
             minH="0"
@@ -257,12 +246,8 @@ export default function Welcome({
               </>
             )}
           </Stack>
-        </Tabs.Content>
-
-        <Tabs.Content value="analyzed" flex="1" minH="0" p="0">
-          <AnalyzedPanel repo={active?.slug ?? null} onSelect={setPreview} />
-        </Tabs.Content>
-      </Tabs.Root>
+        </Box>
+      </Flex>
 
       {preview && (
         <PullRequestPreview

@@ -798,6 +798,29 @@ export async function setPullRequestBase(
   });
 }
 
+// Take the token's own user off a PR's requested reviewers. GitHub needs push
+// access on the repo for this, and a request that came from a team or
+// CODEOWNERS can be re-added by a later push — the error surfaces to the user
+// either way.
+export async function removeReviewRequest(
+  repo: string,
+  prNumber: number,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to update pull requests.",
+    );
+  }
+
+  const viewer = await getViewer();
+  await githubFetch(
+    token,
+    `/repos/${repo}/pulls/${prNumber}/requested_reviewers`,
+    { method: "DELETE", body: { reviewers: [viewer] } },
+  );
+}
+
 export async function setPullRequestBody(
   repo: string,
   prNumber: number,

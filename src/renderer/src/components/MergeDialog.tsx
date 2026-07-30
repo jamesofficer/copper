@@ -10,7 +10,6 @@ import {
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { LuGitMerge } from "react-icons/lu";
 import type { MergeMethod, PullRequestDetail } from "../../../shared/types";
 import { toaster } from "./ui/toaster";
 
@@ -38,6 +37,9 @@ const methodOptions: Array<{
 
 interface Props {
   detail: PullRequestDetail;
+  // Opened from the review header's actions menu, which owns the state.
+  open: boolean;
+  onOpenChange(open: boolean): void;
 }
 
 // GitHub reports "dirty" when the branch has conflicts that block a merge.
@@ -45,27 +47,37 @@ function hasConflicts(detail: PullRequestDetail): boolean {
   return detail.mergeable === false || detail.mergeableState === "dirty";
 }
 
-export default function MergeDialog({ detail }: Props) {
-  const queryClient = useQueryClient();
-  const [open, setOpen] = useState(false);
-  const [method, setMethod] = useState<MergeMethod>("merge");
-
+// Whether merging is on the table at all. Repos can require review approval
+// first; while GitHub says reviews are still needed, merging is hidden rather
+// than offered and refused. A failed lookup returns null (fail open) — a wrong
+// guess just errors on confirm. Shared with the actions menu, so the menu item
+// and the dialog agree.
+export function useMergeAvailability(detail: PullRequestDetail): {
+  awaitingApproval: boolean;
+  canMerge: boolean;
+} {
   const isOpen = detail.state === "open" && !detail.merged;
-
-  // Repos can require review approval before merging; while GitHub says
-  // reviews are still needed, the merge button hides entirely. A failed
-  // lookup returns null (fail open) — a wrong guess just errors on confirm.
   const decisionQuery = useQuery({
     queryKey: ["reviewDecision", detail.repo, detail.number],
     queryFn: () => window.api.getReviewDecision(detail.repo, detail.number),
     enabled: isOpen,
   });
   const decision = decisionQuery.data;
-  const awaitingApproval =
-    isOpen &&
-    (decisionQuery.isPending ||
-      decision === "REVIEW_REQUIRED" ||
-      decision === "CHANGES_REQUESTED");
+  return {
+    awaitingApproval:
+      isOpen &&
+      (decisionQuery.isPending ||
+        decision === "REVIEW_REQUIRED" ||
+        decision === "CHANGES_REQUESTED"),
+    canMerge: isOpen && !detail.draft,
+  };
+}
+
+export default function MergeDialog({ detail, open, onOpenChange }: Props) {
+  const queryClient = useQueryClient();
+  const [method, setMethod] = useState<MergeMethod>("merge");
+
+  const { awaitingApproval } = useMergeAvailability(detail);
 
   // Repo settings can disable merge methods (e.g. squash-only repos); offer
   // only what GitHub would accept. Until they load (or if they fail), all
@@ -93,7 +105,7 @@ export default function MergeDialog({ detail }: Props) {
         title: "Pull request merged",
         description: `${detail.repo}#${detail.number} was merged.`,
       });
-      setOpen(false);
+      onOpenChange(false);
       // Merging removes the PR from every open-PR view: the detail, the PR
       // lists, both sidebar sections, and the repo rows' open counts.
       void queryClient.invalidateQueries({
@@ -118,28 +130,17 @@ export default function MergeDialog({ detail }: Props) {
   });
 
   const conflicts = hasConflicts(detail);
-  const canMerge = isOpen && !detail.draft;
 
   if (awaitingApproval) return null;
 
   return (
     <Dialog.Root
       open={open}
-      onOpenChange={(event) => setOpen(event.open)}
+      onOpenChange={(event) => onOpenChange(event.open)}
       size="md"
       lazyMount
       unmountOnExit
     >
-      <Dialog.Trigger asChild>
-        <Button
-          size="xs"
-          variant="outline"
-          colorPalette="purple"
-          disabled={!canMerge}
-        >
-          <LuGitMerge /> {detail.merged ? "Merged" : "Merge pull request"}
-        </Button>
-      </Dialog.Trigger>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -210,7 +211,7 @@ export default function MergeDialog({ detail }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                onClick={() => onOpenChange(false)}
               >
                 Cancel
               </Button>

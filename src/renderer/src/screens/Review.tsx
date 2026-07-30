@@ -27,11 +27,11 @@ import type {
 import ChangesView from "../components/ChangesView";
 import CopyPrLinkButton from "../components/CopyPrLinkButton";
 import DiffViewModeSelect from "../components/DiffViewModeSelect";
-import MergeDialog from "../components/MergeDialog";
+import FavouritePrButton from "../components/FavouritePrButton";
+import PullRequestActionsMenu from "../components/PullRequestActionsMenu";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReanalyzeButton from "../components/ReanalyzeButton";
 import ReviewPanel from "../components/ReviewPanel";
-import SubmitReviewDialog from "../components/SubmitReviewDialog";
 
 interface Props {
   pr: PullRequest;
@@ -157,9 +157,9 @@ export default function Review({ pr, onBack }: Props) {
           </a>
         </Button>
         <CopyPrLinkButton url={pr.url} />
+        <FavouritePrButton pr={pr} />
         <ReanalyzeButton pr={pr} />
-        <SubmitReviewDialog pr={pr} disabled={detail?.merged} />
-        {detail && <MergeDialog detail={detail} />}
+        {detail && <PullRequestActionsMenu pr={pr} detail={detail} />}
       </HStack>
 
       <Tabs.Root

@@ -23,11 +23,9 @@ import { labelPalette } from "../lib/labelColor";
 import { listReviewThreads, type ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import BaseBranchSelect from "./BaseBranchSelect";
-import ClosePullRequestButton from "./ClosePullRequestButton";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import CommitTimelineGroup from "./CommitTimelineGroup";
-import MarkReadyButton from "./MarkReadyButton";
 import PrStateBadge from "./PrStateBadge";
 import PullRequestDescription from "./PullRequestDescription";
 import RelativeTime from "./RelativeTime";
@@ -329,27 +327,13 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
 
         <Separator />
 
-        <HStack
-          fontSize="xs"
-          color="fg.subtle"
-          gap="4"
-          flexWrap="wrap"
-          justifyContent="space-between"
-        >
-          <HStack gap="4" flexWrap="wrap">
-            <Text>
-              Opened <RelativeTime iso={detail.createdAt} />
-            </Text>
-            <Text>
-              Updated <RelativeTime iso={detail.updatedAt} />
-            </Text>
-          </HStack>
-          {showActions && (
-            <HStack gap="1.5">
-              <MarkReadyButton detail={detail} />
-              <ClosePullRequestButton detail={detail} />
-            </HStack>
-          )}
+        <HStack fontSize="xs" color="fg.subtle" gap="4" flexWrap="wrap">
+          <Text>
+            Opened <RelativeTime iso={detail.createdAt} />
+          </Text>
+          <Text>
+            Updated <RelativeTime iso={detail.updatedAt} />
+          </Text>
         </HStack>
       </VStack>
     </Box>
