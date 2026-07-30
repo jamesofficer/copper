@@ -173,7 +173,8 @@ export default function HomeSidebar({
         overflowY="auto"
         gap="5"
         px="2"
-        py="2"
+        pt="4"
+        pb="2"
         css={scrollbar}
       >
         <Section
