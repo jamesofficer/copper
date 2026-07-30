@@ -65,13 +65,6 @@ export default function App() {
     setRecent([]);
   }
 
-  // The sidebar stays put while reviewing, so its rows jump straight from one
-  // PR to another. On the home screen they open the preview panel instead.
-  function selectFromSidebar(pr: PullRequest) {
-    if (selected) openPullRequest(pr);
-    else setPreview(pr);
-  }
-
   return (
     <Flex h="100vh" minH="0">
       {!collapsed && (
@@ -86,7 +79,7 @@ export default function App() {
           recent={recent}
           onClearRecent={clearRecent}
           openPr={selected}
-          onSelectPullRequest={selectFromSidebar}
+          onSelectPullRequest={openPullRequest}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       )}
