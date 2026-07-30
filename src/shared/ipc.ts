@@ -20,7 +20,9 @@ import type {
   PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
+  PullRequestReactions,
   PullRequestReview,
+  ReactionContent,
   RepoBranchInfo,
   RepoMergeSettings,
   Repository,
@@ -130,6 +132,16 @@ export interface IpcApi {
     body: string,
   ): Promise<ReviewComment>;
   deleteReviewComment(repo: string, commentId: number): Promise<void>;
+  // Emoji reactions on all of the PR's comments, keyed by comment id — one
+  // GraphQL lookup joined onto the comments on screen. Empty without a token.
+  listReactions(repo: string, prNumber: number): Promise<PullRequestReactions>;
+  // Add (reacted) or take back (not reacted) the signed-in user's reaction on
+  // the comment with this node id.
+  setReaction(
+    commentNodeId: string,
+    content: ReactionContent,
+    reacted: boolean,
+  ): Promise<void>;
   // Root-comment ids of resolved inline threads — resolution only exists in
   // GitHub's GraphQL API, so it's a separate lookup from listReviewComments.
   listResolvedReviewThreads(repo: string, prNumber: number): Promise<number[]>;
@@ -289,6 +301,8 @@ export const ipcChannels = [
   "addReviewComment",
   "replyToReviewComment",
   "deleteReviewComment",
+  "listReactions",
+  "setReaction",
   "listResolvedReviewThreads",
   "setReviewThreadResolved",
   "listDraftComments",

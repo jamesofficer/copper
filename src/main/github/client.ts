@@ -9,7 +9,10 @@ import type {
   PullRequestCommit,
   PullRequestDetail,
   PullRequestFile,
+  PullRequestReactions,
   PullRequestReview,
+  ReactionContent,
+  ReactionGroup,
   RepoBranchInfo,
   RepoMergeSettings,
   ReviewComment,
@@ -299,7 +302,7 @@ async function searchOpenPullRequests(
     return registeredSlugs.has(repo.toLowerCase());
   });
 
-  return Promise.all(
+  const results = await Promise.all(
     items.map(async (item) => {
       const repo = item.repository_url.split("/repos/")[1];
       const [pull, reviewStatus] = await Promise.all([
@@ -309,9 +312,18 @@ async function searchOpenPullRequests(
         ),
         getReviewStatus(token, repo, item.number),
       ]);
-      return toPullRequest(repo, pull, reviewStatus);
+      return { repo, pull, reviewStatus };
     }),
   );
+
+  // The search index lags behind a PR closing or merging by a while, so a PR
+  // just closed in the app can still come back as a hit. Each PR was fetched
+  // live above, so trust that state over the search result.
+  return results
+    .filter(({ pull }) => pull.state === "open" && !pull.merged)
+    .map(({ repo, pull, reviewStatus }) =>
+      toPullRequest(repo, pull, reviewStatus),
+    );
 }
 
 export function listReviewRequestedPullRequests(): Promise<PullRequest[]> {
@@ -545,6 +557,7 @@ export async function listCommitFiles(
 
 interface GitHubIssueComment {
   id: number;
+  node_id: string;
   body: string | null;
   user: { login: string } | null;
   created_at: string;
@@ -579,6 +592,7 @@ export async function listPullRequestComments(
 function toPullRequestComment(comment: GitHubIssueComment): PullRequestComment {
   return {
     id: comment.id,
+    nodeId: comment.node_id,
     author: comment.user?.login ?? "unknown",
     body: comment.body ?? "",
     createdAt: comment.created_at,
@@ -606,6 +620,7 @@ export async function addPullRequestComment(
 
 interface GitHubReviewComment {
   id: number;
+  node_id: string;
   body: string | null;
   user: { login: string } | null;
   created_at: string;
@@ -620,6 +635,7 @@ interface GitHubReviewComment {
 function toReviewComment(comment: GitHubReviewComment): ReviewComment {
   return {
     id: comment.id,
+    nodeId: comment.node_id,
     author: comment.user?.login ?? "unknown",
     body: comment.body ?? "",
     createdAt: comment.created_at,
@@ -723,6 +739,184 @@ export async function deleteReviewComment(
     `/repos/${repo}/pulls/comments/${commentId}`,
     { method: "DELETE", body: undefined },
   );
+}
+
+interface GraphQlReactionGroup {
+  content: ReactionContent;
+  viewerHasReacted: boolean;
+  reactors: { totalCount: number };
+}
+
+interface GraphQlReactableComment {
+  databaseId: number | null;
+  reactionGroups: GraphQlReactionGroup[] | null;
+}
+
+interface GraphQlReactions {
+  data?: {
+    repository?: {
+      pullRequest?: {
+        comments?: {
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          nodes: GraphQlReactableComment[];
+        };
+        reviewThreads?: {
+          pageInfo: { hasNextPage: boolean; endCursor: string | null };
+          nodes: Array<{ comments: { nodes: GraphQlReactableComment[] } }>;
+        };
+      } | null;
+    } | null;
+  };
+  errors?: Array<{ message: string }>;
+}
+
+const REACTION_GROUPS = `
+  reactionGroups { content viewerHasReacted reactors { totalCount } }`;
+
+// GitHub returns a group per emoji whether or not anyone used it, so the
+// empty ones are dropped here.
+function toReactionGroups(
+  groups: GraphQlReactionGroup[] | null,
+): ReactionGroup[] {
+  return (groups ?? [])
+    .filter((group) => group.reactors.totalCount > 0)
+    .map((group) => ({
+      content: group.content,
+      count: group.reactors.totalCount,
+      viewerHasReacted: group.viewerHasReacted,
+    }));
+}
+
+function collect(
+  into: PullRequestReactions,
+  comments: GraphQlReactableComment[],
+): void {
+  for (const comment of comments) {
+    if (comment.databaseId == null) continue;
+    const groups = toReactionGroups(comment.reactionGroups);
+    if (groups.length > 0) into[comment.databaseId] = groups;
+  }
+}
+
+// Every reaction on the PR's comments — conversation comments and inline
+// review comments alike — keyed by the REST comment id the renderer knows.
+// GraphQL, not REST: REST's reaction summary can't say whether the signed-in
+// user reacted, which would mean a request per comment to find out. No token
+// means no reactions rather than an error — they're decoration on a view that
+// must still render.
+export async function listReactions(
+  repo: string,
+  prNumber: number,
+): Promise<PullRequestReactions> {
+  const token = await getGitHubToken();
+  if (!token) return {};
+
+  const [owner, name] = repo.split("/");
+  const variables = { owner, name, number: prNumber };
+  const reactions: PullRequestReactions = {};
+
+  const conversationQuery = `
+    query ($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          comments(first: 100, after: $cursor) {
+            pageInfo { hasNextPage endCursor }
+            nodes { databaseId ${REACTION_GROUPS} }
+          }
+        }
+      }
+    }`;
+
+  let cursor: string | null = null;
+  do {
+    const response: GraphQlReactions = await githubFetch<GraphQlReactions>(
+      token,
+      "/graphql",
+      {
+        method: "POST",
+        body: { query: conversationQuery, variables: { ...variables, cursor } },
+      },
+    );
+    if (response.errors?.length) {
+      throw new Error(`GitHub: ${response.errors[0].message}`);
+    }
+    const comments = response.data?.repository?.pullRequest?.comments;
+    if (!comments) break;
+    collect(reactions, comments.nodes);
+    cursor = comments.pageInfo.hasNextPage ? comments.pageInfo.endCursor : null;
+  } while (cursor);
+
+  const threadQuery = `
+    query ($owner: String!, $name: String!, $number: Int!, $cursor: String) {
+      repository(owner: $owner, name: $name) {
+        pullRequest(number: $number) {
+          reviewThreads(first: 50, after: $cursor) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              comments(first: 100) {
+                nodes { databaseId ${REACTION_GROUPS} }
+              }
+            }
+          }
+        }
+      }
+    }`;
+
+  cursor = null;
+  do {
+    const response: GraphQlReactions = await githubFetch<GraphQlReactions>(
+      token,
+      "/graphql",
+      {
+        method: "POST",
+        body: { query: threadQuery, variables: { ...variables, cursor } },
+      },
+    );
+    if (response.errors?.length) {
+      throw new Error(`GitHub: ${response.errors[0].message}`);
+    }
+    const threads = response.data?.repository?.pullRequest?.reviewThreads;
+    if (!threads) break;
+    for (const thread of threads.nodes)
+      collect(reactions, thread.comments.nodes);
+    cursor = threads.pageInfo.hasNextPage ? threads.pageInfo.endCursor : null;
+  } while (cursor);
+
+  return reactions;
+}
+
+// Add or take back one of the signed-in user's reactions. GraphQL takes the
+// emoji itself, so removing needs no lookup of the reaction's own id (which is
+// all REST's delete endpoint accepts).
+export async function setReaction(
+  subjectId: string,
+  content: ReactionContent,
+  reacted: boolean,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to react to comments.");
+  }
+
+  const field = reacted ? "addReaction" : "removeReaction";
+  const mutation = `
+    mutation ($subjectId: ID!, $content: ReactionContent!) {
+      ${field}(input: { subjectId: $subjectId, content: $content }) {
+        clientMutationId
+      }
+    }`;
+
+  const response = await githubFetch<{ errors?: Array<{ message: string }> }>(
+    token,
+    "/graphql",
+    {
+      method: "POST",
+      body: { query: mutation, variables: { subjectId, content } },
+    },
+  );
+  if (response.errors?.length) {
+    throw new Error(`GitHub: ${response.errors[0].message}`);
+  }
 }
 
 // Whether merging still waits on required review approval — GraphQL only;

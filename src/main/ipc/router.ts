@@ -26,6 +26,7 @@ import {
   listPullRequestCommits,
   listPullRequestFiles,
   listPullRequestReviews,
+  listReactions,
   listResolvedReviewThreads,
   listReviewComments,
   listReviewRequestedPullRequests,
@@ -40,6 +41,7 @@ import {
   setPullRequestBody,
   setPullRequestReady,
   setPullRequestState,
+  setReaction,
   setReviewThreadResolved,
   submitReview,
 } from "../github/client";
@@ -109,6 +111,9 @@ const handlers: IpcApi = {
     replyToReviewComment(repo, prNumber, commentId, body),
   deleteReviewComment: (repo, commentId) =>
     deleteReviewComment(repo, commentId),
+  listReactions: (repo, prNumber) => listReactions(repo, prNumber),
+  setReaction: (commentNodeId, content, reacted) =>
+    setReaction(commentNodeId, content, reacted),
   listResolvedReviewThreads: (repo, prNumber) =>
     listResolvedReviewThreads(repo, prNumber),
   setReviewThreadResolved: (repo, prNumber, rootCommentId, resolved) =>

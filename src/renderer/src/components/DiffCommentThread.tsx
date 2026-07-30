@@ -13,6 +13,7 @@ import { LuTrash2 } from "react-icons/lu";
 import type { ReviewComment } from "../../../shared/types";
 import type { ReviewThread } from "../lib/reviewComments";
 import Markdown from "./Markdown";
+import ReactionBar from "./ReactionBar";
 import RelativeTime from "./RelativeTime";
 import UserAvatar from "./UserAvatar";
 import { toaster } from "./ui/toaster";
@@ -195,6 +196,12 @@ export default function DiffCommentThread({
               No comment text.
             </Text>
           )}
+          <ReactionBar
+            repo={repo}
+            prNumber={prNumber}
+            commentId={comment.id}
+            commentNodeId={comment.nodeId}
+          />
         </Box>
       ))}
       <Box borderTopWidth="1px" px="2" py="1.5" bg="bg.subtle">

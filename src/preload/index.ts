@@ -60,6 +60,10 @@ const api: WindowApi = {
     ipcRenderer.invoke("replyToReviewComment", repo, prNumber, commentId, body),
   deleteReviewComment: (repo, commentId) =>
     ipcRenderer.invoke("deleteReviewComment", repo, commentId),
+  listReactions: (repo, prNumber) =>
+    ipcRenderer.invoke("listReactions", repo, prNumber),
+  setReaction: (commentNodeId, content, reacted) =>
+    ipcRenderer.invoke("setReaction", commentNodeId, content, reacted),
   listResolvedReviewThreads: (repo, prNumber) =>
     ipcRenderer.invoke("listResolvedReviewThreads", repo, prNumber),
   setReviewThreadResolved: (repo, prNumber, rootCommentId, resolved) =>

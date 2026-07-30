@@ -1,14 +1,17 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { PullRequestComment } from "../../../shared/types";
 import Markdown from "./Markdown";
+import ReactionBar from "./ReactionBar";
 import RelativeTime from "./RelativeTime";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
   comment: PullRequestComment;
+  repo: string;
+  prNumber: number;
 }
 
-export default function CommentCard({ comment }: Props) {
+export default function CommentCard({ comment, repo, prNumber }: Props) {
   return (
     <Box borderWidth="1px" rounded="lg" overflow="hidden">
       <HStack gap="2" px="4" py="2.5" bg="bg.subtle" borderBottomWidth="1px">
@@ -26,6 +29,12 @@ export default function CommentCard({ comment }: Props) {
             No comment text.
           </Text>
         )}
+        <ReactionBar
+          repo={repo}
+          prNumber={prNumber}
+          commentId={comment.id}
+          commentNodeId={comment.nodeId}
+        />
       </Box>
     </Box>
   );

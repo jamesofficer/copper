@@ -286,6 +286,8 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
                     <CommentCard
                       key={`comment-${item.comment.id}`}
                       comment={item.comment}
+                      repo={pr.repo}
+                      prNumber={pr.number}
                     />
                   ) : item.kind === "review" ? (
                     <ReviewCard

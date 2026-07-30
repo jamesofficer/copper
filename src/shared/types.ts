@@ -156,10 +156,38 @@ export type ReviewPersonality = (typeof reviewPersonalities)[number];
 // comments) — not an inline review comment on a diff line.
 export interface PullRequestComment {
   id: number;
+  // GitHub's global node id, needed by the GraphQL reaction mutations.
+  nodeId: string;
   author: string;
   body: string;
   createdAt: string;
 }
+
+// The eight emoji GitHub allows on a comment. These are GraphQL's enum
+// values — reactions are read and written over GraphQL, because REST can't
+// say whether *you* reacted without a request per comment.
+export const reactionContents = [
+  "THUMBS_UP",
+  "THUMBS_DOWN",
+  "LAUGH",
+  "HOORAY",
+  "CONFUSED",
+  "HEART",
+  "ROCKET",
+  "EYES",
+] as const;
+
+export type ReactionContent = (typeof reactionContents)[number];
+
+export interface ReactionGroup {
+  content: ReactionContent;
+  count: number;
+  viewerHasReacted: boolean;
+}
+
+// Reactions on every comment of a PR, keyed by the comment's REST id — one
+// lookup for the whole conversation, joined onto the comments on screen.
+export type PullRequestReactions = Record<number, ReactionGroup[]>;
 
 // Which side of the diff an inline comment anchors to: LEFT = the old file
 // (deleted lines), RIGHT = the new file (added and context lines).
@@ -169,6 +197,8 @@ export type DiffSide = "LEFT" | "RIGHT";
 // — distinct from PullRequestComment, which lives in the conversation.
 export interface ReviewComment {
   id: number;
+  // GitHub's global node id, needed by the GraphQL reaction mutations.
+  nodeId: string;
   author: string;
   body: string;
   createdAt: string;
