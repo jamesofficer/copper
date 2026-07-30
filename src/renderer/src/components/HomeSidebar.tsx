@@ -1,5 +1,4 @@
 import {
-  Box,
   Button,
   Collapsible,
   Flex,
@@ -33,6 +32,7 @@ import {
 import { type RecentPullRequest, timeAgo } from "../lib/recentPrs";
 import { scrollbar } from "../lib/scrollbar";
 import { setSectionOpen, useCollapsedSections } from "../lib/sidebarSections";
+import { sidebarHover } from "../lib/sidebarStyles";
 import { dragRegion, titleBarHeight } from "../lib/titleBar";
 import AnalyzedSidebarList from "./AnalyzedSidebarList";
 import CommentCountBadge from "./CommentCountBadge";
@@ -98,6 +98,9 @@ export default function HomeSidebar({
     hidden.has(reviewRequestKey(pr)),
   );
 
+  // The sidebar sits recessed against the main column: a translucent black
+  // darkens whatever the current mode's page background is, so one rule covers
+  // both modes and it stays clear of the rows' hover colour.
   return (
     <Flex
       direction="column"
@@ -105,16 +108,43 @@ export default function HomeSidebar({
       flexShrink="0"
       minH="0"
       borderRightWidth="1px"
+      bg="black/5"
+      _dark={{ bg: "black/25" }}
     >
-      {/* Room for the window's traffic lights, which macOS draws over this
-          corner. Its height matches the main column's header so the two line
-          up, and it doubles as the window's drag handle. */}
-      <Box
+      {/* The window's traffic lights are drawn over this corner, so the app's
+          own buttons sit at the far end of the bar. Its height matches the main
+          column's header so the two line up, and the bar itself drags the
+          window. */}
+      <HStack
         h={titleBarHeight}
         flexShrink="0"
         borderBottomWidth="1px"
+        justifyContent="flex-end"
+        gap="1"
+        pr="2"
         css={dragRegion}
-      />
+      >
+        <IconButton
+          aria-label="Add repository"
+          title="Add repository"
+          size="xs"
+          variant="ghost"
+          color="fg.muted"
+          onClick={onAddRepo}
+        >
+          <LuFolderPlus />
+        </IconButton>
+        <IconButton
+          aria-label="Settings"
+          title="Settings"
+          size="xs"
+          variant="ghost"
+          color="fg.muted"
+          onClick={onOpenSettings}
+        >
+          <LuSettings />
+        </IconButton>
+      </HStack>
 
       <Stack
         flex="1"
@@ -194,20 +224,6 @@ export default function HomeSidebar({
           id="reviewRequests"
           title="Review requests"
           count={visibleRequests.length}
-          action={
-            hiddenRequestPrs.length > 0 && (
-              <Button
-                size="2xs"
-                variant="ghost"
-                color="fg.muted"
-                onClick={() => setShowHidden(!showHidden)}
-              >
-                {showHidden
-                  ? "Hide hidden"
-                  : `Show hidden (${hiddenRequestPrs.length})`}
-              </Button>
-            )
-          }
         >
           {reviewRequestsQuery.isPending ? (
             <Spinner size="sm" color="fg.muted" alignSelf="center" my="2" />
@@ -267,6 +283,21 @@ export default function HomeSidebar({
                 }
               />
             ))}
+          {hiddenRequestPrs.length > 0 && (
+            <Button
+              size="2xs"
+              variant="ghost"
+              color="fg.muted"
+              justifyContent="flex-start"
+              px="2"
+              _hover={sidebarHover}
+              onClick={() => setShowHidden(!showHidden)}
+            >
+              {showHidden
+                ? "Hide hidden"
+                : `Show hidden (${hiddenRequestPrs.length})`}
+            </Button>
+          )}
         </Section>
 
         <SectionDivider />
@@ -334,47 +365,7 @@ export default function HomeSidebar({
           )}
         </Section>
       </Stack>
-
-      <Stack gap="1" p="2" borderTopWidth="1px" flexShrink="0">
-        <SidebarAction
-          icon={<LuFolderPlus />}
-          label="Add repository"
-          onClick={onAddRepo}
-        />
-        <SidebarAction
-          icon={<LuSettings />}
-          label="Settings"
-          onClick={onOpenSettings}
-        />
-      </Stack>
     </Flex>
-  );
-}
-
-interface SidebarActionProps {
-  icon: ReactNode;
-  label: string;
-  onClick(): void;
-}
-
-function SidebarAction({ icon, label, onClick }: SidebarActionProps) {
-  return (
-    <HStack
-      as="button"
-      w="full"
-      gap="2"
-      px="2"
-      py="1.5"
-      rounded="md"
-      cursor="pointer"
-      _hover={{ bg: "bg.subtle" }}
-      onClick={onClick}
-    >
-      <Icon size="sm" color="fg.muted">
-        {icon}
-      </Icon>
-      <Text fontSize="sm">{label}</Text>
-    </HStack>
   );
 }
 
@@ -402,8 +393,14 @@ function Section({ id, title, count, action, children }: SectionProps) {
       onOpenChange={(event) => setSectionOpen(id, event.open)}
     >
       <HStack justifyContent="space-between" px="2" minH="5" gap="1">
-        <Collapsible.Trigger flex="1" minW="0" cursor="pointer">
-          <HStack gap="1" color="fg.muted">
+        <Collapsible.Trigger
+          flex="1"
+          minW="0"
+          cursor="pointer"
+          color="fg.muted"
+          _hover={{ color: "fg" }}
+        >
+          <HStack gap="1" color="inherit">
             <Collapsible.Indicator
               display="flex"
               transition="transform 0.2s"
@@ -420,8 +417,8 @@ function Section({ id, title, count, action, children }: SectionProps) {
               {title}
             </Heading>
             {count !== undefined && count > 0 && (
-              <Text fontSize="xs" fontFamily="mono">
-                {count}
+              <Text fontSize="xs" letterSpacing="wider">
+                ({count})
               </Text>
             )}
           </HStack>

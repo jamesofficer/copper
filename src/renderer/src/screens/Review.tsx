@@ -5,7 +5,6 @@ import {
   Heading,
   HStack,
   IconButton,
-  Stack,
   Tabs,
   Text,
 } from "@chakra-ui/react";
@@ -32,7 +31,7 @@ import PullRequestActionsMenu from "../components/PullRequestActionsMenu";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReanalyzeButton from "../components/ReanalyzeButton";
 import ReviewPanel from "../components/ReviewPanel";
-import { dragRegion, trafficLightSpace } from "../lib/titleBar";
+import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
 
 interface Props {
   pr: PullRequest;
@@ -108,11 +107,13 @@ export default function Review({ pr, onBack }: Props) {
 
   return (
     <Flex direction="column" h="100vh">
+      {/* One row, the same height as the home screen's bar, so the window's
+          traffic lights sit centred in both. */}
       <HStack
-        gap="3"
+        gap="2"
         pl={trafficLightSpace}
         pr="4"
-        py="3"
+        h={titleBarHeight}
         borderBottomWidth="1px"
         flexShrink="0"
         align="center"
@@ -121,14 +122,14 @@ export default function Review({ pr, onBack }: Props) {
         <Button variant="outline" size="xs" onClick={onBack}>
           <LuArrowLeft /> Back
         </Button>
-        <Stack gap="0" flex="1" minW="0">
-          <Heading size="lg" truncate>
+        <HStack gap="2" flex="1" minW="0" alignItems="baseline">
+          <Heading size="sm" truncate>
             {pr.title}
           </Heading>
-          <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+          <Text fontFamily="mono" fontSize="xs" color="fg.muted" flexShrink="0">
             {pr.repo}#{pr.number}
           </Text>
-        </Stack>
+        </HStack>
 
         {newActivity ? (
           <Button

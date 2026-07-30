@@ -8,10 +8,10 @@ export const isMac = navigator.userAgent.includes("Mac");
 
 // Left padding for a top bar: clear of the three buttons at their configured x
 // offset on macOS, the usual gutter everywhere else.
-export const trafficLightSpace = isMac ? "78px" : "4";
+export const trafficLightSpace = isMac ? "96px" : "4";
 
 // Height of the app's top bars, so the buttons sit centred in all of them.
-export const titleBarHeight = "10";
+export const titleBarHeight = "12";
 
 // Cast because the app-region property is Electron's, not part of the CSS
 // types Chakra ships.

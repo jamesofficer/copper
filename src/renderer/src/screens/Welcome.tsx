@@ -243,6 +243,7 @@ export default function Welcome({
                       prs={prs}
                       preview={preview}
                       onSelect={setPreview}
+                      onOpen={onSelect}
                     />
                   ))}
               </>

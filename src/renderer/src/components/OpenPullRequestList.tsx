@@ -20,6 +20,7 @@ interface Props {
   prs: PullRequest[];
   preview: PullRequest | null;
   onSelect(pr: PullRequest): void;
+  onOpen(pr: PullRequest): void;
 }
 
 interface FilterItem {
@@ -84,7 +85,12 @@ function FilterSelect({
 // The selected repo's open PRs with GitHub-style filters. Filtering is
 // client-side — the full open list is already loaded. Mounted with
 // key={repo slug} so filters reset when switching repos.
-export default function OpenPullRequestList({ prs, preview, onSelect }: Props) {
+export default function OpenPullRequestList({
+  prs,
+  preview,
+  onSelect,
+  onOpen,
+}: Props) {
   const [author, setAuthor] = useState("all");
   const [assignee, setAssignee] = useState("all");
   const [sort, setSort] = useState<PullRequestSort>("newest");
@@ -145,6 +151,7 @@ export default function OpenPullRequestList({ prs, preview, onSelect }: Props) {
             key={`${pr.repo}#${pr.number}`}
             pr={pr}
             onSelect={onSelect}
+            onOpen={onOpen}
             selected={
               preview?.repo === pr.repo && preview?.number === pr.number
             }

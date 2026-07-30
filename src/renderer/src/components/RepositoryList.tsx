@@ -1,4 +1,11 @@
-import { Box, Center, HStack, Icon, IconButton, Text } from "@chakra-ui/react";
+import {
+  Badge,
+  Center,
+  HStack,
+  Icon,
+  IconButton,
+  Text,
+} from "@chakra-ui/react";
 import {
   closestCenter,
   DndContext,
@@ -20,6 +27,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useState } from "react";
 import { LuFolderGit2, LuTrash2 } from "react-icons/lu";
 import type { Repository } from "../../../shared/types";
+import { sidebarHover, sidebarSelected } from "../lib/sidebarStyles";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
@@ -141,8 +149,8 @@ function RepositoryRow({
       className="group"
       gap="0"
       rounded="md"
-      bg={selected ? "bg.emphasized" : undefined}
-      _hover={selected ? undefined : { bg: "bg.subtle" }}
+      css={selected ? sidebarSelected : undefined}
+      _hover={selected ? undefined : sidebarHover}
       opacity={isDragging ? 0.35 : undefined}
       style={{
         transform: CSS.Transform.toString(transform),
@@ -202,18 +210,16 @@ function RowContent({ repo, count, onSelect, onRemove }: RowContentProps) {
       </HStack>
       {/* One fixed slot at the row's edge: the open-PR count, replaced by
           the remove button while the row is hovered. */}
-      <Box position="relative" boxSize="5" mr="1" flexShrink="0">
+      <Center position="relative" minW="5" h="5" mr="1" flexShrink="0">
         {count !== undefined && count > 0 && (
-          <Center
-            position="absolute"
-            inset="0"
-            fontSize="xs"
+          <Badge
+            size="xs"
+            variant="surface"
             fontFamily="mono"
-            color="fg.muted"
             _groupHover={onRemove ? { opacity: 0 } : undefined}
           >
             {count}
-          </Center>
+          </Badge>
         )}
         {onRemove && (
           <IconButton
@@ -231,7 +237,7 @@ function RowContent({ repo, count, onSelect, onRemove }: RowContentProps) {
             <LuTrash2 />
           </IconButton>
         )}
-      </Box>
+      </Center>
     </>
   );
 }

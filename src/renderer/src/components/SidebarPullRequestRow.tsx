@@ -2,6 +2,7 @@ import { Box, HStack, Icon, Text } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { LuGitPullRequest } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
+import { sidebarHover } from "../lib/sidebarStyles";
 
 interface Props {
   pr: PullRequest;
@@ -27,7 +28,7 @@ export default function SidebarPullRequestRow({
       className="group"
       gap="0"
       rounded="md"
-      _hover={{ bg: "bg.subtle" }}
+      _hover={sidebarHover}
       title={`${pr.repo}#${pr.number} — ${pr.title}`}
     >
       <HStack

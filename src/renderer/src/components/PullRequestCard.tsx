@@ -13,6 +13,8 @@ interface Props {
   // here win over the snapshot.
   detail?: PullRequestDetail;
   onSelect(pr: PullRequest): void;
+  // Double-click skips the preview panel and opens the PR outright.
+  onOpen?(pr: PullRequest): void;
   // Highlight the card while its PR is open in the preview panel.
   selected?: boolean;
   showRepo?: boolean;
@@ -26,6 +28,7 @@ export default function PullRequestCard({
   pr,
   detail,
   onSelect,
+  onOpen,
   selected,
   showRepo,
   viewedAt,
@@ -47,6 +50,7 @@ export default function PullRequestCard({
     <Box
       as="button"
       onClick={() => onSelect(pr)}
+      onDoubleClick={onOpen ? () => onOpen(pr) : undefined}
       maxW={maxW}
       textAlign="left"
       borderWidth="1px"

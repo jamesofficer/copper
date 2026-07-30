@@ -32,7 +32,7 @@ export default function PullRequestPreview({ pr, onView, onClose }: Props) {
         >
           {pr.repo}#{pr.number}
         </Text>
-        <Button size="xs" onClick={() => onView(pr)}>
+        <Button size="xs" variant="outline" onClick={() => onView(pr)}>
           View PR <LuArrowRight />
         </Button>
         <IconButton
