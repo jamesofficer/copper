@@ -215,17 +215,22 @@ async function findFileInput(
 }
 
 // GitHub writes the markdown for the finished upload straight into whichever
-// textarea the file was dropped on, so the asset URL appearing anywhere in the
-// page's textareas is our completion signal.
-async function readAssetUrl(window: BrowserWindow): Promise<string | null> {
-  const found = await window.webContents.executeJavaScript(
+// textarea the file was dropped on, so an asset URL appearing in the page's
+// textareas is our completion signal. A PR page also carries hidden edit forms
+// holding existing comment bodies, though, and those may already contain
+// attachment URLs — so the URLs present before the upload are recorded and
+// only a new one counts.
+async function readAssetUrls(window: BrowserWindow): Promise<string[]> {
+  const text = await window.webContents.executeJavaScript(
     `Array.from(document.querySelectorAll("textarea"))
       .map((area) => area.value)
       .join("\\n")`,
     true,
   );
-  const match = typeof found === "string" ? found.match(assetUrlPattern) : null;
-  return match?.[0] ?? null;
+  if (typeof text !== "string") return [];
+  return [...text.matchAll(new RegExp(assetUrlPattern.source, "g"))].map(
+    (match) => match[0],
+  );
 }
 
 // GitHub ships the "we don't support that file type" wording — the whole
@@ -275,7 +280,32 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export async function uploadAttachment(
+// Each upload drives a hidden window through a full GitHub page load, so
+// dropping five files at once would open five of them. They queue instead.
+let queue: Promise<unknown> = Promise.resolve();
+
+export function uploadAttachment(
+  repo: string,
+  prNumber: number | null,
+  file: AttachmentFile,
+): Promise<AttachmentUpload> {
+  const run = queue.then(
+    () => performUpload(repo, prNumber, file),
+    () => performUpload(repo, prNumber, file),
+  );
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+// A dropped file's name is only a name — keep it from reaching outside the
+// temp directory.
+function safeFileName(name: string): string {
+  const base = name.split(/[/\\]/).pop() ?? "";
+  const cleaned = base.replace(/^\.+/, "").trim();
+  return cleaned || "attachment";
+}
+
+async function performUpload(
   repo: string,
   prNumber: number | null,
   file: AttachmentFile,
@@ -283,14 +313,14 @@ export async function uploadAttachment(
   const status = await getAttachmentAuthStatus();
   if (!status.signedIn) {
     throw new Error(
-      "Not signed in to GitHub for attachments. Connect a GitHub session in Settings → Connections.",
+      "Not signed in to GitHub for attachments. Connect a GitHub session in Settings → GitHub.",
     );
   }
 
   // The upload needs a real file on disk: a pasted screenshot arrives as bytes
   // with no path of its own.
   const directory = await mkdtemp(join(tmpdir(), "reviewr-upload-"));
-  const filePath = join(directory, file.name);
+  const filePath = join(directory, safeFileName(file.name));
   await writeFile(filePath, file.data);
 
   const window = new BrowserWindow({
@@ -308,6 +338,8 @@ export async function uploadAttachment(
     await window.webContents.debugger.sendCommand("DOM.enable");
 
     const input = await findFileInput(window);
+    const before = new Set(await readAssetUrls(window));
+
     await window.webContents.debugger.sendCommand("DOM.setFileInputFiles", {
       files: [filePath],
       nodeId: input.nodeId,
@@ -315,7 +347,7 @@ export async function uploadAttachment(
 
     const deadline = Date.now() + uploadTimeoutMs;
     while (Date.now() < deadline) {
-      const url = await readAssetUrl(window);
+      const url = (await readAssetUrls(window)).find((it) => !before.has(it));
       if (url) return { url, name: file.name, kind: kindOf(file.name) };
 
       const failure = await readUploadError(window);

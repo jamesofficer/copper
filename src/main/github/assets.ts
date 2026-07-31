@@ -43,6 +43,16 @@ function mediaReady(response: Response): Response {
 const signedUrls = new Map<string, { url: string; expires: number }>();
 const signedUrlTtlMs = 60_000;
 
+function rememberSignedUrl(target: string, url: string): void {
+  // Expired entries are only dropped when asked for again, so sweep on write
+  // to stop a long session accumulating them.
+  const now = Date.now();
+  for (const [key, entry] of signedUrls) {
+    if (entry.expires <= now) signedUrls.delete(key);
+  }
+  signedUrls.set(target, { url, expires: now + signedUrlTtlMs });
+}
+
 function rememberedSignedUrl(target: string): string | null {
   const cached = signedUrls.get(target);
   if (!cached) return null;
@@ -85,10 +95,7 @@ export function handleAssetRequests(): void {
     // GitHub answers with a redirect to a short-lived signed S3 URL.
     const location = upstream.headers.get("location");
     if (upstream.status >= 300 && upstream.status < 400 && location) {
-      signedUrls.set(target, {
-        url: location,
-        expires: Date.now() + signedUrlTtlMs,
-      });
+      rememberSignedUrl(target, location);
       return mediaReady(await fetchSigned(location, range));
     }
     return mediaReady(upstream);

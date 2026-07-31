@@ -45,6 +45,16 @@ function errorMessage(cause: unknown): string {
     : String(cause);
 }
 
+// GitHub's own ceiling for a video attachment, and the most generous limit it
+// applies to anything. Smaller per-type limits are left to GitHub to enforce,
+// since they vary by plan and it reports them clearly — this only stops a file
+// far too big from being copied across IPC to be refused.
+const maxUploadBytes = 100 * 1024 * 1024;
+
+function tooBig(file: File): boolean {
+  return file.size > maxUploadBytes;
+}
+
 interface Options {
   target: AttachmentTarget;
   value: string;
@@ -70,7 +80,17 @@ export function useAttachmentUpload({ target, value, onChange }: Options) {
   );
 
   const uploadFiles = useCallback(
-    async (files: File[], cursor: number) => {
+    async (dropped: File[], cursor: number) => {
+      for (const file of dropped.filter(tooBig)) {
+        toaster.create({
+          type: "error",
+          title: `${file.name} is too big to attach`,
+          description: "GitHub accepts attachments up to 100 MB.",
+          closable: true,
+        });
+      }
+
+      const files = dropped.filter((file) => !tooBig(file));
       if (files.length === 0) return;
 
       const status = await window.api.getAttachmentAuthStatus();
