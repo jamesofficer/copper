@@ -86,6 +86,7 @@ export default function PullRequestDescription({ detail, editable }: Props) {
           onChange={setBody}
           onModeChange={setMode}
           onSubmit={() => canSave && save.mutate()}
+          attachments={{ repo: detail.repo, prNumber: detail.number }}
           footer={
             <>
               <Button

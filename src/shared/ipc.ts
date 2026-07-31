@@ -1,6 +1,9 @@
 import type {
   AnalysisResult,
   AnalyzedPullRequest,
+  AttachmentAuthStatus,
+  AttachmentFile,
+  AttachmentUpload,
   ChatMessage,
   DraftReviewComment,
   ExplainRequest,
@@ -186,6 +189,18 @@ export interface IpcApi {
   ): Promise<void>;
   // The GitHub login the stored token belongs to.
   getViewer(): Promise<string>;
+  // Image/video attachments for comment and description bodies. GitHub has no
+  // API for these, so they ride a separate logged-in github.com session —
+  // hence its own sign-in, apart from the personal access token.
+  getAttachmentAuthStatus(): Promise<AttachmentAuthStatus>;
+  signInForAttachments(): Promise<AttachmentAuthStatus>;
+  signOutOfAttachments(): Promise<AttachmentAuthStatus>;
+  // Resolves with the permanent user-attachments URL to embed in the body.
+  uploadAttachment(
+    repo: string,
+    prNumber: number | null,
+    file: AttachmentFile,
+  ): Promise<AttachmentUpload>;
   getAnalysis(repo: string, prNumber: number): Promise<AnalysisResult | null>;
   // Pre-review agent pass: candidate issues to verify, anchored to the diff.
   // getFindings is cache-only (null if never run); findIssues runs the model.
@@ -312,6 +327,10 @@ export const ipcChannels = [
   "listViewedFiles",
   "setFileViewed",
   "getViewer",
+  "getAttachmentAuthStatus",
+  "signInForAttachments",
+  "signOutOfAttachments",
+  "uploadAttachment",
   "getAnalysis",
   "getFindings",
   "findIssues",

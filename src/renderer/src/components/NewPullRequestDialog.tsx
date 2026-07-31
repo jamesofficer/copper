@@ -241,6 +241,7 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
                         onChange={setBody}
                         onModeChange={setMode}
                         onSubmit={() => canCreate && create.mutate()}
+                        attachments={{ repo }}
                       />
                     </Box>
                   </Field.Root>

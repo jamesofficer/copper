@@ -10,6 +10,12 @@ import { deleteAnalyses, listAnalyzedPullRequests } from "../analysis/cache";
 import { findIssues, getExistingFindings } from "../analysis/findings";
 import { analyzePullRequest, getExistingAnalysis } from "../analysis/pipeline";
 import {
+  getAttachmentAuthStatus,
+  signInForAttachments,
+  signOutOfAttachments,
+  uploadAttachment,
+} from "../github/attachments";
+import {
   addPullRequestComment,
   addReviewComment,
   createPullRequest,
@@ -129,6 +135,11 @@ const handlers: IpcApi = {
   setFileViewed: (repo, prNumber, path, viewed) =>
     setFileViewed(repo, prNumber, path, viewed),
   getViewer: () => getViewer(),
+  getAttachmentAuthStatus: () => getAttachmentAuthStatus(),
+  signInForAttachments: () => signInForAttachments(),
+  signOutOfAttachments: () => signOutOfAttachments(),
+  uploadAttachment: (repo, prNumber, file) =>
+    uploadAttachment(repo, prNumber, file),
   getAnalysis: (repo, prNumber) => getExistingAnalysis(repo, prNumber),
   getFindings: (repo, prNumber) => getExistingFindings(repo, prNumber),
   findIssues: (repo, prNumber, force) => findIssues(repo, prNumber, force),

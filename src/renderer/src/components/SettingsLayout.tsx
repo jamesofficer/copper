@@ -11,7 +11,9 @@ interface PanelProps {
 // pieces, so the four tabs look like one screen instead of four forms.
 export function SettingsPanel({ title, description, children }: PanelProps) {
   return (
-    <Stack gap="5" alignItems="stretch">
+    // The bottom padding rides on the panel, not the dialog's scroll box, so
+    // the last card always clears the modal's edge when the tab scrolls.
+    <Stack gap="5" alignItems="stretch" pb="6">
       <Stack gap="1" pr="8">
         <Heading size="md">{title}</Heading>
         <Text fontSize="sm" color="fg.muted">

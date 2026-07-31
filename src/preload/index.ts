@@ -87,6 +87,11 @@ const api: WindowApi = {
   setFileViewed: (repo, prNumber, path, viewed) =>
     ipcRenderer.invoke("setFileViewed", repo, prNumber, path, viewed),
   getViewer: () => ipcRenderer.invoke("getViewer"),
+  getAttachmentAuthStatus: () => ipcRenderer.invoke("getAttachmentAuthStatus"),
+  signInForAttachments: () => ipcRenderer.invoke("signInForAttachments"),
+  signOutOfAttachments: () => ipcRenderer.invoke("signOutOfAttachments"),
+  uploadAttachment: (repo, prNumber, file) =>
+    ipcRenderer.invoke("uploadAttachment", repo, prNumber, file),
   getAnalysis: (repo, prNumber) =>
     ipcRenderer.invoke("getAnalysis", repo, prNumber),
   getFindings: (repo, prNumber) =>

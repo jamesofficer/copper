@@ -1,8 +1,15 @@
 import { Box, CloseButton, Dialog, Flex, Portal, Tabs } from "@chakra-ui/react";
-import { LuBrain, LuKeyRound, LuPalette, LuSparkles } from "react-icons/lu";
+import {
+  LuBrain,
+  LuGithub,
+  LuKeyRound,
+  LuPalette,
+  LuSparkles,
+} from "react-icons/lu";
 import { scrollbar } from "../lib/scrollbar";
 import ApiKeysSettings from "./ApiKeysSettings";
 import AppearanceSettings from "./AppearanceSettings";
+import GitHubSettings from "./GitHubSettings";
 import ModelSettings from "./ModelSettings";
 import ReviewSettings from "./ReviewSettings";
 
@@ -16,6 +23,7 @@ const TABS = [
   { value: "review", label: "Review", icon: <LuSparkles /> },
   { value: "models", label: "Models", icon: <LuBrain /> },
   { value: "keys", label: "Connections", icon: <LuKeyRound /> },
+  { value: "github", label: "GitHub", icon: <LuGithub /> },
 ];
 
 export default function SettingsDialog({ open, onOpenChange }: Props) {
@@ -105,6 +113,9 @@ export default function SettingsDialog({ open, onOpenChange }: Props) {
                 </Tabs.Content>
                 <Tabs.Content value="keys" p="0">
                   <ApiKeysSettings open={open} />
+                </Tabs.Content>
+                <Tabs.Content value="github" p="0">
+                  <GitHubSettings open={open} />
                 </Tabs.Content>
               </Box>
             </Tabs.Root>

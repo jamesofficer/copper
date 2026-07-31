@@ -460,3 +460,27 @@ export interface KeyTestResult {
   ok: boolean;
   message: string;
 }
+
+// GitHub has no API for comment attachments — the upload endpoint only accepts
+// a browser session cookie. So attachments go through a real logged-in
+// github.com session the app keeps in its own window partition, separate from
+// the personal access token the rest of the app uses.
+export interface AttachmentAuthStatus {
+  signedIn: boolean;
+  // The github.com login the session belongs to, when the cookie names it.
+  login: string | null;
+}
+
+// A file to attach, sent as bytes because a pasted image has no path on disk.
+export interface AttachmentFile {
+  name: string;
+  data: Uint8Array;
+}
+
+export interface AttachmentUpload {
+  // The permanent github.com/user-attachments/assets/… URL.
+  url: string;
+  name: string;
+  // Videos embed as a bare URL (GitHub renders a player), images as markdown.
+  kind: "image" | "video" | "file";
+}

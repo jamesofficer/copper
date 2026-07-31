@@ -45,6 +45,7 @@ export default function CommentComposer({ pr }: Props) {
       onChange={setBody}
       onModeChange={setMode}
       onSubmit={() => canSubmit && submit.mutate()}
+      attachments={{ repo: pr.repo, prNumber: pr.number }}
       footer={
         <Button
           size="xs"

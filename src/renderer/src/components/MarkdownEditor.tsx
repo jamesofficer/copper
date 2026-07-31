@@ -1,5 +1,16 @@
-import { Box, Button, HStack, Text, Textarea } from "@chakra-ui/react";
-import type { KeyboardEvent, ReactNode } from "react";
+import { Box, Button, HStack, Spinner, Text, Textarea } from "@chakra-ui/react";
+import type {
+  ClipboardEvent,
+  DragEvent,
+  KeyboardEvent,
+  ReactNode,
+} from "react";
+import { useRef, useState } from "react";
+import { LuImage } from "react-icons/lu";
+import {
+  type AttachmentTarget,
+  useAttachmentUpload,
+} from "../lib/useAttachmentUpload";
 import Markdown from "./Markdown";
 
 export type MarkdownEditorMode = "write" | "preview";
@@ -15,6 +26,10 @@ interface Props {
   onSubmit?(): void;
   // Rendered right-aligned below the editor, inside the border.
   footer?: ReactNode;
+  // Set to allow images and videos to be pasted, dropped, or picked. Uploaded
+  // to GitHub through a signed-in github.com session — see main/github/
+  // attachments.ts for why that's needed.
+  attachments?: AttachmentTarget;
 }
 
 // A bordered Write/Preview markdown editor — used for conversation comments
@@ -28,7 +43,19 @@ export default function MarkdownEditor({
   onModeChange,
   onSubmit,
   footer,
+  attachments,
 }: Props) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [dragging, setDragging] = useState(false);
+
+  const { uploading, uploadFiles } = useAttachmentUpload({
+    target: attachments ?? { repo: "" },
+    value,
+    onChange,
+  });
+
   // Tracks the textarea's height, so switching to Preview doesn't resize the
   // editor under the cursor.
   const previewMinHeight = `${rows * 25 + 2}px`;
@@ -39,8 +66,45 @@ export default function MarkdownEditor({
     }
   }
 
+  function cursorPosition(): number {
+    return textareaRef.current?.selectionStart ?? value.length;
+  }
+
+  function upload(files: File[]) {
+    if (!attachments || files.length === 0) return;
+    void uploadFiles(files, cursorPosition());
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = Array.from(event.clipboardData.files);
+    if (!attachments || files.length === 0) return;
+    // A pasted screenshot is a file with no text alternative — take it over
+    // the default paste, which would drop it.
+    event.preventDefault();
+    upload(files);
+  }
+
+  function handleDrop(event: DragEvent) {
+    setDragging(false);
+    const files = Array.from(event.dataTransfer.files);
+    if (!attachments || files.length === 0) return;
+    event.preventDefault();
+    upload(files);
+  }
+
+  function handleDragOver(event: DragEvent) {
+    if (!attachments || !event.dataTransfer.types.includes("Files")) return;
+    event.preventDefault();
+    setDragging(true);
+  }
+
   return (
-    <Box borderWidth="1px" rounded="lg" overflow="hidden">
+    <Box
+      borderWidth="1px"
+      rounded="lg"
+      overflow="hidden"
+      borderColor={dragging ? "colorPalette.solid" : undefined}
+    >
       <HStack gap="1" px="2" py="1.5" bg="bg.subtle" borderBottomWidth="1px">
         <ModeButton
           active={mode === "write"}
@@ -55,6 +119,7 @@ export default function MarkdownEditor({
       </HStack>
       {mode === "write" ? (
         <Textarea
+          ref={textareaRef}
           placeholder={placeholder}
           rows={rows}
           resize="vertical"
@@ -64,6 +129,10 @@ export default function MarkdownEditor({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={() => setDragging(false)}
         />
       ) : (
         <Box px="4" py="3" minH={previewMinHeight}>
@@ -75,6 +144,45 @@ export default function MarkdownEditor({
             </Text>
           )}
         </Box>
+      )}
+      {attachments && mode === "write" && (
+        <HStack
+          px="3"
+          py="1.5"
+          gap="2"
+          borderTopWidth="1px"
+          bg="bg.subtle"
+          color="fg.muted"
+          fontSize="xs"
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,video/*"
+            hidden
+            onChange={(event) => {
+              upload(Array.from(event.target.files ?? []));
+              event.target.value = "";
+            }}
+          />
+          <Button
+            size="2xs"
+            variant="ghost"
+            color="fg.muted"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <LuImage /> Attach files
+          </Button>
+          {uploading ? (
+            <HStack gap="1.5">
+              <Spinner size="xs" />
+              <Text>Uploading to GitHub…</Text>
+            </HStack>
+          ) : (
+            <Text>Or paste and drop images and videos here.</Text>
+          )}
+        </HStack>
       )}
       {footer && (
         <HStack justifyContent="flex-end" px="3" py="2" borderTopWidth="1px">
