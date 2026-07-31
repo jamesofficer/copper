@@ -1,12 +1,17 @@
 import { Box, Link } from "@chakra-ui/react";
 import hljs from "highlight.js/lib/common";
+import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
-import rehypeSanitize from "rehype-sanitize";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
-import { toDisplayableImageSrc } from "../lib/githubImages";
+import {
+  isGitHubAttachmentUrl,
+  toDisplayableImageSrc,
+} from "../lib/githubImages";
 import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
+import AttachmentMedia from "./AttachmentMedia";
 
 interface Props {
   children: string;
@@ -155,9 +160,75 @@ const prose = {
     maxWidth: "100%",
     borderRadius: "6px",
   },
+  // Videos are block-level and capped so a screen recording doesn't push the
+  // rest of the description off the page.
+  "& video": {
+    display: "block",
+    maxWidth: "100%",
+    maxHeight: "30rem",
+    borderRadius: "6px",
+    borderWidth: "1px",
+    borderColor: "var(--chakra-colors-border)",
+    margin: "0.75em 0",
+  },
   ...tokenColors,
   ...innerScrollbar,
 } as const;
+
+function ProseLink({ href, children }: { href?: string; children: ReactNode }) {
+  return (
+    <Link
+      href={href}
+      color="colorPalette.fg"
+      textDecoration="underline"
+      textDecorationColor="color-mix(in srgb, currentColor 40%, transparent)"
+      textUnderlineOffset="3px"
+      _hover={{ textDecorationColor: "currentColor" }}
+      target="_blank"
+      rel="noreferrer"
+    >
+      {children}
+    </Link>
+  );
+}
+
+// An autolinked bare URL — GitHub's markdown for an uploaded video — arrives
+// as a link whose only child is the href itself. A link someone wrote by hand
+// has different text and stays a link.
+function bareUrlText(children: ReactNode): string | null {
+  if (typeof children === "string") return children;
+  if (
+    Array.isArray(children) &&
+    children.length === 1 &&
+    typeof children[0] === "string"
+  ) {
+    return children[0];
+  }
+  return null;
+}
+
+// Bodies written on github.com embed videos as real <video> tags, which the
+// default sanitize schema drops entirely. Allow them, with the attributes a
+// player needs and nothing that could load or run anything else.
+const schema = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames ?? []), "video", "source"],
+  attributes: {
+    ...defaultSchema.attributes,
+    video: [
+      "src",
+      "poster",
+      "controls",
+      "width",
+      "height",
+      "loop",
+      "muted",
+      "playsInline",
+      "autoPlay",
+    ],
+    source: ["src", "type"],
+  },
+};
 
 export default function Markdown({ children, fontSize = "sm" }: Props) {
   return (
@@ -166,23 +237,30 @@ export default function Markdown({ children, fontSize = "sm" }: Props) {
         remarkPlugins={[remarkGfm]}
         // GitHub allows inline HTML in markdown (bots lean on it for links),
         // so parse it — then sanitize, since comment HTML is untrusted.
-        rehypePlugins={[rehypeRaw, rehypeSanitize]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, schema]]}
         components={{
-          a: ({ href, children }) => (
-            <Link
-              href={href}
-              color="colorPalette.fg"
-              textDecoration="underline"
-              textDecorationColor="color-mix(in srgb, currentColor 40%, transparent)"
-              textUnderlineOffset="3px"
-              _hover={{ textDecorationColor: "currentColor" }}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {children}
-            </Link>
-          ),
+          a: ({ href, children }) => {
+            // A bare attachment link is a video embed; anything else is a link.
+            if (isGitHubAttachmentUrl(href) && bareUrlText(children) === href) {
+              return (
+                <AttachmentMedia
+                  href={href as string}
+                  fallback={<ProseLink href={href}>{children}</ProseLink>}
+                />
+              );
+            }
+            return <ProseLink href={href}>{children}</ProseLink>;
+          },
           code: Code,
+          // Private-repo attachments need the token, same as images.
+          video: ({ src, children, ...rest }) => (
+            <video {...rest} controls src={toDisplayableImageSrc(src)}>
+              {children}
+            </video>
+          ),
+          source: ({ src, ...rest }) => (
+            <source {...rest} src={toDisplayableImageSrc(src)} />
+          ),
           // Private-repo attachments need the main process to fetch them
           // with the GitHub token; other images load directly.
           img: ({ src, alt, ...rest }) => (

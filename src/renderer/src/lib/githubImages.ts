@@ -13,6 +13,14 @@ const attachmentPatterns = [
 const privateImagePattern =
   /^https:\/\/private-user-images\.githubusercontent\.com\/.*-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.\w+(?:\?|$)/;
 
+// A bare attachment link is how both GitHub and this app write an uploaded
+// video into a body — GitHub decides it's a player by content type, which the
+// URL doesn't carry (attachment URLs have no file extension).
+export function isGitHubAttachmentUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  return attachmentPatterns.some((pattern) => pattern.test(url));
+}
+
 function proxied(url: string): string {
   return `gh-asset://proxy?url=${encodeURIComponent(url)}`;
 }
