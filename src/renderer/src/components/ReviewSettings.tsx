@@ -56,7 +56,7 @@ export default function ReviewSettings() {
       <SettingsGroup>
         <SettingRow
           title="Review personality"
-          description="The voice the analysis is written in. Changes the wording only — never what gets reported. Applies to new analyses; already-analysed PRs keep their text."
+          description="The voice the analysis is written in. Changes the wording only, never what gets reported. Applies to new analyses only; already-analysed PRs keep their previously generated text."
         >
           <Stack gap="1.5" alignItems="flex-end">
             <Select.Root
