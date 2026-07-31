@@ -33,6 +33,19 @@ const config = defineConfig({
     } as SystemStyleObject,
   },
   theme: {
+    recipes: {
+      button: {
+        variants: {
+          variant: {
+            // Outline buttons are the app's secondary actions — toolbars, Cancel,
+            // and the like — so they stay neutral instead of inheriting the
+            // accent from <html>. A button that means something (yellow, red,
+            // green) still sets its own colorPalette, which wins over this.
+            outline: { colorPalette: "gray" },
+          },
+        },
+      },
+    },
     tokens: {
       fonts: {
         mono: {
