@@ -52,6 +52,7 @@ import {
   submitReview,
 } from "../github/client";
 import { getLlmStatus, setLlmModel, setLlmProvider } from "../llm/settings";
+import { getLocalChanges } from "../repo/changes";
 import {
   addRepository,
   listRepositories,
@@ -74,6 +75,7 @@ const handlers: IpcApi = {
   addRepository: () => addRepository(),
   removeRepository: (path) => removeRepository(path),
   reorderRepositories: (paths) => reorderRepositories(paths),
+  getLocalChanges: (repoPath) => getLocalChanges(repoPath),
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
   listMyPullRequests: () => listMyPullRequests(),

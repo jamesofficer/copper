@@ -2,18 +2,31 @@ import {
   Alert,
   Box,
   Button,
+  Center,
   EmptyState,
   Flex,
-  Heading,
   HStack,
+  IconButton,
   Spinner,
   Stack,
+  Tabs,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { LuFolderGit2, LuFolderPlus, LuGitPullRequest } from "react-icons/lu";
+import { useState } from "react";
+import {
+  LuFileDiff,
+  LuFolderGit2,
+  LuFolderPlus,
+  LuGitBranch,
+  LuGitPullRequest,
+  LuRefreshCw,
+} from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
+import LocalChangesView, {
+  localChangesQueryOptions,
+} from "../components/LocalChangesView";
 import NewPullRequestDialog from "../components/NewPullRequestDialog";
 import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
@@ -45,6 +58,7 @@ export default function Welcome({
   onOpenSettings,
 }: Props) {
   const queryClient = useQueryClient();
+  const [tab, setTab] = useState("pull-requests");
   // With the sidebar hidden its header is gone too, so this bar takes over
   // holding the window's traffic lights clear.
   const collapsed = useSidebarCollapsed();
@@ -61,6 +75,17 @@ export default function Welcome({
       : "Couldn't load pull requests."
     : null;
 
+  // Same query LocalChangesView owns — this observer feeds the tab label's
+  // file count and, while that tab is showing, the top bar's branch label and
+  // refresh button. Enabled whichever tab is up so the count shows before the
+  // tab is opened; it's a cheap local git call.
+  const localChangesTab = tab === "local-changes";
+  const changesQuery = useQuery({
+    ...localChangesQueryOptions(active?.path ?? ""),
+    enabled: Boolean(active),
+  });
+  const changedCount = changesQuery.data?.files.length;
+
   function openCreatedPullRequest(pr: PullRequest) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
     void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
@@ -71,111 +96,161 @@ export default function Welcome({
   return (
     <>
       <Flex direction="column" flex="1" minW="0">
-        <HStack
-          flexShrink="0"
-          h={titleBarHeight}
-          pl={collapsed ? trafficLightSpace : "4"}
-          pr="4"
-          gap="2"
-          borderBottomWidth="1px"
-          color="fg.muted"
-          css={dragRegion}
+        <Tabs.Root
+          value={tab}
+          onValueChange={(details) => setTab(details.value)}
+          display="flex"
+          flexDirection="column"
+          flex="1"
+          minH="0"
         >
-          <ShowSidebarButton />
-          <LuGitPullRequest />
-          <Heading size="sm">Open pull requests</Heading>
-          {active?.slug && (
-            <Box ml="auto">
-              <NewPullRequestDialog
-                key={active.slug}
-                repo={active.slug}
-                onCreated={openCreatedPullRequest}
-              />
-            </Box>
-          )}
-        </HStack>
-
-        <Box flex="1" minH="0">
-          <Stack
-            h="full"
-            minH="0"
-            overflowY="auto"
-            gap="3"
-            px="4"
-            py="4"
-            css={scrollbar}
+          <HStack
+            flexShrink="0"
+            h={titleBarHeight}
+            pl={collapsed ? trafficLightSpace : "4"}
+            pr="4"
+            gap="2"
+            borderBottomWidth="1px"
+            color="fg.muted"
+            css={dragRegion}
           >
-            <SetupBanner onOpenSettings={onOpenSettings} />
-
-            {!reposPending && (!repositories || repositories.length === 0) ? (
-              <EmptyState.Root
-                borderWidth="1px"
-                borderStyle="dashed"
-                rounded="xl"
-                maxW="2xl"
-              >
-                <EmptyState.Content>
-                  <EmptyState.Indicator>
-                    <LuFolderGit2 />
-                  </EmptyState.Indicator>
-                  <VStack textAlign="center">
-                    <EmptyState.Title>No repositories yet</EmptyState.Title>
-                    <EmptyState.Description>
-                      Add a local git repository to start reviewing its pull
-                      requests.
-                    </EmptyState.Description>
-                  </VStack>
-                  <Button onClick={onAddRepo}>
-                    <LuFolderPlus /> Add repository
-                  </Button>
-                </EmptyState.Content>
-              </EmptyState.Root>
-            ) : (
-              <>
-                {active && !active.slug && (
-                  <Text fontSize="sm" color="fg.muted">
-                    This repository has no GitHub remote, so pull requests can’t
-                    be loaded.
-                  </Text>
-                )}
-
-                {prsError && (
-                  <Alert.Root status="error" rounded="lg" maxW="2xl">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Alert.Title>Couldn’t load pull requests</Alert.Title>
-                      <Alert.Description>{prsError}</Alert.Description>
-                    </Alert.Content>
-                  </Alert.Root>
-                )}
-
-                {active?.slug &&
-                  !prsError &&
-                  (prsQuery.isPending || !prs ? (
-                    <HStack color="fg.muted" py="4">
-                      <Spinner size="sm" />
-                      <Text fontSize="sm">Loading open pull requests…</Text>
-                    </HStack>
-                  ) : prs.length === 0 ? (
-                    <Text fontSize="sm" color="fg.muted" py="4">
-                      No open pull requests. Nice and quiet.
-                    </Text>
-                  ) : (
-                    <OpenPullRequestList
-                      key={active.slug}
-                      prs={prs}
-                      preview={preview}
-                      onSelect={onPreviewChange}
-                      onOpen={onSelect}
-                    />
-                  ))}
-              </>
+            <ShowSidebarButton />
+            <Tabs.List h="full" border="none" alignItems="stretch">
+              <Tabs.Trigger value="pull-requests" h="full">
+                <LuGitPullRequest /> Open pull requests
+              </Tabs.Trigger>
+              <Tabs.Trigger value="local-changes" h="full">
+                <LuFileDiff /> Current changes
+                {changedCount !== undefined ? ` (${changedCount})` : ""}
+              </Tabs.Trigger>
+            </Tabs.List>
+            {active?.slug && tab === "pull-requests" && (
+              <Box ml="auto">
+                <NewPullRequestDialog
+                  key={active.slug}
+                  repo={active.slug}
+                  onCreated={openCreatedPullRequest}
+                />
+              </Box>
             )}
-          </Stack>
-        </Box>
+            {active && localChangesTab && (
+              <HStack ml="auto" gap="2">
+                {changesQuery.data?.branch && (
+                  <HStack gap="1" fontFamily="mono" fontSize="xs" minW="0">
+                    <LuGitBranch size={12} />
+                    <Text as="span" truncate>
+                      {changesQuery.data.branch}
+                    </Text>
+                  </HStack>
+                )}
+                <IconButton
+                  aria-label="Refresh"
+                  title="Refresh"
+                  variant="outline"
+                  size="xs"
+                  loading={changesQuery.isFetching}
+                  onClick={() => void changesQuery.refetch()}
+                >
+                  <LuRefreshCw />
+                </IconButton>
+              </HStack>
+            )}
+          </HStack>
+
+          <Tabs.Content value="pull-requests" flex="1" minH="0" p="0">
+            <Stack
+              h="full"
+              minH="0"
+              overflowY="auto"
+              gap="3"
+              px="4"
+              py="4"
+              css={scrollbar}
+            >
+              <SetupBanner onOpenSettings={onOpenSettings} />
+
+              {!reposPending && (!repositories || repositories.length === 0) ? (
+                <EmptyState.Root
+                  borderWidth="1px"
+                  borderStyle="dashed"
+                  rounded="xl"
+                  maxW="2xl"
+                >
+                  <EmptyState.Content>
+                    <EmptyState.Indicator>
+                      <LuFolderGit2 />
+                    </EmptyState.Indicator>
+                    <VStack textAlign="center">
+                      <EmptyState.Title>No repositories yet</EmptyState.Title>
+                      <EmptyState.Description>
+                        Add a local git repository to start reviewing its pull
+                        requests.
+                      </EmptyState.Description>
+                    </VStack>
+                    <Button onClick={onAddRepo}>
+                      <LuFolderPlus /> Add repository
+                    </Button>
+                  </EmptyState.Content>
+                </EmptyState.Root>
+              ) : (
+                <>
+                  {active && !active.slug && (
+                    <Text fontSize="sm" color="fg.muted">
+                      This repository has no GitHub remote, so pull requests
+                      can’t be loaded.
+                    </Text>
+                  )}
+
+                  {prsError && (
+                    <Alert.Root status="error" rounded="lg" maxW="2xl">
+                      <Alert.Indicator />
+                      <Alert.Content>
+                        <Alert.Title>Couldn’t load pull requests</Alert.Title>
+                        <Alert.Description>{prsError}</Alert.Description>
+                      </Alert.Content>
+                    </Alert.Root>
+                  )}
+
+                  {active?.slug &&
+                    !prsError &&
+                    (prsQuery.isPending || !prs ? (
+                      <HStack color="fg.muted" py="4">
+                        <Spinner size="sm" />
+                        <Text fontSize="sm">Loading open pull requests…</Text>
+                      </HStack>
+                    ) : prs.length === 0 ? (
+                      <Text fontSize="sm" color="fg.muted" py="4">
+                        No open pull requests. Nice and quiet.
+                      </Text>
+                    ) : (
+                      <OpenPullRequestList
+                        key={active.slug}
+                        prs={prs}
+                        preview={preview}
+                        onSelect={onPreviewChange}
+                        onOpen={onSelect}
+                      />
+                    ))}
+                </>
+              )}
+            </Stack>
+          </Tabs.Content>
+
+          <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
+            {active ? (
+              <LocalChangesView key={active.path} repo={active} />
+            ) : (
+              <Center h="full" p="4">
+                <Text color="fg.muted" fontSize="sm">
+                  Select a repository to see its uncommitted changes.
+                </Text>
+              </Center>
+            )}
+          </Tabs.Content>
+        </Tabs.Root>
       </Flex>
 
-      {preview && (
+      {tab === "pull-requests" && preview && (
         <PullRequestPreview
           pr={preview}
           onView={onSelect}

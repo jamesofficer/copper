@@ -14,6 +14,7 @@ import type {
   LlmProviderChoice,
   LlmStatus,
   LlmTask,
+  LocalChanges,
   MergeMethod,
   NewPullRequest,
   NewReviewComment,
@@ -43,6 +44,10 @@ export interface IpcApi {
   removeRepository(path: string): Promise<Repository[]>;
   // Persists a drag-reordered sidebar list; paths in their new order.
   reorderRepositories(paths: string[]): Promise<Repository[]>;
+  // Uncommitted work in a registered checkout (staged + unstaged + untracked),
+  // for the home screen's Current changes tab. Read from local git only — no
+  // GitHub token needed.
+  getLocalChanges(repoPath: string): Promise<LocalChanges>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
   // Open PRs across the registered repos where the logged-in user's review is
   // requested.
@@ -290,6 +295,7 @@ export const ipcChannels = [
   "addRepository",
   "removeRepository",
   "reorderRepositories",
+  "getLocalChanges",
   "listPullRequests",
   "listReviewRequestedPullRequests",
   "listMyPullRequests",

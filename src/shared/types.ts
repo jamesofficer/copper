@@ -286,6 +286,15 @@ export interface PullRequestFile {
   patch: string | null;
 }
 
+// Uncommitted work in a registered local checkout — staged + unstaged changes
+// plus untracked files, shaped like a PR's changed files so the diff UI
+// renders them unchanged.
+export interface LocalChanges {
+  // Current branch of the checkout; null on a detached HEAD.
+  branch: string | null;
+  files: PullRequestFile[];
+}
+
 // "attention" = changed logic worth careful thought, "routine" = ordinary
 // changes, "mechanical" = renames/lockfiles/generated code — skimmable.
 export type ChangeGroupRisk = "attention" | "routine" | "mechanical";
