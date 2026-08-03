@@ -17,4 +17,15 @@ if [ -f build/icon.icns ]; then
 fi
 
 codesign --force --deep --sign - "$APP" 2>/dev/null
+
+# macOS caches a bundle's name in LaunchServices, so the dock keeps saying
+# "Electron" no matter what the plist holds. Re-register the real path (the
+# node_modules entry is a symlink into the pnpm store) to refresh that record.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+if [ -x "$LSREGISTER" ]; then
+  REAL_APP="$(cd "$APP" && pwd -P)"
+  touch "$REAL_APP"
+  "$LSREGISTER" -f "$REAL_APP" || true
+fi
+
 echo "Branded dev Electron.app as Reviewr"
