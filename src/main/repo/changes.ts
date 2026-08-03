@@ -13,6 +13,12 @@ const emptyTree = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 const devNull = process.platform === "win32" ? "NUL" : "/dev/null";
 
+// Above this a file's patch is dropped (counts kept) and the diff viewer
+// shows its existing "too large to show" state — like GitHub, which omits
+// the patch for huge files. Keeps a stray bundle or log from shipping
+// megabytes over IPC into the renderer.
+const maxPatchLength = 1024 * 1024;
+
 async function git(repoPath: string, args: string[]): Promise<string> {
   const { stdout } = await run(
     "git",
@@ -48,7 +54,7 @@ function stripPathPrefix(path: string, prefix: "a/" | "b/"): string {
 
 // Trims the trailing empty line a split leaves behind and counts +/- lines.
 function finishBody(lines: string[]): {
-  patch: string;
+  patch: string | null;
   additions: number;
   deletions: number;
 } {
@@ -60,7 +66,12 @@ function finishBody(lines: string[]): {
     if (line.startsWith("+")) additions++;
     else if (line.startsWith("-")) deletions++;
   }
-  return { patch: body.join("\n"), additions, deletions };
+  const patch = body.join("\n");
+  return {
+    patch: patch.length > maxPatchLength ? null : patch,
+    additions,
+    deletions,
+  };
 }
 
 // One "diff --git" block (the header line's remainder at index 0) → a
@@ -87,13 +98,14 @@ function parseFileBlock(block: string): PullRequestFile | null {
     } else if (line.startsWith("rename to ")) {
       path = unquotePath(line.slice("rename to ".length));
     } else if (line.startsWith("+++ ")) {
-      const target = unquotePath(line.slice(4));
+      // git appends a tab to unquoted ---/+++ paths containing spaces.
+      const target = unquotePath(line.slice(4).replace(/\t$/, ""));
       if (target !== "/dev/null" && path === null) {
         path = stripPathPrefix(target, "b/");
       }
     } else if (line.startsWith("--- ")) {
       // Deleted files only name themselves on the old side.
-      const source = unquotePath(line.slice(4));
+      const source = unquotePath(line.slice(4).replace(/\t$/, ""));
       if (source !== "/dev/null" && path === null && status === "deleted") {
         path = stripPathPrefix(source, "a/");
       }
