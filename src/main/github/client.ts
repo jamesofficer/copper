@@ -1,3 +1,4 @@
+import { isRateLimitMessage, RATE_LIMIT_MESSAGE } from "../../shared/rateLimit";
 import type {
   FileStatus,
   MergeMethod,
@@ -24,11 +25,7 @@ import type {
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
-import {
-  githubRequest,
-  hasGraphQlRateLimitError,
-  RATE_LIMIT_MESSAGE,
-} from "./rateLimit";
+import { githubRequest, hasGraphQlRateLimitError } from "./rateLimit";
 
 interface GitHubPullSummary {
   number: number;
@@ -78,7 +75,7 @@ async function githubFetch<T>(
   if (res.status === 403 || res.status === 429) {
     const detail = await githubErrorDetail(res);
     throw new Error(
-      detail.toLowerCase().includes("rate limit")
+      isRateLimitMessage(detail)
         ? RATE_LIMIT_MESSAGE
         : detail
           ? `GitHub: ${detail}`

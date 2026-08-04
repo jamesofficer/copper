@@ -4,20 +4,16 @@ import {
   QueryClient,
 } from "@tanstack/react-query";
 import type { PersistQueryClientOptions } from "@tanstack/react-query-persist-client";
+import { isRateLimitMessage } from "../../../shared/rateLimit";
 
 const DAY = 24 * 60 * 60 * 1000;
 
-// A retry of a PR-list query re-runs its whole fan-out (one request per PR),
-// so retrying a rate-limit error doubles the burst that caused it. The main
-// process already retries with backoff, so give up here instead. Both spellings
-// are matched because the wording travels across IPC as a plain string: the
-// main process normalises its own failures to "rate-limiting", but GitHub's own
-// prose ("exceeded a secondary rate limit") can still reach us verbatim.
+// A retry of a PR-list query re-runs its whole fan-out (one request per PR), so
+// retrying a rate-limit error doubles the burst that caused it. The main process
+// already retries with backoff, so give up here instead. The error arrives as a
+// plain string over IPC, so the matcher is shared rather than reimplemented.
 function shouldRetry(failureCount: number, error: Error): boolean {
-  const message = error.message.toLowerCase();
-  if (message.includes("rate-limit") || message.includes("rate limit")) {
-    return false;
-  }
+  if (isRateLimitMessage(error.message)) return false;
   return failureCount < 1;
 }
 

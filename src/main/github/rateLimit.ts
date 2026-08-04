@@ -1,3 +1,5 @@
+import { isRateLimitMessage } from "../../shared/rateLimit";
+
 const API = "https://api.github.com";
 
 // GitHub's secondary rate limit trips on *concurrency*, not just volume: it
@@ -14,18 +16,25 @@ const MAX_ATTEMPTS = 3;
 // away, and blocking a UI query for an hour is worse than a clear error.
 const MAX_WAIT_MS = 30_000;
 
-// One wording for every rate-limit failure, whatever shape it arrived in (403,
-// 429, or a GraphQL RATE_LIMITED body). The renderer keys its "don't retry
-// this" rule off the message, so the phrasing is load-bearing: a second
-// spelling would silently start re-running fan-outs into a tripped limit.
-export const RATE_LIMIT_MESSAGE =
-  "GitHub is rate-limiting this app. Wait a minute, then try again.";
-
-// GraphQL reports a spent budget in-band: HTTP 200 with an errors entry typed
-// RATE_LIMITED. Nothing about the status line says so.
+// GraphQL reports a rate limit in-band, with HTTP 200 and nothing in the status
+// line to say so. Both forms appear: a spent points budget is typed
+// RATE_LIMITED, while a secondary limit only says so in the message ("the
+// response status will be 200 or 403, and you will receive an error message
+// that indicates that you hit a secondary rate limit"). Matching the message as
+// well as the type is what catches the secondary case — the one this gate
+// exists for. Scoped to the errors array, so a PR titled "fix rate limit
+// handling" in a normal 200 body can't be mistaken for a limit.
 export function hasGraphQlRateLimitError(body: unknown): boolean {
-  const errors = (body as { errors?: Array<{ type?: string }> } | null)?.errors;
-  return (errors ?? []).some((error) => error.type === "RATE_LIMITED");
+  const errors = (body as { errors?: Array<GraphQlError> } | null)?.errors;
+  return (errors ?? []).some(
+    (error) =>
+      error.type === "RATE_LIMITED" || isRateLimitMessage(error.message),
+  );
+}
+
+interface GraphQlError {
+  type?: string;
+  message?: string;
 }
 
 let inFlight = 0;
@@ -102,13 +111,15 @@ async function retryDelayMs(
   // from an ordinary permission 403, so read a copy of the body — the original
   // stays unread for the caller's error reporting.
   if (!(await mentionsRateLimit(res))) return null;
+  // GitHub asks for at least a minute here, which MAX_WAIT_MS deliberately
+  // undercuts: a UI query frozen for 60s reads as a hang. The shared pause
+  // still keeps siblings off the API while this one backs off.
   return Math.min(5000 * 4 ** (attempt - 1), MAX_WAIT_MS);
 }
 
 async function mentionsRateLimit(res: Response): Promise<boolean> {
   try {
-    const body = await res.clone().text();
-    return body.toLowerCase().includes("rate limit");
+    return isRateLimitMessage(await res.clone().text());
   } catch {
     return false;
   }
