@@ -79,9 +79,16 @@ const highlighter = createHighlighterCoreSync({
 // variables and nothing else, so colour mode switching is a pure CSS
 // swap (see tokenColors in syntaxColors.ts) with no !important fight
 // against an inline color.
+//
+// tokenizeMaxLineLength: TextMate grammars go superlinear on giant lines —
+// a 21KB markdown paragraph took ~1s (× two themes), freezing the UI for
+// seconds on a diff that touched it. Lines over the cap render plain, like
+// GitHub does; real code never gets near 2,000 chars, only minified output
+// and one-line prose.
 const themedOptions = {
   themes: { dark: "github-dark", light: "github-light" },
   defaultColor: false,
+  tokenizeMaxLineLength: 2000,
 } as const;
 
 // Loaded language ids plus their grammar aliases (ts, js, shell, …).
