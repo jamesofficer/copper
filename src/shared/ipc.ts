@@ -36,6 +36,7 @@ import type {
   ReviewVerdict,
   SecretProvider,
   SecretsStatus,
+  Worktree,
 } from "./types";
 
 export interface IpcApi {
@@ -48,6 +49,9 @@ export interface IpcApi {
   // for the home screen's Current changes tab. Read from local git only — no
   // GitHub token needed.
   getLocalChanges(repoPath: string): Promise<LocalChanges>;
+  // The repo's checkouts — the main worktree plus any linked git worktrees —
+  // so Current changes can switch between them. [] when listing fails.
+  listWorktrees(repoPath: string): Promise<Worktree[]>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
   // Open PRs across the registered repos where the logged-in user's review is
   // requested.
@@ -296,6 +300,7 @@ export const ipcChannels = [
   "removeRepository",
   "reorderRepositories",
   "getLocalChanges",
+  "listWorktrees",
   "listPullRequests",
   "listReviewRequestedPullRequests",
   "listMyPullRequests",

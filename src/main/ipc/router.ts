@@ -56,6 +56,7 @@ import { getLocalChanges } from "../repo/changes";
 import {
   addRepository,
   listRepositories,
+  listWorktrees,
   removeRepository,
   reorderRepositories,
 } from "../repo/local";
@@ -76,6 +77,7 @@ const handlers: IpcApi = {
   removeRepository: (path) => removeRepository(path),
   reorderRepositories: (paths) => reorderRepositories(paths),
   getLocalChanges: (repoPath) => getLocalChanges(repoPath),
+  listWorktrees: (repoPath) => listWorktrees(repoPath),
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
   listMyPullRequests: () => listMyPullRequests(),

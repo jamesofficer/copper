@@ -13,14 +13,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { LuSearch } from "react-icons/lu";
 import { useDebounce } from "use-debounce";
-import type { Repository } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
 import { usePanelWidth } from "../lib/usePanelWidth";
 import DiffView from "./DiffView";
 import FileList from "./FileList";
 
 interface Props {
-  repo: Repository;
+  // The checkout to read — the registered repo path, or one of its worktrees.
+  path: string;
 }
 
 // The working tree changes under the app constantly: always refetch on mount
@@ -38,7 +38,7 @@ export function localChangesQueryOptions(repoPath: string) {
 // Browse-only view of the checkout's uncommitted changes (staged, unstaged,
 // and untracked) — the Changes-tab layout without the PR-only affordances
 // (commenting, viewed state, context expansion).
-export default function LocalChangesView({ repo }: Props) {
+export default function LocalChangesView({ path }: Props) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
   const { width: sidebarWidth, startResize: startSidebarResize } =
@@ -50,7 +50,7 @@ export default function LocalChangesView({ repo }: Props) {
       handle: "right",
     });
 
-  const changesQuery = useQuery(localChangesQueryOptions(repo.path));
+  const changesQuery = useQuery(localChangesQueryOptions(path));
   const files = changesQuery.data?.files;
 
   const [debouncedFilter] = useDebounce(filter, 150);
