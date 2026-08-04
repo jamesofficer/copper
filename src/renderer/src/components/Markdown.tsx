@@ -1,5 +1,4 @@
 import { Box, Link } from "@chakra-ui/react";
-import hljs from "highlight.js/lib/common";
 import type { ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
@@ -9,6 +8,7 @@ import {
   isGitHubAttachmentUrl,
   toDisplayableImageSrc,
 } from "../lib/githubImages";
+import { highlightBlock, resolveLanguage } from "../lib/highlighter";
 import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
 import AttachmentMedia from "./AttachmentMedia";
@@ -32,42 +32,24 @@ interface CodeProps {
   children?: React.ReactNode;
 }
 
-// Candidates for auto-detection on untagged code blocks — kept narrow so
-// hljs doesn't misfire on short snippets.
-const autoLanguages = [
-  "typescript",
-  "javascript",
-  "json",
-  "bash",
-  "diff",
-  "xml",
-  "css",
-  "python",
-  "sql",
-  "yaml",
-];
-
-// Fenced code blocks arrive as `language-<lang>`; highlight the ones hljs
-// knows (including diff). Untagged multi-line blocks get auto-detection.
-// Inline code (no className, no newlines) stays plain neutral text — it
-// renders as a chip, and token colors just add noise at that size.
+// Fenced code blocks arrive as `language-<lang>`; highlight the ones shiki
+// knows (including diff). Untagged blocks render plain, like GitHub. Inline
+// code (no className, no newlines) stays plain neutral text — it renders as
+// a chip, and token colors just add noise at that size.
 function Code({ className, children }: CodeProps) {
-  const language = /language-(\w+)/.exec(className ?? "")?.[1];
+  const language = resolveLanguage(
+    /language-([\w-]+)/.exec(className ?? "")?.[1],
+  );
   const code =
     typeof children === "string" ? children.replace(/\n$/, "") : null;
 
-  let html: string | null = null;
-  if (code && language && hljs.getLanguage(language)) {
-    html = hljs.highlight(code, { language, ignoreIllegals: true }).value;
-  } else if (code && !language && code.includes("\n")) {
-    html = hljs.highlightAuto(code, autoLanguages).value;
-  }
+  const html = code && language ? highlightBlock(code, language) : null;
 
   if (html !== null) {
     return (
       <code
         className={className}
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: hljs escapes its input
+        // biome-ignore lint/security/noDangerouslySetInnerHtml: highlightBlock escapes its input
         dangerouslySetInnerHTML={{ __html: html }}
       />
     );
