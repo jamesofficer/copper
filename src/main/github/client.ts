@@ -24,8 +24,7 @@ import type {
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
-
-const API = "https://api.github.com";
+import { githubRequest } from "./rateLimit";
 
 interface GitHubPullSummary {
   number: number;
@@ -62,17 +61,7 @@ async function githubFetch<T>(
   path: string,
   init?: { method: string; body: unknown },
 ): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    method: init?.method ?? "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "User-Agent": "pr-reviewer",
-      "X-GitHub-Api-Version": "2022-11-28",
-      ...(init ? { "Content-Type": "application/json" } : {}),
-    },
-    body: init ? JSON.stringify(init.body) : undefined,
-  });
+  const res = await githubRequest(token, path, init);
 
   if (res.status === 401) {
     throw new Error("GitHub rejected your token. Re-check it in settings.");
@@ -80,6 +69,16 @@ async function githubFetch<T>(
   if (res.status === 404) {
     throw new Error(
       "Couldn't find this repository on GitHub. Check its origin remote.",
+    );
+  }
+  if (res.status === 403 || res.status === 429) {
+    const detail = await githubErrorDetail(res);
+    throw new Error(
+      detail.toLowerCase().includes("rate limit")
+        ? "GitHub is rate-limiting this app. Wait a minute, then try again."
+        : detail
+          ? `GitHub: ${detail}`
+          : `GitHub returned status ${res.status}.`,
     );
   }
   if (!res.ok) {
@@ -404,14 +403,8 @@ export async function peekPullRequestActivity(
   const cached = activityCache.get(key);
 
   try {
-    const res = await fetch(`${API}/repos/${repo}/pulls/${prNumber}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "User-Agent": "pr-reviewer",
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...(cached ? { "If-None-Match": cached.etag } : {}),
-      },
+    const res = await githubRequest(token, `/repos/${repo}/pulls/${prNumber}`, {
+      headers: cached ? { "If-None-Match": cached.etag } : undefined,
     });
 
     if (res.status === 304 && cached) return cached.activity;
@@ -1503,16 +1496,9 @@ async function fetchRepoFile(
   path: string,
   ref: string,
 ): Promise<string | null> {
-  const res = await fetch(
-    `${API}/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "User-Agent": "pr-reviewer",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    },
+  const res = await githubRequest(
+    token,
+    `/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
   );
   if (!res.ok) return null;
   const body = (await res.json()) as { content?: string; encoding?: string };

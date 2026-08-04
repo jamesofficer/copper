@@ -7,6 +7,14 @@ import type { PersistQueryClientOptions } from "@tanstack/react-query-persist-cl
 
 const DAY = 24 * 60 * 60 * 1000;
 
+// A retry of a PR-list query re-runs its whole fan-out (one request per PR),
+// so retrying a rate-limit error doubles the burst that caused it. The main
+// process already retries with backoff, so give up here instead.
+function shouldRetry(failureCount: number, error: Error): boolean {
+  if (error.message.toLowerCase().includes("rate-limit")) return false;
+  return failureCount < 1;
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -14,7 +22,7 @@ export const queryClient = new QueryClient({
       // Keep cached data around long enough to be worth persisting.
       gcTime: DAY,
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: shouldRetry,
     },
   },
 });
