@@ -24,7 +24,11 @@ import type {
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
-import { githubRequest } from "./rateLimit";
+import {
+  githubRequest,
+  hasGraphQlRateLimitError,
+  RATE_LIMIT_MESSAGE,
+} from "./rateLimit";
 
 interface GitHubPullSummary {
   number: number;
@@ -75,7 +79,7 @@ async function githubFetch<T>(
     const detail = await githubErrorDetail(res);
     throw new Error(
       detail.toLowerCase().includes("rate limit")
-        ? "GitHub is rate-limiting this app. Wait a minute, then try again."
+        ? RATE_LIMIT_MESSAGE
         : detail
           ? `GitHub: ${detail}`
           : `GitHub returned status ${res.status}.`,
@@ -90,7 +94,14 @@ async function githubFetch<T>(
 
   // Deletes come back as 204 with no body.
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+
+  // A GraphQL rate limit arrives as a 200 whose body carries the error, so it
+  // never reaches the status checks above. Catching it here rather than at each
+  // GraphQL call site means every one of them reports it identically — and by
+  // now the gate has already backed off and given up.
+  const body = (await res.json()) as T;
+  if (hasGraphQlRateLimitError(body)) throw new Error(RATE_LIMIT_MESSAGE);
+  return body;
 }
 
 // The login the stored token belongs to — the renderer uses it to decide
@@ -374,13 +385,16 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
     },
   });
 
-  if (response.errors?.length) {
-    throw new Error(`GitHub: ${response.errors[0].message}`);
-  }
+  // GraphQL answers partial errors with the data it could resolve, and a node
+  // it couldn't comes back as null for the flatMap to skip. So only the absence
+  // of nodes is fatal — raising on any error would throw away a good list.
   const nodes = response.data?.repository?.pullRequests.nodes;
   if (!nodes) {
+    const detail = response.errors?.[0]?.message;
     throw new Error(
-      "Couldn't find this repository on GitHub. Check its origin remote.",
+      detail
+        ? `GitHub: ${detail}`
+        : "Couldn't find this repository on GitHub. Check its origin remote.",
     );
   }
 
@@ -422,14 +436,16 @@ async function searchOpenPullRequests(
     },
   });
 
-  if (response.errors?.length) {
-    throw new Error(`GitHub: ${response.errors[0].message}`);
+  const nodes = response.data?.search.nodes;
+  if (!nodes) {
+    const detail = response.errors?.[0]?.message;
+    throw new Error(detail ? `GitHub: ${detail}` : "GitHub search failed.");
   }
 
   // The search index lags behind a PR closing or merging by a while, so a PR
   // just closed in the app can still come back as a hit. The nodes are live PR
   // objects, so trust their state over the search index.
-  return (response.data?.search.nodes ?? []).flatMap((pull) => {
+  return nodes.flatMap((pull) => {
     if (pull?.state !== "OPEN") return [];
     if (!registeredSlugs.has(pull.repository.nameWithOwner.toLowerCase())) {
       return [];

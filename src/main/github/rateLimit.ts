@@ -14,6 +14,20 @@ const MAX_ATTEMPTS = 3;
 // away, and blocking a UI query for an hour is worse than a clear error.
 const MAX_WAIT_MS = 30_000;
 
+// One wording for every rate-limit failure, whatever shape it arrived in (403,
+// 429, or a GraphQL RATE_LIMITED body). The renderer keys its "don't retry
+// this" rule off the message, so the phrasing is load-bearing: a second
+// spelling would silently start re-running fan-outs into a tripped limit.
+export const RATE_LIMIT_MESSAGE =
+  "GitHub is rate-limiting this app. Wait a minute, then try again.";
+
+// GraphQL reports a spent budget in-band: HTTP 200 with an errors entry typed
+// RATE_LIMITED. Nothing about the status line says so.
+export function hasGraphQlRateLimitError(body: unknown): boolean {
+  const errors = (body as { errors?: Array<{ type?: string }> } | null)?.errors;
+  return (errors ?? []).some((error) => error.type === "RATE_LIMITED");
+}
+
 let inFlight = 0;
 const waiting: Array<() => void> = [];
 
@@ -39,14 +53,30 @@ function releaseSlot(): void {
   waiting.shift()?.();
 }
 
+// The PR lists are GraphQL now, so without this check the app's busiest path
+// would skip the gate entirely — no backoff, no shared pause.
+async function isGraphQlRateLimited(
+  res: Response,
+  path: string,
+): Promise<boolean> {
+  if (!path.startsWith("/graphql") || !res.ok) return false;
+  try {
+    return hasGraphQlRateLimitError(await res.clone().json());
+  } catch {
+    return false;
+  }
+}
+
 // Whether GitHub asked us to retry later, and after how long. Null means this
 // is not a rate-limit response (or the wait is too long to be worth it), so
 // the caller must handle it as a normal failure.
 async function retryDelayMs(
   res: Response,
+  path: string,
   attempt: number,
 ): Promise<number | null> {
-  if (res.status !== 403 && res.status !== 429) return null;
+  const graphQlLimited = await isGraphQlRateLimited(res, path);
+  if (!graphQlLimited && res.status !== 403 && res.status !== 429) return null;
 
   // Retry-After is authoritative and is what secondary limits usually send.
   const retryAfter = Number(res.headers.get("retry-after"));
@@ -55,8 +85,12 @@ async function retryDelayMs(
     return wait <= MAX_WAIT_MS ? wait : null;
   }
 
-  // A spent primary limit: wait for the reset window if it is close.
-  if (res.headers.get("x-ratelimit-remaining") === "0") {
+  // A spent primary limit: wait for the reset window if it is close. A
+  // RATE_LIMITED GraphQL body means the hourly points budget is gone, which can
+  // be most of an hour away — so time it against the reset (GraphQL responses
+  // carry x-ratelimit-reset too) rather than burn three short retries on a wait
+  // that was never going to be long enough.
+  if (graphQlLimited || res.headers.get("x-ratelimit-remaining") === "0") {
     const reset = Number(res.headers.get("x-ratelimit-reset"));
     if (!Number.isFinite(reset)) return null;
     const wait = reset * 1000 - Date.now();
@@ -97,8 +131,14 @@ export async function githubRequest(
   await acquireSlot();
   try {
     for (let attempt = 1; ; attempt += 1) {
-      const pause = pausedUntil - Date.now();
-      if (pause > 0) await sleep(pause);
+      // A loop, not one sleep: another request can push pausedUntil further out
+      // while this one waits, and waking early would fire into the window we
+      // were told to keep clear.
+      for (;;) {
+        const pause = pausedUntil - Date.now();
+        if (pause <= 0) break;
+        await sleep(pause);
+      }
 
       const res = await fetch(`${API}${path}`, {
         method: init?.method ?? "GET",
@@ -115,7 +155,7 @@ export async function githubRequest(
         body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
       });
 
-      const delay = await retryDelayMs(res, attempt);
+      const delay = await retryDelayMs(res, path, attempt);
       if (delay === null || attempt >= MAX_ATTEMPTS) return res;
 
       pausedUntil = Math.max(pausedUntil, Date.now() + delay);
