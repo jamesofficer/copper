@@ -24,6 +24,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@tanstack/react-hotkeys": "^0.10.0",
+    "shiki": "^4.4.1",
     "use-debounce": "^10.1.1",
     "zod": "^4.4.3"
   },
@@ -42,7 +43,6 @@
     "electron": "^43.1.0",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
-    "highlight.js": "^11.11.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-icons": "^5.7.0",

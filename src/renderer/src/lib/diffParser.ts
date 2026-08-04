@@ -1,4 +1,4 @@
-import hljs from "highlight.js/lib/common";
+import { escapeHtml, highlightToLines } from "./highlighter";
 
 export type LineKind = "hunk" | "add" | "del" | "context" | "meta";
 
@@ -13,107 +13,7 @@ export interface DiffLine {
   expanded?: boolean;
 }
 
-const extToLanguage: Record<string, string> = {
-  ts: "typescript",
-  tsx: "typescript",
-  mts: "typescript",
-  cts: "typescript",
-  js: "javascript",
-  jsx: "javascript",
-  mjs: "javascript",
-  cjs: "javascript",
-  json: "json",
-  css: "css",
-  scss: "scss",
-  less: "less",
-  html: "xml",
-  xml: "xml",
-  svg: "xml",
-  vue: "xml",
-  md: "markdown",
-  markdown: "markdown",
-  py: "python",
-  rb: "ruby",
-  go: "go",
-  rs: "rust",
-  java: "java",
-  kt: "kotlin",
-  c: "c",
-  h: "c",
-  cpp: "cpp",
-  cc: "cpp",
-  hpp: "cpp",
-  cs: "csharp",
-  php: "php",
-  swift: "swift",
-  sh: "bash",
-  bash: "bash",
-  zsh: "bash",
-  yml: "yaml",
-  yaml: "yaml",
-  toml: "ini",
-  ini: "ini",
-  sql: "sql",
-  lua: "lua",
-  r: "r",
-};
-
-export function languageForPath(path: string): string | null {
-  const dot = path.lastIndexOf(".");
-  if (dot === -1) return null;
-  const language = extToLanguage[path.slice(dot + 1).toLowerCase()];
-  return language && hljs.getLanguage(language) ? language : null;
-}
-
-export function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}
-
-// Highlights a multi-line snippet as ONE document, then splits the HTML back
-// into per-line chunks — open spans are closed at each newline and reopened on
-// the next line. Highlighting line-by-line instead would drop state that spans
-// lines (block comments, template literals), leaving e.g. the middle of a
-// /** ... */ block highlighted as code. Returns null if hljs fails.
-export function highlightToLines(
-  text: string,
-  language: string,
-): string[] | null {
-  let value: string;
-  try {
-    value = hljs.highlight(text, { language, ignoreIllegals: true }).value;
-  } catch {
-    return null;
-  }
-  // hljs output is only escaped text, <span class="...">, and </span>.
-  const lines: string[] = [];
-  const openTags: string[] = [];
-  let current = "";
-  let i = 0;
-  while (i < value.length) {
-    const char = value[i];
-    if (char === "<") {
-      const end = value.indexOf(">", i);
-      if (end === -1) return null;
-      const tag = value.slice(i, end + 1);
-      if (tag.startsWith("</")) openTags.pop();
-      else openTags.push(tag);
-      current += tag;
-      i = end + 1;
-    } else if (char === "\n") {
-      lines.push(current + "</span>".repeat(openTags.length));
-      current = openTags.join("");
-      i++;
-    } else {
-      current += char;
-      i++;
-    }
-  }
-  lines.push(current + "</span>".repeat(openTags.length));
-  return lines;
-}
+export { escapeHtml, highlightToLines, languageForPath } from "./highlighter";
 
 // Each hunk is highlighted as two documents — the old side (del + context
 // lines) and the new side (add + context lines) — both contiguous slices of

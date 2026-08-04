@@ -45,7 +45,7 @@ export default function FileView({ path, text }: Props) {
             flex="1"
             pr="4"
             whiteSpace="pre"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: highlight.js output is escaped
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: highlighter output is escaped
             dangerouslySetInnerHTML={{ __html: html }}
           />
         </Flex>
