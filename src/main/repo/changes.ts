@@ -24,7 +24,13 @@ async function git(repoPath: string, args: string[]): Promise<string> {
   const { stdout } = await run(
     "git",
     ["-C", repoPath, "-c", "core.quotepath=off", ...args],
-    { maxBuffer: 64 * 1024 * 1024 },
+    {
+      maxBuffer: 64 * 1024 * 1024,
+      // Every path supplied by the renderer is a filename, never a pathspec.
+      // Without literal mode, names such as pages/[id].tsx can match and
+      // mutate different files than the user selected.
+      env: { ...process.env, GIT_LITERAL_PATHSPECS: "1" },
+    },
   );
   return stdout;
 }
@@ -308,15 +314,22 @@ export async function unstageFiles(
 ): Promise<void> {
   if (paths.length === 0) return;
   try {
-    await git(repoPath, ["restore", "--staged", "--", ...paths]);
-  } catch (error) {
+    let hasHead = true;
     try {
+      await git(repoPath, ["rev-parse", "--verify", "HEAD"]);
+    } catch {
+      hasHead = false;
+    }
+
+    if (hasHead) {
+      await git(repoPath, ["restore", "--staged", "--", ...paths]);
+    } else {
       // No HEAD to restore from yet — the first commit's staged files can
       // only leave the index by being removed from it.
       await git(repoPath, ["rm", "--cached", "-r", "--", ...paths]);
-    } catch {
-      throw gitError(error, "Couldn't unstage those files.");
     }
+  } catch (error) {
+    throw gitError(error, "Couldn't unstage those files.");
   }
 }
 

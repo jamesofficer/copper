@@ -23,6 +23,10 @@ import {
 } from "react-icons/lu";
 import { useDebounce } from "use-debounce";
 import type { PullRequestFile } from "../../../shared/types";
+import {
+  type LocalChangeSelection,
+  resolveLocalChangeSelection,
+} from "../lib/localChangesSelection";
 import { scrollbar } from "../lib/scrollbar";
 import { usePanelWidth } from "../lib/usePanelWidth";
 import CommitComposer from "./CommitComposer";
@@ -33,15 +37,6 @@ import { toaster } from "./ui/toaster";
 
 interface Props {
   // The checkout to read — the registered repo path, or one of its worktrees.
-  path: string;
-}
-
-// Which of the two lists a selected file came from. A partially staged path
-// appears in both with different diffs, so the path alone can't identify it.
-type Area = "staged" | "unstaged";
-
-interface Selection {
-  area: Area;
   path: string;
 }
 
@@ -82,7 +77,7 @@ function matches(file: PullRequestFile, query: string): boolean {
 // staged. The PR-only affordances (commenting, viewed state, context
 // expansion) stay out.
 export default function LocalChangesView({ path }: Props) {
-  const [selection, setSelection] = useState<Selection | null>(null);
+  const [selection, setSelection] = useState<LocalChangeSelection | null>(null);
   const [filter, setFilter] = useState("");
   // The paths waiting on the discard confirmation; null closes the dialog.
   const [discarding, setDiscarding] = useState<string[] | null>(null);
@@ -116,22 +111,8 @@ export default function LocalChangesView({ path }: Props) {
 
   // Falls back to the first visible file whenever the selection disappears —
   // staging a file moves it between the lists under the user.
-  const selectedFile =
-    (selection?.area === "staged"
-      ? staged.find((file) => file.path === selection.path)
-      : selection
-        ? unstaged.find((file) => file.path === selection.path)
-        : undefined) ??
-    unstaged[0] ??
-    staged[0] ??
-    null;
-  const selectedArea: Area | null = !selectedFile
-    ? null
-    : selection && selectedFile.path === selection.path
-      ? selection.area
-      : unstaged.includes(selectedFile)
-        ? "unstaged"
-        : "staged";
+  const { file: selectedFile, area: selectedArea } =
+    resolveLocalChangeSelection(selection, staged, unstaged);
 
   function reportFailure(title: string) {
     return (error: unknown) => {

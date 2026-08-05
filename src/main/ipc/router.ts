@@ -53,16 +53,8 @@ import {
 } from "../github/client";
 import { getLlmStatus, setLlmModel, setLlmProvider } from "../llm/settings";
 import {
-  commitChanges,
-  discardChanges,
-  getLocalChanges,
-  stageFiles,
-  unstageFiles,
-} from "../repo/changes";
-import {
   addRepository,
   listRepositories,
-  listWorktrees,
   removeRepository,
   reorderRepositories,
 } from "../repo/local";
@@ -76,18 +68,14 @@ import {
 } from "../store/drafts";
 import { deleteExplanation, listExplanations } from "../store/explanations";
 import { setFindingResolution } from "../store/findings";
+import { localChangesHandlers } from "./localChanges";
 
 const handlers: IpcApi = {
   listRepositories: () => listRepositories(),
   addRepository: () => addRepository(),
   removeRepository: (path) => removeRepository(path),
   reorderRepositories: (paths) => reorderRepositories(paths),
-  getLocalChanges: (repoPath) => getLocalChanges(repoPath),
-  listWorktrees: (repoPath) => listWorktrees(repoPath),
-  stageFiles: (repoPath, paths) => stageFiles(repoPath, paths),
-  unstageFiles: (repoPath, paths) => unstageFiles(repoPath, paths),
-  discardChanges: (repoPath, paths) => discardChanges(repoPath, paths),
-  commitChanges: (repoPath, message) => commitChanges(repoPath, message),
+  ...localChangesHandlers,
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
   listMyPullRequests: () => listMyPullRequests(),

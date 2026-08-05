@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -147,6 +147,25 @@ describe("discardChanges", () => {
     expect(exists("new.txt")).toBe(false);
   });
 
+  it("treats glob characters in a filename literally", async () => {
+    await write("[id].tsx", "selected v1\n");
+    await write("i.tsx", "other v1\n");
+    await git("add", ".");
+    await git("commit", "-qm", "special names");
+    await write("[id].tsx", "selected edited\n");
+    await write("i.tsx", "other edited\n");
+
+    await discardChanges(repo, ["[id].tsx"]);
+
+    // Git pathspecs treat [id] as a character class unless literal mode is
+    // forced. Discard must never revert a similarly named file the user did
+    // not confirm while leaving the selected file untouched.
+    expect(await readFile(join(repo, "[id].tsx"), "utf8")).toBe(
+      "selected v1\n",
+    );
+    expect(await readFile(join(repo, "i.tsx"), "utf8")).toBe("other edited\n");
+  });
+
   it("leaves ignored files alone", async () => {
     await commitInitial();
     await write(".gitignore", "*.log\n");
@@ -186,6 +205,59 @@ describe("stageFiles and unstageFiles", () => {
 
     expect(await git("diff", "--cached", "--name-status")).toContain(
       "D\ttracked.txt",
+    );
+  });
+
+  it("treats glob characters literally when staging and unstaging", async () => {
+    await write("[id].tsx", "selected v1\n");
+    await write("i.tsx", "other v1\n");
+    await git("add", ".");
+    await git("commit", "-qm", "special names");
+    await write("[id].tsx", "selected edited\n");
+    await write("i.tsx", "other edited\n");
+
+    await stageFiles(repo, ["[id].tsx"]);
+
+    expect((await git("diff", "--cached", "--name-only")).trim()).toBe(
+      "[id].tsx",
+    );
+
+    await git("add", "i.tsx");
+    await unstageFiles(repo, ["[id].tsx"]);
+
+    expect((await git("diff", "--cached", "--name-only")).trim()).toBe("i.tsx");
+  });
+
+  it("surfaces a restore failure instead of treating it as an unborn HEAD", async () => {
+    await commitInitial();
+    await write("tracked.txt", "staged\n");
+    await git("add", "tracked.txt");
+
+    // Put a deterministic failing restore in front of real git. The old
+    // fallback swallowed every restore failure and ran `rm --cached`, even in
+    // a repository with a valid HEAD.
+    const bin = await mkdtemp(join(tmpdir(), "reviewr-fake-git-"));
+    const shim = join(bin, "git");
+    const { stdout: realGit } = await run("which", ["git"]);
+    await writeFile(
+      shim,
+      `#!/bin/sh\nif [ "$5" = "restore" ] && [ "$6" = "--staged" ]; then\n  echo "simulated restore failure" >&2\n  exit 1\nfi\nexec "${realGit.trim()}" "$@"\n`,
+    );
+    await chmod(shim, 0o755);
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${bin}:${previousPath ?? ""}`;
+    try {
+      await expect(unstageFiles(repo, ["tracked.txt"])).rejects.toThrow(
+        /simulated restore failure/i,
+      );
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      await rm(bin, { recursive: true, force: true });
+    }
+
+    expect(await git("diff", "--cached", "--name-only")).toContain(
+      "tracked.txt",
     );
   });
 
