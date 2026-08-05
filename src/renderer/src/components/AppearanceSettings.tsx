@@ -27,6 +27,7 @@ import {
   useFilePathDisplay,
 } from "../lib/filePathDisplay";
 import { SettingRow, SettingsGroup, SettingsPanel } from "./SettingsLayout";
+import SyntaxThemePicker from "./SyntaxThemePicker";
 
 const modeLabels: Record<ColorModeSetting, string> = {
   light: "Light",
@@ -88,7 +89,7 @@ export default function AppearanceSettings() {
   return (
     <SettingsPanel
       title="Appearance"
-      description="How the app looks: its theme, accent colour, and the way file paths are written."
+      description="How the app looks: its theme, accent colour, code colours, and the way file paths are written."
     >
       <SettingsGroup>
         <SettingRow
@@ -171,6 +172,14 @@ export default function AppearanceSettings() {
               </Select.Content>
             </Select.Positioner>
           </Select.Root>
+        </SettingRow>
+
+        <SettingRow
+          title="Syntax theme"
+          description="Code colours in diffs, file views, and markdown code blocks. Each colour mode keeps its own theme."
+          stacked
+        >
+          <SyntaxThemePicker />
         </SettingRow>
 
         <SettingRow

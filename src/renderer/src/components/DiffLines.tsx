@@ -36,6 +36,7 @@ import {
 import type { ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
+import { useSyntaxThemes } from "../lib/syntaxTheme";
 import AiExplanationCard from "./AiExplanationCard";
 import DiffCommentComposer from "./DiffCommentComposer";
 import DiffCommentThread from "./DiffCommentThread";
@@ -667,9 +668,12 @@ function DiffLines({ file, commenting, expansion }: Props) {
 
   const split = mode === "split" || (mode === "dynamic" && wide);
   const language = languageForPath(file.path);
+  // Changing the theme changes the html of every line, so it belongs in the
+  // dependencies of both highlighting memos below.
+  const themes = useSyntaxThemes();
   const lines = useMemo(
-    () => (file.patch ? parsePatch(file.patch, language) : []),
-    [file.patch, language],
+    () => (file.patch ? parsePatch(file.patch, language, themes) : []),
+    [file.patch, language, themes],
   );
 
   const fullFile = expansion?.fullFile ?? null;
@@ -682,9 +686,9 @@ function DiffLines({ file, commenting, expansion }: Props) {
   const fileHtml = useMemo(
     () =>
       fullFile !== null && language
-        ? highlightToLines(fullFile, language)
+        ? highlightToLines(fullFile, language, themes)
         : null,
-    [fullFile, language],
+    [fullFile, language, themes],
   );
 
   // Guard against the fetched file not matching the diff (stale clone, wrong

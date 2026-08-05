@@ -6,6 +6,7 @@ import { type DiffLine, languageForPath, parsePatch } from "../lib/diffParser";
 import { formatThreadRange, type ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import { tokenColors } from "../lib/syntaxColors";
+import { useSyntaxThemes } from "../lib/syntaxTheme";
 import DiffCommentThread from "./DiffCommentThread";
 
 interface Props {
@@ -42,6 +43,7 @@ export default function ReviewThreadCard({
   resolved = false,
 }: Props) {
   const { root } = thread;
+  const themes = useSyntaxThemes();
   const range = formatThreadRange(root);
   const [expanded, setExpanded] = useState(false);
   const collapsed = resolved && !expanded;
@@ -49,9 +51,12 @@ export default function ReviewThreadCard({
   const hunkLines = useMemo(
     () =>
       root.diffHunk
-        ? trimHunk(root, parsePatch(root.diffHunk, languageForPath(root.path)))
+        ? trimHunk(
+            root,
+            parsePatch(root.diffHunk, languageForPath(root.path), themes),
+          )
         : [],
-    [root],
+    [root, themes],
   );
 
   return (
