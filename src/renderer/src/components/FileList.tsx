@@ -1,4 +1,5 @@
-import { Box, HStack, Icon, Stack, Text } from "@chakra-ui/react";
+import { Box, HStack, Icon, IconButton, Stack, Text } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import { LuCheck } from "react-icons/lu";
 import type { PullRequestFile } from "../../../shared/types";
 import { useFilePathDisplay } from "../lib/filePathDisplay";
@@ -17,6 +18,13 @@ interface Props {
   commentCounts?: Map<string, number>;
   // Local AI explanations per file path; undefined hides the chips.
   explanationCounts?: Map<string, number>;
+  // A per-row button revealed on hover — stage/unstage in the Current changes
+  // view. Undefined leaves the rows action-free, as the PR views want them.
+  rowAction?: {
+    icon: ReactNode;
+    label: string;
+    onRun(path: string): void;
+  };
 }
 
 export default function FileList({
@@ -26,6 +34,7 @@ export default function FileList({
   viewedPaths,
   commentCounts,
   explanationCounts,
+  rowAction,
 }: Props) {
   const display = useFilePathDisplay();
 
@@ -41,68 +50,91 @@ export default function FileList({
         const dir = slash === -1 ? "" : file.path.slice(0, slash + 1);
         const name = slash === -1 ? file.path : file.path.slice(slash + 1);
         return (
-          <Box
-            key={file.path}
-            as="button"
-            onClick={() => onSelect(file.path)}
-            textAlign="left"
-            rounded="md"
-            px="2"
-            py="1.5"
-            bg={selected ? "bg.emphasized" : "transparent"}
-            _hover={{ bg: selected ? "bg.emphasized" : "bg.subtle" }}
-            opacity={viewed ? 0.55 : undefined}
-          >
-            <HStack gap="2" minW="0">
-              <Text
-                as="span"
-                fontFamily="mono"
-                fontSize="xs"
-                fontWeight="bold"
-                color={meta.color}
-                w="3"
-                flexShrink="0"
-              >
-                {meta.label}
-              </Text>
-              <Box flex="1" minW="0" title={file.path}>
-                <Text as="span" fontSize="xs" display="block" truncate>
-                  {display === "inline" && (
-                    <Text as="span" color="fg.muted">
-                      {dir}
+          <HStack key={file.path} className="group" gap="0" minW="0">
+            <Box
+              as="button"
+              flex="1"
+              minW="0"
+              onClick={() => onSelect(file.path)}
+              textAlign="left"
+              rounded="md"
+              px="2"
+              py="1.5"
+              bg={selected ? "bg.emphasized" : "transparent"}
+              _hover={{ bg: selected ? "bg.emphasized" : "bg.subtle" }}
+              opacity={viewed ? 0.55 : undefined}
+            >
+              <HStack gap="2" minW="0">
+                <Text
+                  as="span"
+                  fontFamily="mono"
+                  fontSize="xs"
+                  fontWeight="bold"
+                  color={meta.color}
+                  w="3"
+                  flexShrink="0"
+                >
+                  {meta.label}
+                </Text>
+                <Box flex="1" minW="0" title={file.path}>
+                  <Text as="span" fontSize="xs" display="block" truncate>
+                    {display === "inline" && (
+                      <Text as="span" color="fg.muted">
+                        {dir}
+                      </Text>
+                    )}
+                    {name}
+                  </Text>
+                  {display === "stacked" && dir !== "" && (
+                    <Text
+                      as="span"
+                      display="block"
+                      fontSize="2xs"
+                      color="fg.muted"
+                      truncate
+                    >
+                      {dir.slice(0, -1)}
                     </Text>
                   )}
-                  {name}
-                </Text>
-                {display === "stacked" && dir !== "" && (
-                  <Text
-                    as="span"
-                    display="block"
-                    fontSize="2xs"
-                    color="fg.muted"
-                    truncate
-                  >
-                    {dir.slice(0, -1)}
+                </Box>
+                <HStack
+                  gap="1.5"
+                  fontFamily="mono"
+                  fontSize="2xs"
+                  flexShrink="0"
+                >
+                  <CommentCountBadge count={comments} />
+                  <ExplanationCountBadge count={explanations} />
+                  <Text as="span" color="green.fg">
+                    +{file.additions}
                   </Text>
-                )}
-              </Box>
-              <HStack gap="1.5" fontFamily="mono" fontSize="2xs" flexShrink="0">
-                <CommentCountBadge count={comments} />
-                <ExplanationCountBadge count={explanations} />
-                <Text as="span" color="green.fg">
-                  +{file.additions}
-                </Text>
-                <Text as="span" color="red.fg">
-                  −{file.deletions}
-                </Text>
-                {viewed && (
-                  <Icon color="green.fg" size="xs">
-                    <LuCheck />
-                  </Icon>
-                )}
+                  <Text as="span" color="red.fg">
+                    −{file.deletions}
+                  </Text>
+                  {viewed && (
+                    <Icon color="green.fg" size="xs">
+                      <LuCheck />
+                    </Icon>
+                  )}
+                </HStack>
               </HStack>
-            </HStack>
-          </Box>
+            </Box>
+            {rowAction && (
+              <IconButton
+                size="2xs"
+                variant="ghost"
+                flexShrink="0"
+                aria-label={`${rowAction.label} ${file.path}`}
+                title={rowAction.label}
+                opacity="0"
+                _groupHover={{ opacity: 1 }}
+                _focusVisible={{ opacity: 1 }}
+                onClick={() => rowAction.onRun(file.path)}
+              >
+                {rowAction.icon}
+              </IconButton>
+            )}
+          </HStack>
         );
       })}
     </Stack>

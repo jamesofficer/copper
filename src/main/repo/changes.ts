@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type {
+  CommitResult,
   FileStatus,
   LocalChanges,
   PullRequestFile,
@@ -152,18 +153,25 @@ export function parseGitDiff(output: string): PullRequestFile[] {
   return files;
 }
 
-// Staged + unstaged changes in one diff against HEAD.
-async function trackedChanges(repoPath: string): Promise<PullRequestFile[]> {
-  const diffArgs = ["-M", "--no-color", "--no-ext-diff"];
+const diffArgs = ["-M", "--no-color", "--no-ext-diff"];
+
+// The index against HEAD — what a commit would record.
+async function stagedChanges(repoPath: string): Promise<PullRequestFile[]> {
   let output: string;
   try {
-    output = await git(repoPath, ["diff", "HEAD", ...diffArgs]);
+    output = await git(repoPath, ["diff", "--cached", "HEAD", ...diffArgs]);
   } catch {
     // A repo with no commits yet has no HEAD — diff against the empty tree
     // so staged files still show.
-    output = await git(repoPath, ["diff", emptyTree, ...diffArgs]);
+    output = await git(repoPath, ["diff", "--cached", emptyTree, ...diffArgs]);
   }
   return parseGitDiff(output);
+}
+
+// The working tree against the index — what a commit would leave behind.
+// Needs no HEAD, so it works in a repo with no commits.
+async function unstagedChanges(repoPath: string): Promise<PullRequestFile[]> {
+  return parseGitDiff(await git(repoPath, ["diff", ...diffArgs]));
 }
 
 async function untrackedFile(
@@ -233,23 +241,88 @@ async function currentBranch(repoPath: string): Promise<string | null> {
   }
 }
 
-// Uncommitted work in a registered local checkout — staged + unstaged changes
-// plus untracked files — shaped like a PR's changed files so the diff UI
+function byPath(files: PullRequestFile[]): PullRequestFile[] {
+  // "git rm --cached" leaves a path both deleted-in-index and untracked;
+  // keep the first (tracked) entry so paths stay unique within a group.
+  const unique = new Map<string, PullRequestFile>();
+  for (const file of files) {
+    if (!unique.has(file.path)) unique.set(file.path, file);
+  }
+  return [...unique.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
+// Uncommitted work in a registered local checkout, split the way git sees it:
+// the index (staged) and the working tree (unstaged, untracked files
+// included). A partially staged path appears in both — that is git's model,
+// not a bug. Each entry is shaped like a PR's changed file so the diff UI
 // renders them unchanged.
 export async function getLocalChanges(repoPath: string): Promise<LocalChanges> {
-  const [branch, tracked, untracked] = await Promise.all([
+  const [branch, staged, unstaged, untracked] = await Promise.all([
     currentBranch(repoPath),
-    trackedChanges(repoPath),
+    stagedChanges(repoPath),
+    unstagedChanges(repoPath),
     untrackedChanges(repoPath),
   ]);
-  // "git rm --cached" leaves a path both deleted-in-index and untracked;
-  // keep the tracked entry so paths stay unique.
-  const byPath = new Map<string, PullRequestFile>();
-  for (const file of [...tracked, ...untracked]) {
-    if (!byPath.has(file.path)) byPath.set(file.path, file);
+  return {
+    branch,
+    staged: byPath(staged),
+    unstaged: byPath([...unstaged, ...untracked]),
+  };
+}
+
+// git reports a failed command through the error's stderr; the message alone
+// is the whole command line, which tells the user nothing. Pre-commit hooks,
+// an unset user.email, and index locks all surface here.
+function gitError(error: unknown, fallback: string): Error {
+  const stderr = (error as { stderr?: unknown }).stderr;
+  const text = typeof stderr === "string" ? stderr.trim() : "";
+  return new Error(text === "" ? fallback : text);
+}
+
+// "add -A" so a deleted or untracked path stages like any other.
+export async function stageFiles(
+  repoPath: string,
+  paths: string[],
+): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    await git(repoPath, ["add", "-A", "--", ...paths]);
+  } catch (error) {
+    throw gitError(error, "Couldn't stage those files.");
   }
-  const files = [...byPath.values()].sort((a, b) =>
-    a.path.localeCompare(b.path),
-  );
-  return { branch, files };
+}
+
+export async function unstageFiles(
+  repoPath: string,
+  paths: string[],
+): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    await git(repoPath, ["restore", "--staged", "--", ...paths]);
+  } catch (error) {
+    try {
+      // No HEAD to restore from yet — the first commit's staged files can
+      // only leave the index by being removed from it.
+      await git(repoPath, ["rm", "--cached", "-r", "--", ...paths]);
+    } catch {
+      throw gitError(error, "Couldn't unstage those files.");
+    }
+  }
+}
+
+// Commits what is staged, and only that — never "commit -a". The message is
+// passed as an argument, not a shell string, so newlines and quotes are safe.
+export async function commitChanges(
+  repoPath: string,
+  message: string,
+): Promise<CommitResult> {
+  const trimmed = message.trim();
+  if (trimmed === "") throw new Error("A commit needs a message.");
+  try {
+    await git(repoPath, ["commit", "-m", trimmed]);
+  } catch (error) {
+    throw gitError(error, "Couldn't create the commit.");
+  }
+  const sha = (await git(repoPath, ["rev-parse", "--short", "HEAD"])).trim();
+  return { sha, subject: trimmed.split("\n")[0] };
 }

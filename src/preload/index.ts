@@ -14,6 +14,12 @@ const api: WindowApi = {
   getLocalChanges: (repoPath) =>
     ipcRenderer.invoke("getLocalChanges", repoPath),
   listWorktrees: (repoPath) => ipcRenderer.invoke("listWorktrees", repoPath),
+  stageFiles: (repoPath, paths) =>
+    ipcRenderer.invoke("stageFiles", repoPath, paths),
+  unstageFiles: (repoPath, paths) =>
+    ipcRenderer.invoke("unstageFiles", repoPath, paths),
+  commitChanges: (repoPath, message) =>
+    ipcRenderer.invoke("commitChanges", repoPath, message),
   listPullRequests: (repo) => ipcRenderer.invoke("listPullRequests", repo),
   listReviewRequestedPullRequests: () =>
     ipcRenderer.invoke("listReviewRequestedPullRequests"),

@@ -25,6 +25,7 @@ import {
 } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
 import LocalChangesView, {
+  changedPathCount,
   localChangesQueryOptions,
 } from "../components/LocalChangesView";
 import NewPullRequestDialog from "../components/NewPullRequestDialog";
@@ -108,7 +109,9 @@ export default function Welcome({
     ...localChangesQueryOptions(worktreePath),
     enabled: Boolean(active),
   });
-  const changedCount = changesQuery.data?.files.length;
+  const changedCount = changesQuery.data
+    ? changedPathCount(changesQuery.data)
+    : undefined;
 
   function openCreatedPullRequest(pr: PullRequest) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
