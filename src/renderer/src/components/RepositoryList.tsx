@@ -110,6 +110,7 @@ export default function RepositoryList({
           >
             <RowContent
               repo={dragged}
+              selected={dragged.path === activePath}
               count={dragged.slug ? openPrCounts?.[dragged.slug] : undefined}
             />
           </HStack>
@@ -162,6 +163,7 @@ function RepositoryRow({
     >
       <RowContent
         repo={repo}
+        selected={selected}
         count={count}
         onSelect={onSelect}
         onRemove={onRemove}
@@ -170,15 +172,29 @@ function RepositoryRow({
   );
 }
 
+// The badge and the button share one slot, so one condition has to drive
+// both, or they draw at once: closing a dialog (or tabbing away) hands focus
+// back with the pointer elsewhere, and a hover-only rule can't see it. Same
+// selectors, inverse values. :focus-visible rather than :focus-within so
+// restored focus only counts when the user is actually on the keyboard.
+const revealed = ".group:hover &, .group:has(:focus-visible) &";
+
 interface RowContentProps {
   repo: Repository;
+  selected: boolean;
   count: number | undefined;
   // Absent on the DragOverlay copy — it's purely visual.
   onSelect?(path: string): void;
   onRemove?(path: string): void;
 }
 
-function RowContent({ repo, count, onSelect, onRemove }: RowContentProps) {
+function RowContent({
+  repo,
+  selected,
+  count,
+  onSelect,
+  onRemove,
+}: RowContentProps) {
   const owner = repo.slug?.split("/")[0];
   return (
     <>
@@ -210,13 +226,13 @@ function RowContent({ repo, count, onSelect, onRemove }: RowContentProps) {
       </HStack>
       {/* One fixed slot at the row's edge: the open-PR count, replaced by
           the remove button while the row is hovered. */}
-      <Center position="relative" minW="5" h="5" mr="1" flexShrink="0">
+      <Center position="relative" minW="5" h="5" mr="2" flexShrink="0">
         {count !== undefined && count > 0 && (
           <Badge
             size="xs"
             variant="surface"
             fontFamily="mono"
-            _groupHover={onRemove ? { opacity: 0 } : undefined}
+            css={onRemove ? { [revealed]: { opacity: 0 } } : undefined}
           >
             {count}
           </Badge>
@@ -225,13 +241,15 @@ function RowContent({ repo, count, onSelect, onRemove }: RowContentProps) {
           <IconButton
             aria-label="Remove repository"
             size="2xs"
-            variant="ghost"
-            color="fg.muted"
+            variant="outline"
+            // A selected row's overlay sits within a shade of the outline
+            // variant's default border, which would swallow it; the next step
+            // out reads in both colour modes.
+            borderColor={selected ? "border.emphasized" : undefined}
             position="absolute"
             inset="0"
             opacity="0"
-            _groupHover={{ opacity: 1 }}
-            _focusVisible={{ opacity: 1 }}
+            css={{ [revealed]: { opacity: 1 } }}
             onClick={() => onRemove(repo.path)}
           >
             <LuTrash2 />
