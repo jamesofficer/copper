@@ -57,6 +57,9 @@ export interface IpcApi {
   // list and reject with git's stderr so the reason reaches the user.
   stageFiles(repoPath: string, paths: string[]): Promise<void>;
   unstageFiles(repoPath: string, paths: string[]): Promise<void>;
+  // Throws uncommitted work away — tracked paths revert to the index,
+  // untracked paths are deleted. Irreversible; the renderer confirms first.
+  discardChanges(repoPath: string, paths: string[]): Promise<void>;
   // Commits the index — never the working tree — in the given checkout.
   commitChanges(repoPath: string, message: string): Promise<CommitResult>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
@@ -310,6 +313,7 @@ export const ipcChannels = [
   "listWorktrees",
   "stageFiles",
   "unstageFiles",
+  "discardChanges",
   "commitChanges",
   "listPullRequests",
   "listReviewRequestedPullRequests",

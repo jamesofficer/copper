@@ -267,6 +267,9 @@ export async function getLocalChanges(repoPath: string): Promise<LocalChanges> {
     branch,
     staged: byPath(staged),
     unstaged: byPath([...unstaged, ...untracked]),
+    // Reported rather than inferred from the status letter: discarding an
+    // untracked file deletes it, and that warning must not rest on a guess.
+    untracked: untracked.map((file) => file.path).sort(),
   };
 }
 
@@ -307,6 +310,38 @@ export async function unstageFiles(
     } catch {
       throw gitError(error, "Couldn't unstage those files.");
     }
+  }
+}
+
+// Throws away uncommitted work: tracked paths are restored from the index
+// (so staged work survives — only the unstaged edits go), untracked paths are
+// deleted outright. Nothing here is recoverable through git, which is why the
+// renderer confirms first.
+export async function discardChanges(
+  repoPath: string,
+  paths: string[],
+): Promise<void> {
+  if (paths.length === 0) return;
+  // Ask git which of these it doesn't track, rather than trusting the caller.
+  const listed = await git(repoPath, [
+    "ls-files",
+    "--others",
+    "--exclude-standard",
+    "-z",
+    "--",
+    ...paths,
+  ]);
+  const untracked = new Set(listed.split("\0").filter(Boolean));
+  const tracked = paths.filter((path) => !untracked.has(path));
+  try {
+    if (tracked.length > 0) {
+      await git(repoPath, ["restore", "--worktree", "--", ...tracked]);
+    }
+    if (untracked.size > 0) {
+      await git(repoPath, ["clean", "-f", "--", ...untracked]);
+    }
+  } catch (error) {
+    throw gitError(error, "Couldn't discard those changes.");
   }
 }
 

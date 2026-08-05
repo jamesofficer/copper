@@ -13,14 +13,15 @@ import {
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { LuMinus, LuPlus, LuSearch } from "react-icons/lu";
+import { LuMinus, LuPlus, LuSearch, LuUndo2 } from "react-icons/lu";
 import { useDebounce } from "use-debounce";
 import type { PullRequestFile } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
 import { usePanelWidth } from "../lib/usePanelWidth";
 import CommitComposer from "./CommitComposer";
 import DiffView from "./DiffView";
-import FileList from "./FileList";
+import DiscardChangesDialog from "./DiscardChangesDialog";
+import FileList, { type RowAction } from "./FileList";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -76,6 +77,8 @@ function matches(file: PullRequestFile, query: string): boolean {
 export default function LocalChangesView({ path }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [filter, setFilter] = useState("");
+  // The paths waiting on the discard confirmation; null closes the dialog.
+  const [discarding, setDiscarding] = useState<string[] | null>(null);
   const queryClient = useQueryClient();
   const { width: sidebarWidth, startResize: startSidebarResize } =
     usePanelWidth({
@@ -150,6 +153,10 @@ export default function LocalChangesView({ path }: Props) {
     ...settle,
   });
 
+  const untrackedPaths = useMemo(
+    () => new Set(changes?.untracked ?? []),
+    [changes],
+  );
   const total = changes ? changedPathCount(changes) : 0;
   const shown = new Set([...staged, ...unstaged].map((file) => file.path)).size;
   const fileCount = !changes ? null : query ? `${shown}/${total}` : `${total}`;
@@ -212,10 +219,16 @@ export default function LocalChangesView({ path }: Props) {
                   onSelect={(file) =>
                     setSelection({ area: "staged", path: file })
                   }
-                  actionLabel="Unstage"
-                  actionIcon={<LuMinus />}
-                  onAction={(paths) => unstage.mutate(paths)}
+                  bulkLabel="Unstage all"
+                  onBulk={(paths) => unstage.mutate(paths)}
                   busy={unstage.isPending}
+                  actions={[
+                    {
+                      icon: <LuMinus />,
+                      label: "Unstage",
+                      onRun: (path) => unstage.mutate([path]),
+                    },
+                  ]}
                 />
                 <FileGroup
                   title="Changes"
@@ -228,10 +241,22 @@ export default function LocalChangesView({ path }: Props) {
                   onSelect={(file) =>
                     setSelection({ area: "unstaged", path: file })
                   }
-                  actionLabel="Stage"
-                  actionIcon={<LuPlus />}
-                  onAction={(paths) => stage.mutate(paths)}
+                  bulkLabel="Stage all"
+                  onBulk={(paths) => stage.mutate(paths)}
                   busy={stage.isPending}
+                  actions={[
+                    {
+                      icon: <LuUndo2 />,
+                      label: "Discard",
+                      colorPalette: "red",
+                      onRun: (path) => setDiscarding([path]),
+                    },
+                    {
+                      icon: <LuPlus />,
+                      label: "Stage",
+                      onRun: (path) => stage.mutate([path]),
+                    },
+                  ]}
                 />
               </Stack>
             )}
@@ -239,6 +264,12 @@ export default function LocalChangesView({ path }: Props) {
           <CommitComposer
             path={path}
             stagedCount={changes?.staged.length ?? 0}
+          />
+          <DiscardChangesDialog
+            repoPath={path}
+            paths={discarding}
+            untracked={untrackedPaths}
+            onClose={() => setDiscarding(null)}
           />
         </Flex>
         <Box
@@ -278,9 +309,9 @@ interface GroupProps {
   files: PullRequestFile[];
   selectedPath: string | null;
   onSelect(path: string): void;
-  actionLabel: string;
-  actionIcon: React.ReactNode;
-  onAction(paths: string[]): void;
+  bulkLabel: string;
+  onBulk(paths: string[]): void;
+  actions: RowAction[];
   busy: boolean;
 }
 
@@ -291,9 +322,9 @@ function FileGroup({
   files,
   selectedPath,
   onSelect,
-  actionLabel,
-  actionIcon,
-  onAction,
+  bulkLabel,
+  onBulk,
+  actions,
   busy,
 }: GroupProps) {
   if (files.length === 0) return null;
@@ -313,20 +344,16 @@ function FileGroup({
           size="2xs"
           variant="ghost"
           disabled={busy}
-          onClick={() => onAction(files.map((file) => file.path))}
+          onClick={() => onBulk(files.map((file) => file.path))}
         >
-          {actionLabel} all
+          {bulkLabel}
         </Button>
       </HStack>
       <FileList
         files={files}
         selectedPath={selectedPath}
         onSelect={onSelect}
-        rowAction={{
-          icon: actionIcon,
-          label: actionLabel,
-          onRun: (path) => onAction([path]),
-        }}
+        rowActions={actions}
       />
     </Stack>
   );

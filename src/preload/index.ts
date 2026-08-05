@@ -18,6 +18,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("stageFiles", repoPath, paths),
   unstageFiles: (repoPath, paths) =>
     ipcRenderer.invoke("unstageFiles", repoPath, paths),
+  discardChanges: (repoPath, paths) =>
+    ipcRenderer.invoke("discardChanges", repoPath, paths),
   commitChanges: (repoPath, message) =>
     ipcRenderer.invoke("commitChanges", repoPath, message),
   listPullRequests: (repo) => ipcRenderer.invoke("listPullRequests", repo),

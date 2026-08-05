@@ -54,6 +54,7 @@ import {
 import { getLlmStatus, setLlmModel, setLlmProvider } from "../llm/settings";
 import {
   commitChanges,
+  discardChanges,
   getLocalChanges,
   stageFiles,
   unstageFiles,
@@ -85,6 +86,7 @@ const handlers: IpcApi = {
   listWorktrees: (repoPath) => listWorktrees(repoPath),
   stageFiles: (repoPath, paths) => stageFiles(repoPath, paths),
   unstageFiles: (repoPath, paths) => unstageFiles(repoPath, paths),
+  discardChanges: (repoPath, paths) => discardChanges(repoPath, paths),
   commitChanges: (repoPath, message) => commitChanges(repoPath, message),
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),

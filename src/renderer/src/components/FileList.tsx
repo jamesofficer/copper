@@ -18,13 +18,18 @@ interface Props {
   commentCounts?: Map<string, number>;
   // Local AI explanations per file path; undefined hides the chips.
   explanationCounts?: Map<string, number>;
-  // A per-row button revealed on hover — stage/unstage in the Current changes
-  // view. Undefined leaves the rows action-free, as the PR views want them.
-  rowAction?: {
-    icon: ReactNode;
-    label: string;
-    onRun(path: string): void;
-  };
+  // Per-row buttons revealed on hover, in place of the diff counts —
+  // stage/discard in the Current changes view. Undefined leaves the rows
+  // action-free, as the PR views want them.
+  rowActions?: RowAction[];
+}
+
+export interface RowAction {
+  icon: ReactNode;
+  label: string;
+  // "red" marks a destructive action; omitted follows the app accent.
+  colorPalette?: string;
+  onRun(path: string): void;
 }
 
 export default function FileList({
@@ -34,7 +39,7 @@ export default function FileList({
   viewedPaths,
   commentCounts,
   explanationCounts,
-  rowAction,
+  rowActions,
 }: Props) {
   const display = useFilePathDisplay();
 
@@ -106,7 +111,7 @@ export default function FileList({
                   fontFamily="mono"
                   fontSize="2xs"
                   flexShrink="0"
-                  _groupHover={rowAction ? { opacity: 0 } : undefined}
+                  _groupHover={rowActions ? { opacity: 0 } : undefined}
                 >
                   <CommentCountBadge count={comments} />
                   <ExplanationCountBadge count={explanations} />
@@ -124,23 +129,31 @@ export default function FileList({
                 </HStack>
               </HStack>
             </Box>
-            {rowAction && (
-              <IconButton
+            {rowActions && rowActions.length > 0 && (
+              <HStack
                 position="absolute"
-                right="1"
+                right="1.5"
                 top="50%"
                 transform="translateY(-50%)"
-                size="2xs"
-                variant="ghost"
-                aria-label={`${rowAction.label} ${file.path}`}
-                title={rowAction.label}
+                gap="1"
                 opacity="0"
                 _groupHover={{ opacity: 1 }}
-                _focusVisible={{ opacity: 1 }}
-                onClick={() => rowAction.onRun(file.path)}
+                _focusWithin={{ opacity: 1 }}
               >
-                {rowAction.icon}
-              </IconButton>
+                {rowActions.map((action) => (
+                  <IconButton
+                    key={action.label}
+                    size="2xs"
+                    variant="outline"
+                    colorPalette={action.colorPalette}
+                    aria-label={`${action.label} ${file.path}`}
+                    title={action.label}
+                    onClick={() => action.onRun(file.path)}
+                  >
+                    {action.icon}
+                  </IconButton>
+                ))}
+              </HStack>
             )}
           </Box>
         );
