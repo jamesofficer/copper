@@ -153,6 +153,11 @@ export default function FileList({
                     key={action.label}
                     size="2xs"
                     variant="outline"
+                    // A selected row is bg.emphasized, which resolves to the
+                    // very same gray as the outline variant's default border
+                    // — the button vanished into it. border.emphasized is the
+                    // next step out in both modes.
+                    borderColor={selected ? "border.emphasized" : undefined}
                     aria-label={`${action.label} ${file.path}`}
                     title={action.label}
                     onClick={() => action.onRun(file.path)}
