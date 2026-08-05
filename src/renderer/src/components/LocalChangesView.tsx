@@ -248,7 +248,6 @@ export default function LocalChangesView({ path }: Props) {
                     {
                       icon: <LuUndo2 />,
                       label: "Discard",
-                      colorPalette: "red",
                       onRun: (path) => setDiscarding([path]),
                     },
                     {

@@ -27,10 +27,14 @@ interface Props {
 export interface RowAction {
   icon: ReactNode;
   label: string;
-  // "red" marks a destructive action; omitted follows the app accent.
-  colorPalette?: string;
   onRun(path: string): void;
 }
+
+// The counts and the actions occupy the same slot, so one condition has to
+// drive both — hover alone left the buttons showing over the counts once the
+// discard dialog closed and returned focus to its trigger with the pointer
+// elsewhere. Same selectors, inverse values.
+const revealed = ".group:hover &, .group:focus-within &";
 
 export default function FileList({
   files,
@@ -111,7 +115,7 @@ export default function FileList({
                   fontFamily="mono"
                   fontSize="2xs"
                   flexShrink="0"
-                  _groupHover={rowActions ? { opacity: 0 } : undefined}
+                  css={rowActions ? { [revealed]: { opacity: 0 } } : undefined}
                 >
                   <CommentCountBadge count={comments} />
                   <ExplanationCountBadge count={explanations} />
@@ -137,15 +141,13 @@ export default function FileList({
                 transform="translateY(-50%)"
                 gap="1"
                 opacity="0"
-                _groupHover={{ opacity: 1 }}
-                _focusWithin={{ opacity: 1 }}
+                css={{ [revealed]: { opacity: 1 } }}
               >
                 {rowActions.map((action) => (
                   <IconButton
                     key={action.label}
                     size="2xs"
                     variant="outline"
-                    colorPalette={action.colorPalette}
                     aria-label={`${action.label} ${file.path}`}
                     title={action.label}
                     onClick={() => action.onRun(file.path)}
