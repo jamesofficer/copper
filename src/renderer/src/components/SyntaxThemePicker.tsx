@@ -149,8 +149,8 @@ export default function SyntaxThemePicker() {
 
   return (
     <Stack direction={{ base: "column", md: "row" }} gap="4" w="full">
-      <Column appearance="dark" label="Dark mode" value={themes.dark} />
       <Column appearance="light" label="Light mode" value={themes.light} />
+      <Column appearance="dark" label="Dark mode" value={themes.dark} />
     </Stack>
   );
 }

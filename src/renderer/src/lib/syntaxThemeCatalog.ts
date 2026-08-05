@@ -164,15 +164,25 @@ function describeTheme(registration: ThemeRegistrationAny): SyntaxTheme {
     type?: ThemeAppearance;
     bg?: string;
     fg?: string;
+    colors?: Record<string, string>;
   };
   const id = theme.name ?? "";
+  const appearance = theme.type === "light" ? "light" : "dark";
   return {
     id,
     label: theme.displayName ?? id,
-    appearance: theme.type === "light" ? "light" : "dark",
+    appearance,
     registration,
-    bg: theme.bg ?? "#000000",
-    fg: theme.fg ?? "#ffffff",
+    // Raw registrations carry no top-level bg/fg (shiki computes those when a
+    // theme is registered) — the colours live in the VS Code colour map.
+    bg:
+      theme.bg ??
+      theme.colors?.["editor.background"] ??
+      (appearance === "light" ? "#ffffff" : "#000000"),
+    fg:
+      theme.fg ??
+      theme.colors?.["editor.foreground"] ??
+      (appearance === "light" ? "#000000" : "#ffffff"),
   };
 }
 

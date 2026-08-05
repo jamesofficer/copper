@@ -5,7 +5,7 @@ import {
   highlightToLines,
   languageForPath,
 } from "../lib/diffParser";
-import { tokenColors } from "../lib/syntaxColors";
+import { syntaxBackground, tokenColors } from "../lib/syntaxColors";
 import { useSyntaxThemes } from "../lib/syntaxTheme";
 import { diffFontStyles } from "./DiffLines";
 
@@ -27,7 +27,11 @@ export default function FileView({ path, text }: Props) {
   }, [path, text, themes]);
 
   return (
-    <Box {...diffFontStyles} css={tokenColors} minW="max-content">
+    <Box
+      {...diffFontStyles}
+      css={[tokenColors, syntaxBackground(themes)]}
+      minW="max-content"
+    >
       {rows.map((html, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the line number
         <Flex key={index}>

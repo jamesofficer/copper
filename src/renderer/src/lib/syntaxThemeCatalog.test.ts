@@ -24,6 +24,20 @@ describe("syntaxThemes", () => {
       expect(["light", "dark"], theme.id).toContain(theme.appearance);
     }
   });
+
+  // Raw shiki registrations have no top-level bg/fg — the colours sit in the
+  // VS Code colour map. Reading the wrong field paints every preview and
+  // swatch black, which for a light theme is exactly wrong.
+  it("reads each theme's own background, not a black fallback", () => {
+    expect(findSyntaxTheme("light-plus")?.bg.toLowerCase()).toBe("#ffffff");
+    expect(findSyntaxTheme("github-dark")?.bg.toLowerCase()).not.toBe(
+      "#ffffff",
+    );
+    const black = syntaxThemesFor("light").filter(
+      (theme) => theme.bg === "#000000",
+    );
+    expect(black.map((theme) => theme.id)).toEqual([]);
+  });
 });
 
 describe("syntaxThemesFor", () => {

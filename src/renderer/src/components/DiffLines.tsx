@@ -35,7 +35,7 @@ import {
 } from "../lib/explanationStatus";
 import type { ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
-import { tokenColors } from "../lib/syntaxColors";
+import { syntaxBackground, tokenColors } from "../lib/syntaxColors";
 import { useSyntaxThemes } from "../lib/syntaxTheme";
 import AiExplanationCard from "./AiExplanationCard";
 import DiffCommentComposer from "./DiffCommentComposer";
@@ -1001,7 +1001,11 @@ function DiffLines({ file, commenting, expansion }: Props) {
   }
 
   return (
-    <Box ref={rootRef} {...diffFontStyles} css={tokenColors}>
+    <Box
+      ref={rootRef}
+      {...diffFontStyles}
+      css={[tokenColors, syntaxBackground(themes)]}
+    >
       {split ? (
         <SplitRows lines={displayLines} ctx={ctx} expand={expandCtx} />
       ) : (

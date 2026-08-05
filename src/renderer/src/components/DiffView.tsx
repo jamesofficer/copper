@@ -13,6 +13,8 @@ import { LuCheck, LuFileCode, LuFileDiff } from "react-icons/lu";
 import type { PullRequestFile } from "../../../shared/types";
 import { statusMeta } from "../lib/fileStatus";
 import { scrollbar } from "../lib/scrollbar";
+import { syntaxBackground } from "../lib/syntaxColors";
+import { useSyntaxThemes } from "../lib/syntaxTheme";
 import DiffLines, {
   type DiffCommenting,
   type DiffExpansion,
@@ -39,6 +41,9 @@ export default function DiffView({
 }: Props) {
   const meta = statusMeta[file.status];
   const [showFullFile, setShowFullFile] = useState(false);
+  // The scroll pane shares the theme's background so the area past the last
+  // row matches the rows instead of snapping back to the app surface.
+  const paneBackground = syntaxBackground(useSyntaxThemes());
 
   // Deleted files don't exist at the diff's commit.
   const canReadFile = Boolean(fileContext) && file.status !== "deleted";
@@ -161,12 +166,22 @@ export default function DiffView({
             </Text>
           </Center>
         ) : (
-          <Box flex="1" minH="0" overflow="auto" css={scrollbar}>
+          <Box
+            flex="1"
+            minH="0"
+            overflow="auto"
+            css={[scrollbar, paneBackground]}
+          >
             <FileView path={file.path} text={fullFile} />
           </Box>
         )
       ) : file.patch ? (
-        <Box flex="1" minH="0" overflow="auto" css={scrollbar}>
+        <Box
+          flex="1"
+          minH="0"
+          overflow="auto"
+          css={[scrollbar, paneBackground]}
+        >
           <DiffLines
             file={file}
             commenting={commenting}
