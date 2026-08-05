@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { basename, join } from "node:path";
 import { promisify } from "node:util";
 import { dialog } from "electron";
-import type { Repository } from "../../shared/types";
+import type { Repository, Worktree } from "../../shared/types";
 
 const run = promisify(execFile);
 
@@ -101,6 +101,52 @@ export async function getLocalCheckoutBranch(
   } catch {
     return null;
   }
+}
+
+// The repo's checkouts — the main worktree plus any linked worktrees, for the
+// Current changes tab's worktree switcher. `-z` NUL-terminates every field so
+// paths with newlines survive; entries are separated by a double NUL. Bare and
+// prunable (directory deleted, not yet pruned) entries are skipped; [] on any
+// failure just hides the switcher.
+export async function listWorktrees(repoPath: string): Promise<Worktree[]> {
+  let output: string;
+  try {
+    const { stdout } = await run("git", [
+      "-C",
+      repoPath,
+      "worktree",
+      "list",
+      "--porcelain",
+      "-z",
+    ]);
+    output = stdout;
+  } catch {
+    return [];
+  }
+
+  const worktrees: Worktree[] = [];
+  let first = true;
+  for (const entry of output.split("\0\0")) {
+    const fields = entry.split("\0").filter(Boolean);
+    if (fields.length === 0) continue;
+    const isMain = first;
+    first = false;
+
+    let path: string | null = null;
+    let branch: string | null = null;
+    let skip = false;
+    for (const field of fields) {
+      if (field.startsWith("worktree ")) {
+        path = field.slice("worktree ".length);
+      } else if (field.startsWith("branch refs/heads/")) {
+        branch = field.slice("branch refs/heads/".length);
+      } else if (field === "bare" || field.startsWith("prunable")) {
+        skip = true;
+      }
+    }
+    if (!skip && path !== null) worktrees.push({ path, branch, isMain });
+  }
+  return worktrees;
 }
 
 // Persists a drag-reordered list. Unknown paths are ignored; registered

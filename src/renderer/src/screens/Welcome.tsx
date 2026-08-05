@@ -32,6 +32,7 @@ import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
 import SetupBanner from "../components/SetupBanner";
 import ShowSidebarButton from "../components/ShowSidebarButton";
+import WorktreeSelect from "../components/WorktreeSelect";
 import { scrollbar } from "../lib/scrollbar";
 import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
@@ -75,13 +76,36 @@ export default function Welcome({
       : "Couldn't load pull requests."
     : null;
 
+  const localChangesTab = tab === "local-changes";
+
+  // The repo's checkouts — main worktree plus any linked git worktrees, so
+  // Current changes can jump between agents working in parallel. Worktrees
+  // come and go while the app runs, so never trust a cached list.
+  const worktreesQuery = useQuery({
+    queryKey: ["worktrees", active?.path],
+    queryFn: () => window.api.listWorktrees(active?.path ?? ""),
+    enabled: Boolean(active),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  });
+  const worktrees = worktreesQuery.data;
+
+  // Which checkout the tab reads. The selection only sticks while it names a
+  // listed worktree, so switching repos or removing a worktree falls back to
+  // the registered path on its own.
+  const [selectedWorktree, setSelectedWorktree] = useState<string | null>(null);
+  const worktreePath =
+    selectedWorktree &&
+    worktrees?.some((worktree) => worktree.path === selectedWorktree)
+      ? selectedWorktree
+      : (active?.path ?? "");
+
   // Same query LocalChangesView owns — this observer feeds the tab label's
   // file count and, while that tab is showing, the top bar's branch label and
   // refresh button. Enabled whichever tab is up so the count shows before the
   // tab is opened; it's a cheap local git call.
-  const localChangesTab = tab === "local-changes";
   const changesQuery = useQuery({
-    ...localChangesQueryOptions(active?.path ?? ""),
+    ...localChangesQueryOptions(worktreePath),
     enabled: Boolean(active),
   });
   const changedCount = changesQuery.data?.files.length;
@@ -135,13 +159,21 @@ export default function Welcome({
             )}
             {active && localChangesTab && (
               <HStack ml="auto" gap="2">
-                {changesQuery.data?.branch && (
-                  <HStack gap="1" fontFamily="mono" fontSize="xs" minW="0">
-                    <LuGitBranch size={12} />
-                    <Text as="span" truncate>
-                      {changesQuery.data.branch}
-                    </Text>
-                  </HStack>
+                {worktrees && worktrees.length > 1 ? (
+                  <WorktreeSelect
+                    worktrees={worktrees}
+                    value={worktreePath}
+                    onChange={setSelectedWorktree}
+                  />
+                ) : (
+                  changesQuery.data?.branch && (
+                    <HStack gap="1" fontFamily="mono" fontSize="xs" minW="0">
+                      <LuGitBranch size={12} />
+                      <Text as="span" truncate>
+                        {changesQuery.data.branch}
+                      </Text>
+                    </HStack>
+                  )
                 )}
                 <IconButton
                   aria-label="Refresh"
@@ -149,7 +181,10 @@ export default function Welcome({
                   variant="outline"
                   size="xs"
                   loading={changesQuery.isFetching}
-                  onClick={() => void changesQuery.refetch()}
+                  onClick={() => {
+                    void worktreesQuery.refetch();
+                    void changesQuery.refetch();
+                  }}
                 >
                   <LuRefreshCw />
                 </IconButton>
@@ -238,7 +273,7 @@ export default function Welcome({
 
           <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
             {active ? (
-              <LocalChangesView key={active.path} repo={active} />
+              <LocalChangesView key={worktreePath} path={worktreePath} />
             ) : (
               <Center h="full" p="4">
                 <Text color="fg.muted" fontSize="sm">

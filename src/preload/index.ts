@@ -13,6 +13,7 @@ const api: WindowApi = {
     ipcRenderer.invoke("reorderRepositories", paths),
   getLocalChanges: (repoPath) =>
     ipcRenderer.invoke("getLocalChanges", repoPath),
+  listWorktrees: (repoPath) => ipcRenderer.invoke("listWorktrees", repoPath),
   listPullRequests: (repo) => ipcRenderer.invoke("listPullRequests", repo),
   listReviewRequestedPullRequests: () =>
     ipcRenderer.invoke("listReviewRequestedPullRequests"),

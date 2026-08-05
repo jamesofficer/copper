@@ -286,6 +286,15 @@ export interface PullRequestFile {
   patch: string | null;
 }
 
+// A checkout of a registered repository — the main worktree plus any linked
+// git worktrees, so work agents do in parallel worktrees can be reviewed too.
+export interface Worktree {
+  path: string;
+  // null on a detached HEAD.
+  branch: string | null;
+  isMain: boolean;
+}
+
 // Uncommitted work in a registered local checkout — staged + unstaged changes
 // plus untracked files, shaped like a PR's changed files so the diff UI
 // renders them unchanged.
