@@ -30,6 +30,7 @@ interface Props {
 export interface RowAction {
   icon: ReactNode;
   label: string;
+  disabled?: boolean;
   onRun(path: string): void;
 }
 
@@ -170,6 +171,7 @@ export default function FileList({
                     borderColor={selected ? "border.emphasized" : undefined}
                     aria-label={`${action.label} ${file.path}`}
                     title={action.label}
+                    disabled={action.disabled}
                     onClick={() => action.onRun(file.path)}
                   >
                     {action.icon}

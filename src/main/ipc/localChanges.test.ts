@@ -14,6 +14,7 @@ function dependencies() {
       .mockResolvedValue([
         { path: "/worktrees/feature", branch: "feature", isMain: false },
       ]),
+    getLocalChangeCount: vi.fn().mockResolvedValue(3),
     getLocalChanges: vi.fn().mockResolvedValue({
       branch: "main",
       staged: [],
@@ -31,6 +32,16 @@ function dependencies() {
 }
 
 describe("local changes IPC handlers", () => {
+  it("exposes the cheap changed-path count without loading file patches", async () => {
+    const deps = dependencies();
+    const handlers = createLocalChangesHandlers(deps);
+
+    await expect(handlers.getLocalChangeCount("/repos/app")).resolves.toBe(3);
+
+    expect(deps.getLocalChangeCount).toHaveBeenCalledWith("/repos/app");
+    expect(deps.getLocalChanges).not.toHaveBeenCalled();
+  });
+
   it("allows a mutation in a worktree belonging to a registered repository", async () => {
     const deps = dependencies();
     const handlers = createLocalChangesHandlers(deps);
@@ -41,6 +52,54 @@ describe("local changes IPC handlers", () => {
     expect(deps.stageFiles).toHaveBeenCalledWith("/worktrees/feature", [
       "src/app.ts",
     ]);
+  });
+
+  it("serializes mutations in the same checkout", async () => {
+    const deps = dependencies();
+    let finishStage: (() => void) | undefined;
+    deps.stageFiles.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          finishStage = resolve;
+        }),
+    );
+    const handlers = createLocalChangesHandlers(deps);
+
+    const staging = handlers.stageFiles("/repos/app", ["one.ts"]);
+    await vi.waitFor(() => expect(deps.stageFiles).toHaveBeenCalledOnce());
+    const unstaging = handlers.unstageFiles("/repos/app", ["two.ts"]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const overlapped = deps.unstageFiles.mock.calls.length;
+
+    finishStage?.();
+    await Promise.all([staging, unstaging]);
+
+    // Git protects the index with one lock. Starting a second write before the
+    // first settles makes rapid row actions fail intermittently or lets a
+    // commit race ahead of the staging operation it was meant to include.
+    expect(overlapped).toBe(0);
+    expect(deps.unstageFiles).toHaveBeenCalledOnce();
+  });
+
+  it("continues the checkout queue after a failed mutation", async () => {
+    const deps = dependencies();
+    let failStage: ((error: Error) => void) | undefined;
+    deps.stageFiles.mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          failStage = reject;
+        }),
+    );
+    const handlers = createLocalChangesHandlers(deps);
+
+    const staging = handlers.stageFiles("/repos/app", ["one.ts"]);
+    await vi.waitFor(() => expect(deps.stageFiles).toHaveBeenCalledOnce());
+    const unstaging = handlers.unstageFiles("/repos/app", ["two.ts"]);
+    failStage?.(new Error("index locked"));
+
+    await expect(staging).rejects.toThrow(/index locked/i);
+    await expect(unstaging).resolves.toBeUndefined();
+    expect(deps.unstageFiles).toHaveBeenCalledOnce();
   });
 
   it("rejects every mutation outside registered repositories and their worktrees", async () => {

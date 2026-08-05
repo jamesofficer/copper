@@ -1,7 +1,15 @@
 import { Box, Button, Stack, Textarea } from "@chakra-ui/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
 import { LuGitCommitHorizontal } from "react-icons/lu";
+import {
+  invalidateLocalChangeQueries,
+  localChangesWriteMutationKey,
+} from "../lib/localChangesMutations";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -16,8 +24,11 @@ interface Props {
 export default function CommitComposer({ path, stagedCount }: Props) {
   const [message, setMessage] = useState("");
   const queryClient = useQueryClient();
+  const writeMutationKey = localChangesWriteMutationKey(path);
+  const writesPending = useIsMutating({ mutationKey: writeMutationKey }) > 0;
 
   const commit = useMutation({
+    mutationKey: writeMutationKey,
     mutationFn: () => window.api.commitChanges(path, message),
     onSuccess: (result) => {
       setMessage("");
@@ -26,7 +37,7 @@ export default function CommitComposer({ path, stagedCount }: Props) {
         title: `Committed ${result.sha}`,
         description: result.subject,
       });
-      queryClient.invalidateQueries({ queryKey: ["localChanges", path] });
+      void invalidateLocalChangeQueries(queryClient, path);
     },
     onError: (error) => {
       // git's stderr — a failed pre-commit hook or an unset user.email says
@@ -36,11 +47,11 @@ export default function CommitComposer({ path, stagedCount }: Props) {
         title: "Couldn't commit",
         description: error instanceof Error ? error.message : String(error),
       });
-      queryClient.invalidateQueries({ queryKey: ["localChanges", path] });
+      void invalidateLocalChangeQueries(queryClient, path);
     },
   });
 
-  const ready = stagedCount > 0 && message.trim() !== "";
+  const ready = stagedCount > 0 && message.trim() !== "" && !writesPending;
 
   return (
     <Stack gap="2" px="3" py="3" borderTopWidth="1px" flexShrink="0">

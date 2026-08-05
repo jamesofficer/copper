@@ -12,7 +12,12 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   LuChevronRight,
@@ -24,7 +29,12 @@ import {
 import { useDebounce } from "use-debounce";
 import type { PullRequestFile } from "../../../shared/types";
 import {
+  invalidateLocalChangeQueries,
+  localChangesWriteMutationKey,
+} from "../lib/localChangesMutations";
+import {
   type LocalChangeSelection,
+  localChangesBulkLabel,
   resolveLocalChangeSelection,
 } from "../lib/localChangesSelection";
 import { scrollbar } from "../lib/scrollbar";
@@ -43,6 +53,15 @@ interface Props {
 // The working tree changes under the app constantly: always refetch on mount
 // and window focus, and never persist (queryClient's doNotPersist). Shared
 // with the home screen's top bar, which shows the branch and refresh button.
+export function localChangeCountQueryOptions(repoPath: string) {
+  return {
+    queryKey: ["localChangeCount", repoPath],
+    queryFn: () => window.api.getLocalChangeCount(repoPath),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  } as const;
+}
+
 export function localChangesQueryOptions(repoPath: string) {
   return {
     queryKey: ["localChanges", repoPath],
@@ -82,6 +101,8 @@ export default function LocalChangesView({ path }: Props) {
   // The paths waiting on the discard confirmation; null closes the dialog.
   const [discarding, setDiscarding] = useState<string[] | null>(null);
   const queryClient = useQueryClient();
+  const writeMutationKey = localChangesWriteMutationKey(path);
+  const writesPending = useIsMutating({ mutationKey: writeMutationKey }) > 0;
   const { width: sidebarWidth, startResize: startSidebarResize } =
     usePanelWidth({
       storageKey: "localChangesFileListWidth",
@@ -127,15 +148,16 @@ export default function LocalChangesView({ path }: Props) {
   // git is the source of truth for the index — refetch rather than patch the
   // cache, since one "add" can move a path between both lists at once.
   const settle = {
-    onSettled: () =>
-      queryClient.invalidateQueries({ queryKey: ["localChanges", path] }),
+    onSettled: () => invalidateLocalChangeQueries(queryClient, path),
   };
   const stage = useMutation({
+    mutationKey: writeMutationKey,
     mutationFn: (paths: string[]) => window.api.stageFiles(path, paths),
     onError: reportFailure("Couldn't stage"),
     ...settle,
   });
   const unstage = useMutation({
+    mutationKey: writeMutationKey,
     mutationFn: (paths: string[]) => window.api.unstageFiles(path, paths),
     onError: reportFailure("Couldn't unstage"),
     ...settle,
@@ -207,14 +229,15 @@ export default function LocalChangesView({ path }: Props) {
                   onSelect={(file) =>
                     setSelection({ area: "staged", path: file })
                   }
-                  bulkLabel="Unstage all"
+                  bulkLabel={localChangesBulkLabel("staged", Boolean(query))}
                   onBulk={(paths) => unstage.mutate(paths)}
-                  busy={unstage.isPending}
+                  busy={writesPending}
                   nameColor="green.fg"
                   actions={[
                     {
                       icon: <LuMinus />,
                       label: "Unstage",
+                      disabled: writesPending,
                       onRun: (path) => unstage.mutate([path]),
                     },
                   ]}
@@ -230,18 +253,20 @@ export default function LocalChangesView({ path }: Props) {
                   onSelect={(file) =>
                     setSelection({ area: "unstaged", path: file })
                   }
-                  bulkLabel="Stage all"
+                  bulkLabel={localChangesBulkLabel("unstaged", Boolean(query))}
                   onBulk={(paths) => stage.mutate(paths)}
-                  busy={stage.isPending}
+                  busy={writesPending}
                   actions={[
                     {
                       icon: <LuUndo2 />,
                       label: "Discard",
+                      disabled: writesPending,
                       onRun: (path) => setDiscarding([path]),
                     },
                     {
                       icon: <LuPlus />,
                       label: "Stage",
+                      disabled: writesPending,
                       onRun: (path) => stage.mutate([path]),
                     },
                   ]}

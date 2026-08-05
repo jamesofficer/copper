@@ -161,17 +161,24 @@ export function parseGitDiff(output: string): PullRequestFile[] {
 
 const diffArgs = ["-M", "--no-color", "--no-ext-diff"];
 
+async function hasHead(repoPath: string): Promise<boolean> {
+  try {
+    await git(repoPath, ["rev-parse", "--verify", "HEAD"]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // The index against HEAD — what a commit would record.
 async function stagedChanges(repoPath: string): Promise<PullRequestFile[]> {
-  let output: string;
-  try {
-    output = await git(repoPath, ["diff", "--cached", "HEAD", ...diffArgs]);
-  } catch {
-    // A repo with no commits yet has no HEAD — diff against the empty tree
-    // so staged files still show.
-    output = await git(repoPath, ["diff", "--cached", emptyTree, ...diffArgs]);
-  }
-  return parseGitDiff(output);
+  // Only an unborn repository uses the empty tree. A valid HEAD whose diff
+  // fails must surface that failure rather than making the whole index look
+  // newly added.
+  const base = (await hasHead(repoPath)) ? "HEAD" : emptyTree;
+  return parseGitDiff(
+    await git(repoPath, ["diff", "--cached", base, ...diffArgs]),
+  );
 }
 
 // The working tree against the index — what a commit would leave behind.
@@ -257,6 +264,35 @@ function byPath(files: PullRequestFile[]): PullRequestFile[] {
   return [...unique.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
+// Cheap count for the always-visible tab badge. Porcelain reports one record
+// per changed path, even when it differs in both the index and working tree;
+// rename/copy records carry one extra NUL-delimited source path to skip.
+export async function getLocalChangeCount(repoPath: string): Promise<number> {
+  const output = await git(repoPath, [
+    "status",
+    "--porcelain=v1",
+    "-z",
+    "--renames",
+    "--untracked-files=all",
+  ]);
+  const records = output.split("\0");
+  let count = 0;
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index];
+    if (record.length < 3) continue;
+    count++;
+    if (
+      record[0] === "R" ||
+      record[0] === "C" ||
+      record[1] === "R" ||
+      record[1] === "C"
+    ) {
+      index++;
+    }
+  }
+  return count;
+}
+
 // Uncommitted work in a registered local checkout, split the way git sees it:
 // the index (staged) and the working tree (unstaged, untracked files
 // included). A partially staged path appears in both — that is git's model,
@@ -314,14 +350,7 @@ export async function unstageFiles(
 ): Promise<void> {
   if (paths.length === 0) return;
   try {
-    let hasHead = true;
-    try {
-      await git(repoPath, ["rev-parse", "--verify", "HEAD"]);
-    } catch {
-      hasHead = false;
-    }
-
-    if (hasHead) {
+    if (await hasHead(repoPath)) {
       await git(repoPath, ["restore", "--staged", "--", ...paths]);
     } else {
       // No HEAD to restore from yet — the first commit's staged files can

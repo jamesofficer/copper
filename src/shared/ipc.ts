@@ -46,6 +46,9 @@ export interface IpcApi {
   removeRepository(path: string): Promise<Repository[]>;
   // Persists a drag-reordered sidebar list; paths in their new order.
   reorderRepositories(paths: string[]): Promise<Repository[]>;
+  // Cheap unique changed-path count for the always-visible tab badge. Does
+  // not build file patches.
+  getLocalChangeCount(repoPath: string): Promise<number>;
   // Uncommitted work in a registered checkout (staged + unstaged + untracked),
   // for the home screen's Current changes tab. Read from local git only — no
   // GitHub token needed.

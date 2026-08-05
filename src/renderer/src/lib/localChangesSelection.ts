@@ -7,6 +7,14 @@ export interface LocalChangeSelection {
   path: string;
 }
 
+export function localChangesBulkLabel(
+  area: LocalChangeArea,
+  filtered: boolean,
+): string {
+  const verb = area === "staged" ? "Unstage" : "Stage";
+  return `${verb} ${filtered ? "shown" : "all"}`;
+}
+
 interface ResolvedLocalChange {
   file: PullRequestFile | null;
   area: LocalChangeArea | null;

@@ -1,7 +1,7 @@
 import type { WindowApi } from "../../../shared/ipc";
 
-// The renderer reaches window.api from ~93 call sites against a 69-method
-// interface, so writing a literal fake would mean 69 stubs that add nothing
+// The renderer reaches window.api from ~94 call sites against a 70-method
+// interface, so writing a literal fake would mean 70 stubs that add nothing
 // and rot on every IPC change. This is a Proxy instead: complete by
 // construction, and a test declares only the handful of methods it exercises.
 //

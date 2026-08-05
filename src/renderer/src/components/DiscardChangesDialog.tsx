@@ -1,5 +1,13 @@
 import { Button, CloseButton, Dialog, Portal, Text } from "@chakra-ui/react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useIsMutating,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
+import {
+  invalidateLocalChangeQueries,
+  localChangesWriteMutationKey,
+} from "../lib/localChangesMutations";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -27,8 +35,11 @@ export default function DiscardChangesDialog({
   onClose,
 }: Props) {
   const queryClient = useQueryClient();
+  const writeMutationKey = localChangesWriteMutationKey(repoPath);
+  const writesPending = useIsMutating({ mutationKey: writeMutationKey }) > 0;
 
   const discard = useMutation({
+    mutationKey: writeMutationKey,
     mutationFn: (targets: string[]) =>
       window.api.discardChanges(repoPath, targets),
     onError: (error) => {
@@ -39,7 +50,7 @@ export default function DiscardChangesDialog({
       });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["localChanges", repoPath] });
+      void invalidateLocalChangeQueries(queryClient, repoPath);
       onClose();
     },
   });
@@ -102,6 +113,7 @@ export default function DiscardChangesDialog({
               <Button
                 size="sm"
                 colorPalette="red"
+                disabled={writesPending}
                 loading={discard.isPending}
                 onClick={() => discard.mutate(targets)}
               >

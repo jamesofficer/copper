@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequestFile } from "../../../shared/types";
-import { resolveLocalChangeSelection } from "./localChangesSelection";
+import {
+  localChangesBulkLabel,
+  resolveLocalChangeSelection,
+} from "./localChangesSelection";
 
 function file(path: string, patch: string): PullRequestFile {
   return {
@@ -12,6 +15,14 @@ function file(path: string, patch: string): PullRequestFile {
     patch,
   };
 }
+
+describe("localChangesBulkLabel", () => {
+  it("says shown rather than all when a filter limits the action", () => {
+    expect(localChangesBulkLabel("staged", true)).toBe("Unstage shown");
+    expect(localChangesBulkLabel("unstaged", true)).toBe("Stage shown");
+    expect(localChangesBulkLabel("unstaged", false)).toBe("Stage all");
+  });
+});
 
 describe("resolveLocalChangeSelection", () => {
   it("classifies a fallback from the list where the file was actually found", () => {

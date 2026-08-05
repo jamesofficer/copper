@@ -30,12 +30,13 @@ export const queryClient = new QueryClient({
 });
 
 // Query keys that never get written to localStorage: file patches are too
-// large for its ~5MB quota and are cheap to refetch — and localChanges and
-// worktrees are stale the moment the working tree moves.
+// large for its ~5MB quota and are cheap to refetch — and local change data
+// and worktrees are stale the moment the working tree moves.
 const doNotPersist = [
   "pullRequestFiles",
   "commitFiles",
   "fileAtCommit",
+  "localChangeCount",
   "localChanges",
   "worktrees",
 ];

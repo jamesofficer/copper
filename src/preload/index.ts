@@ -11,6 +11,8 @@ const api: WindowApi = {
   removeRepository: (path) => ipcRenderer.invoke("removeRepository", path),
   reorderRepositories: (paths) =>
     ipcRenderer.invoke("reorderRepositories", paths),
+  getLocalChangeCount: (repoPath) =>
+    ipcRenderer.invoke("getLocalChangeCount", repoPath),
   getLocalChanges: (repoPath) =>
     ipcRenderer.invoke("getLocalChanges", repoPath),
   listWorktrees: (repoPath) => ipcRenderer.invoke("listWorktrees", repoPath),

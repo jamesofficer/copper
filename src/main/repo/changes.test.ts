@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   commitChanges,
   discardChanges,
+  getLocalChangeCount,
   getLocalChanges,
   stageFiles,
   unstageFiles,
@@ -51,6 +52,28 @@ async function commitInitial(): Promise<void> {
   await git("add", ".");
   await git("commit", "-qm", "init");
 }
+
+describe("getLocalChangeCount", () => {
+  it("counts a partially staged path once", async () => {
+    await commitInitial();
+    await write("tracked.txt", "staged\n");
+    await git("add", "tracked.txt");
+    await write("tracked.txt", "staged then edited again\n");
+    await write("new.txt", "untracked\n");
+
+    expect(await getLocalChangeCount(repo)).toBe(2);
+  });
+
+  it("counts a rename as one changed path", async () => {
+    await commitInitial();
+    // The detailed diff always enables rename detection with -M, so the cheap
+    // count must agree even when this repository disables it for status.
+    await git("config", "status.renames", "false");
+    await git("mv", "tracked.txt", "renamed.txt");
+
+    expect(await getLocalChangeCount(repo)).toBe(1);
+  });
+});
 
 describe("getLocalChanges", () => {
   it("splits the index from the working tree", async () => {
@@ -97,6 +120,32 @@ describe("getLocalChanges", () => {
       "new.txt",
       "tracked.txt",
     ]);
+  });
+
+  it("surfaces a staged diff failure when HEAD exists", async () => {
+    await commitInitial();
+    await write("tracked.txt", "staged\n");
+    await git("add", "tracked.txt");
+
+    const bin = await mkdtemp(join(tmpdir(), "reviewr-fake-git-"));
+    const shim = join(bin, "git");
+    const { stdout: realGit } = await run("which", ["git"]);
+    await writeFile(
+      shim,
+      `#!/bin/sh\nif [ "$5" = "diff" ] && [ "$6" = "--cached" ] && [ "$7" = "HEAD" ]; then\n  echo "simulated staged diff failure" >&2\n  exit 1\nfi\nexec "${realGit.trim()}" "$@"\n`,
+    );
+    await chmod(shim, 0o755);
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${bin}:${previousPath ?? ""}`;
+    try {
+      await expect(getLocalChanges(repo)).rejects.toThrow(
+        /simulated staged diff failure/i,
+      );
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+      await rm(bin, { recursive: true, force: true });
+    }
   });
 
   it("shows staged files in a repo with no commits, where there is no HEAD", async () => {

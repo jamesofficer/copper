@@ -2,6 +2,7 @@ import type { IpcApi } from "../../shared/ipc";
 import {
   commitChanges,
   discardChanges,
+  getLocalChangeCount,
   getLocalChanges,
   stageFiles,
   unstageFiles,
@@ -10,6 +11,7 @@ import { listRepositories, listWorktrees } from "../repo/local";
 
 type LocalChangesHandlers = Pick<
   IpcApi,
+  | "getLocalChangeCount"
   | "getLocalChanges"
   | "listWorktrees"
   | "stageFiles"
@@ -21,6 +23,7 @@ type LocalChangesHandlers = Pick<
 interface LocalChangesDependencies {
   listRepositories: typeof listRepositories;
   listWorktrees: typeof listWorktrees;
+  getLocalChangeCount: typeof getLocalChangeCount;
   getLocalChanges: typeof getLocalChanges;
   stageFiles: typeof stageFiles;
   unstageFiles: typeof unstageFiles;
@@ -31,6 +34,27 @@ interface LocalChangesDependencies {
 export function createLocalChangesHandlers(
   dependencies: LocalChangesDependencies,
 ): LocalChangesHandlers {
+  // Git uses one index lock per checkout. Keep calls in invocation order so a
+  // commit cannot race ahead of the stage operation it was meant to include.
+  const pendingWrites = new Map<string, Promise<void>>();
+
+  function serializeMutation<T>(
+    repoPath: string,
+    mutation: () => Promise<T>,
+  ): Promise<T> {
+    const previous = pendingWrites.get(repoPath) ?? Promise.resolve();
+    const result = previous.then(mutation);
+    const tail = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    pendingWrites.set(repoPath, tail);
+    void tail.finally(() => {
+      if (pendingWrites.get(repoPath) === tail) pendingWrites.delete(repoPath);
+    });
+    return result;
+  }
+
   async function assertRegisteredCheckout(repoPath: string): Promise<void> {
     const repositories = await dependencies.listRepositories();
     if (repositories.some((repository) => repository.path === repoPath)) return;
@@ -51,30 +75,37 @@ export function createLocalChangesHandlers(
   }
 
   return {
+    getLocalChangeCount: (repoPath) =>
+      dependencies.getLocalChangeCount(repoPath),
     getLocalChanges: (repoPath) => dependencies.getLocalChanges(repoPath),
     listWorktrees: (repoPath) => dependencies.listWorktrees(repoPath),
-    stageFiles: async (repoPath, paths) => {
-      await assertRegisteredCheckout(repoPath);
-      return dependencies.stageFiles(repoPath, paths);
-    },
-    unstageFiles: async (repoPath, paths) => {
-      await assertRegisteredCheckout(repoPath);
-      return dependencies.unstageFiles(repoPath, paths);
-    },
-    discardChanges: async (repoPath, paths) => {
-      await assertRegisteredCheckout(repoPath);
-      return dependencies.discardChanges(repoPath, paths);
-    },
-    commitChanges: async (repoPath, message) => {
-      await assertRegisteredCheckout(repoPath);
-      return dependencies.commitChanges(repoPath, message);
-    },
+    stageFiles: (repoPath, paths) =>
+      serializeMutation(repoPath, async () => {
+        await assertRegisteredCheckout(repoPath);
+        return dependencies.stageFiles(repoPath, paths);
+      }),
+    unstageFiles: (repoPath, paths) =>
+      serializeMutation(repoPath, async () => {
+        await assertRegisteredCheckout(repoPath);
+        return dependencies.unstageFiles(repoPath, paths);
+      }),
+    discardChanges: (repoPath, paths) =>
+      serializeMutation(repoPath, async () => {
+        await assertRegisteredCheckout(repoPath);
+        return dependencies.discardChanges(repoPath, paths);
+      }),
+    commitChanges: (repoPath, message) =>
+      serializeMutation(repoPath, async () => {
+        await assertRegisteredCheckout(repoPath);
+        return dependencies.commitChanges(repoPath, message);
+      }),
   };
 }
 
 export const localChangesHandlers = createLocalChangesHandlers({
   listRepositories,
   listWorktrees,
+  getLocalChangeCount,
   getLocalChanges,
   stageFiles,
   unstageFiles,
