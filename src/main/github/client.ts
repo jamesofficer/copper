@@ -1,3 +1,4 @@
+import { isRateLimitMessage, RATE_LIMIT_MESSAGE } from "../../shared/rateLimit";
 import type {
   FileStatus,
   MergeMethod,
@@ -24,8 +25,7 @@ import type {
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
-
-const API = "https://api.github.com";
+import { githubRequest, hasGraphQlRateLimitError } from "./rateLimit";
 
 interface GitHubPullSummary {
   number: number;
@@ -62,17 +62,7 @@ async function githubFetch<T>(
   path: string,
   init?: { method: string; body: unknown },
 ): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
-    method: init?.method ?? "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "User-Agent": "pr-reviewer",
-      "X-GitHub-Api-Version": "2022-11-28",
-      ...(init ? { "Content-Type": "application/json" } : {}),
-    },
-    body: init ? JSON.stringify(init.body) : undefined,
-  });
+  const res = await githubRequest(token, path, init);
 
   if (res.status === 401) {
     throw new Error("GitHub rejected your token. Re-check it in settings.");
@@ -80,6 +70,16 @@ async function githubFetch<T>(
   if (res.status === 404) {
     throw new Error(
       "Couldn't find this repository on GitHub. Check its origin remote.",
+    );
+  }
+  if (res.status === 403 || res.status === 429) {
+    const detail = await githubErrorDetail(res);
+    throw new Error(
+      isRateLimitMessage(detail)
+        ? RATE_LIMIT_MESSAGE
+        : detail
+          ? `GitHub: ${detail}`
+          : `GitHub returned status ${res.status}.`,
     );
   }
   if (!res.ok) {
@@ -91,7 +91,14 @@ async function githubFetch<T>(
 
   // Deletes come back as 204 with no body.
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+
+  // A GraphQL rate limit arrives as a 200 whose body carries the error, so it
+  // never reaches the status checks above. Catching it here rather than at each
+  // GraphQL call site means every one of them reports it identically — and by
+  // now the gate has already backed off and given up.
+  const body = (await res.json()) as T;
+  if (hasGraphQlRateLimitError(body)) throw new Error(RATE_LIMIT_MESSAGE);
+  return body;
 }
 
 // The login the stored token belongs to — the renderer uses it to decide
@@ -232,6 +239,109 @@ export async function listPullRequestReviews(
   });
 }
 
+// Everything a PullRequest needs, in one GraphQL selection. REST needs three
+// requests per PR to cover this (summary, detail, reviews), which is what put
+// 100 requests in flight for a 50-PR repo and tripped the secondary rate
+// limit. Kept as a shared fragment so the repo list and the search list can
+// never drift apart.
+const PR_FIELDS = `
+  number
+  title
+  url
+  isDraft
+  state
+  headRefOid
+  additions
+  deletions
+  changedFiles
+  createdAt
+  updatedAt
+  author { __typename login }
+  assignees(first: 20) { nodes { login } }
+  repository { nameWithOwner }
+  latestOpinionatedReviews(first: 50) { nodes { state } }
+  comments { totalCount }
+  reviews(first: 100) { nodes { comments { totalCount } } }
+`;
+
+interface GraphQlPullRequest {
+  number: number;
+  title: string;
+  url: string;
+  isDraft: boolean;
+  state: "OPEN" | "CLOSED" | "MERGED";
+  headRefOid: string;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  createdAt: string;
+  updatedAt: string;
+  author: { __typename: string; login: string } | null;
+  assignees: { nodes: Array<{ login: string } | null> };
+  repository: { nameWithOwner: string };
+  latestOpinionatedReviews: { nodes: Array<{ state: string } | null> } | null;
+  comments: { totalCount: number };
+  reviews: {
+    nodes: Array<{ comments: { totalCount: number } } | null>;
+  } | null;
+}
+
+// REST reports a bot as "renovate[bot]", GraphQL as "renovate" with a Bot
+// typename. The rest of the app is REST-fed (the PR detail, the Author filter,
+// and UserAvatar, which builds avatars.githubusercontent.com/{login}), and
+// "renovate" without the suffix is a different account, so restore the suffix
+// here rather than let a list row disagree with the PR it opens.
+function actorLogin(
+  actor: { __typename: string; login: string } | null,
+): string {
+  if (!actor) return "unknown";
+  return actor.__typename === "Bot" ? `${actor.login}[bot]` : actor.login;
+}
+
+// latestOpinionatedReviews is GitHub's own "one opinionated review per
+// reviewer", so it already applies the rules reviewStatusFrom has to derive by
+// hand from the REST list: newest per reviewer wins, dismissals drop out, and
+// COMMENTED/PENDING reviews never appear.
+function fromGraphQlPullRequest(pull: GraphQlPullRequest): PullRequest {
+  const states = (pull.latestOpinionatedReviews?.nodes ?? []).map(
+    (review) => review?.state,
+  );
+  const reviewStatus: ReviewStatus = states.includes("CHANGES_REQUESTED")
+    ? "changes_requested"
+    : states.includes("APPROVED")
+      ? "approved"
+      : "awaiting_review";
+
+  // Matches REST's comments + review_comments. Deliberately not GraphQL's
+  // totalCommentsCount, which also counts review summary bodies — that would
+  // make a card's count disagree with the PR detail's own count. Only a PR
+  // with more than 100 reviews under-reports, which no real PR reaches.
+  const inlineComments = (pull.reviews?.nodes ?? []).reduce(
+    (total, review) => total + (review?.comments.totalCount ?? 0),
+    0,
+  );
+
+  return {
+    repo: pull.repository.nameWithOwner,
+    number: pull.number,
+    title: pull.title,
+    author: actorLogin(pull.author),
+    draft: pull.isDraft,
+    reviewStatus,
+    headSha: pull.headRefOid.slice(0, 7),
+    url: pull.url,
+    additions: pull.additions,
+    deletions: pull.deletions,
+    changedFiles: pull.changedFiles,
+    comments: pull.comments.totalCount + inlineComments,
+    assignees: (pull.assignees.nodes ?? []).flatMap((assignee) =>
+      assignee ? [assignee.login] : [],
+    ),
+    createdAt: pull.createdAt,
+    updatedAt: pull.updatedAt,
+  };
+}
+
 export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
   if (!repo.includes("/")) {
     throw new Error(
@@ -246,31 +356,46 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
     );
   }
 
-  const summaries = await githubFetch<GitHubPullSummary[]>(
-    token,
-    `/repos/${repo}/pulls?state=open&sort=updated&direction=desc&per_page=50`,
-  );
+  const [owner, name] = repo.split("/");
+  const response = await githubFetch<{
+    data?: {
+      repository?: {
+        pullRequests: { nodes: Array<GraphQlPullRequest | null> };
+      };
+    };
+    errors?: Array<{ message: string }>;
+  }>(token, "/graphql", {
+    method: "POST",
+    body: {
+      query: `query ($owner: String!, $name: String!) {
+        repository(owner: $owner, name: $name) {
+          pullRequests(
+            states: OPEN
+            orderBy: { field: UPDATED_AT, direction: DESC }
+            first: 50
+          ) {
+            nodes { ${PR_FIELDS} }
+          }
+        }
+      }`,
+      variables: { owner, name },
+    },
+  });
 
-  const details = await Promise.all(
-    summaries.map(async (summary) => {
-      const [pull, reviewStatus] = await Promise.all([
-        githubFetch<GitHubPullDetail>(
-          token,
-          `/repos/${repo}/pulls/${summary.number}`,
-        ),
-        getReviewStatus(token, repo, summary.number),
-      ]);
-      return { pull, reviewStatus };
-    }),
-  );
+  // GraphQL answers partial errors with the data it could resolve, and a node
+  // it couldn't comes back as null for the flatMap to skip. So only the absence
+  // of nodes is fatal — raising on any error would throw away a good list.
+  const nodes = response.data?.repository?.pullRequests.nodes;
+  if (!nodes) {
+    const detail = response.errors?.[0]?.message;
+    throw new Error(
+      detail
+        ? `GitHub: ${detail}`
+        : "Couldn't find this repository on GitHub. Check its origin remote.",
+    );
+  }
 
-  return details.map(({ pull, reviewStatus }) =>
-    toPullRequest(repo, pull, reviewStatus),
-  );
-}
-
-interface GitHubSearchIssues {
-  items: Array<{ number: number; repository_url: string }>;
+  return nodes.flatMap((pull) => (pull ? [fromGraphQlPullRequest(pull)] : []));
 }
 
 // Open PRs matching a search qualifier, limited to the repositories added to
@@ -291,39 +416,39 @@ async function searchOpenPullRequests(
   );
   if (registeredSlugs.size === 0) return [];
 
-  const query = encodeURIComponent(`is:pr is:open archived:false ${qualifier}`);
-  const search = await githubFetch<GitHubSearchIssues>(
-    token,
-    `/search/issues?q=${query}&sort=updated&order=desc&per_page=20&advanced_search=true`,
-  );
-
-  const items = search.items.filter((item) => {
-    const repo = item.repository_url.split("/repos/")[1];
-    return registeredSlugs.has(repo.toLowerCase());
+  const response = await githubFetch<{
+    data?: { search: { nodes: Array<GraphQlPullRequest | null> } };
+    errors?: Array<{ message: string }>;
+  }>(token, "/graphql", {
+    method: "POST",
+    body: {
+      query: `query ($q: String!) {
+        search(query: $q, type: ISSUE, first: 20) {
+          nodes { ... on PullRequest { ${PR_FIELDS} } }
+        }
+      }`,
+      variables: {
+        q: `is:pr is:open archived:false sort:updated-desc ${qualifier}`,
+      },
+    },
   });
 
-  const results = await Promise.all(
-    items.map(async (item) => {
-      const repo = item.repository_url.split("/repos/")[1];
-      const [pull, reviewStatus] = await Promise.all([
-        githubFetch<GitHubPullDetail>(
-          token,
-          `/repos/${repo}/pulls/${item.number}`,
-        ),
-        getReviewStatus(token, repo, item.number),
-      ]);
-      return { repo, pull, reviewStatus };
-    }),
-  );
+  const nodes = response.data?.search.nodes;
+  if (!nodes) {
+    const detail = response.errors?.[0]?.message;
+    throw new Error(detail ? `GitHub: ${detail}` : "GitHub search failed.");
+  }
 
   // The search index lags behind a PR closing or merging by a while, so a PR
-  // just closed in the app can still come back as a hit. Each PR was fetched
-  // live above, so trust that state over the search result.
-  return results
-    .filter(({ pull }) => pull.state === "open" && !pull.merged)
-    .map(({ repo, pull, reviewStatus }) =>
-      toPullRequest(repo, pull, reviewStatus),
-    );
+  // just closed in the app can still come back as a hit. The nodes are live PR
+  // objects, so trust their state over the search index.
+  return nodes.flatMap((pull) => {
+    if (pull?.state !== "OPEN") return [];
+    if (!registeredSlugs.has(pull.repository.nameWithOwner.toLowerCase())) {
+      return [];
+    }
+    return [fromGraphQlPullRequest(pull)];
+  });
 }
 
 export function listReviewRequestedPullRequests(): Promise<PullRequest[]> {
@@ -404,14 +529,8 @@ export async function peekPullRequestActivity(
   const cached = activityCache.get(key);
 
   try {
-    const res = await fetch(`${API}/repos/${repo}/pulls/${prNumber}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "User-Agent": "pr-reviewer",
-        "X-GitHub-Api-Version": "2022-11-28",
-        ...(cached ? { "If-None-Match": cached.etag } : {}),
-      },
+    const res = await githubRequest(token, `/repos/${repo}/pulls/${prNumber}`, {
+      headers: cached ? { "If-None-Match": cached.etag } : undefined,
     });
 
     if (res.status === 304 && cached) return cached.activity;
@@ -1503,16 +1622,9 @@ async function fetchRepoFile(
   path: string,
   ref: string,
 ): Promise<string | null> {
-  const res = await fetch(
-    `${API}/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/vnd.github+json",
-        "User-Agent": "pr-reviewer",
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    },
+  const res = await githubRequest(
+    token,
+    `/repos/${repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
   );
   if (!res.ok) return null;
   const body = (await res.json()) as { content?: string; encoding?: string };
