@@ -31,11 +31,23 @@ import typescript from "shiki/langs/typescript.mjs";
 import vue from "shiki/langs/vue.mjs";
 import xml from "shiki/langs/xml.mjs";
 import yaml from "shiki/langs/yaml.mjs";
-import githubDark from "shiki/themes/github-dark.mjs";
-import githubLight from "shiki/themes/github-light.mjs";
+import type { SyntaxThemePair } from "./syntaxTheme";
+import {
+  defaultSyntaxThemeIds,
+  findSyntaxTheme,
+  resolveSyntaxThemeId,
+} from "./syntaxThemeCatalog";
+
+const defaultThemes = [
+  findSyntaxTheme(defaultSyntaxThemeIds.dark)?.registration,
+  findSyntaxTheme(defaultSyntaxThemeIds.light)?.registration,
+].filter((registration) => registration !== undefined);
 
 const highlighter = createHighlighterCoreSync({
-  themes: [githubDark, githubLight],
+  // Only the defaults are registered up front. Resolving a theme into colour
+  // maps costs real work, and the catalogue holds 65 of them, so the rest are
+  // loaded by ensureThemes the first time they are actually asked for.
+  themes: defaultThemes,
   langs: [
     c,
     cpp,
@@ -85,11 +97,31 @@ const highlighter = createHighlighterCoreSync({
 // seconds on a diff that touched it. Lines over the cap render plain, like
 // GitHub does; real code never gets near 2,000 chars, only minified output
 // and one-line prose.
-const themedOptions = {
-  themes: { dark: "github-dark", light: "github-light" },
+const sharedOptions = {
   defaultColor: false,
   tokenizeMaxLineLength: 2000,
 } as const;
+
+const loaded = new Set(highlighter.getLoadedThemes());
+
+// Registers the pair on first use and hands back ids the highlighter will
+// accept, so an id left behind by a Shiki upgrade colours with the default
+// instead of throwing mid-render.
+function ensureThemes(themes: SyntaxThemePair): {
+  dark: string;
+  light: string;
+} {
+  const dark = resolveSyntaxThemeId(themes.dark, "dark");
+  const light = resolveSyntaxThemeId(themes.light, "light");
+  for (const id of [dark, light]) {
+    if (loaded.has(id)) continue;
+    const theme = findSyntaxTheme(id);
+    if (!theme) continue;
+    highlighter.loadThemeSync(theme.registration);
+    loaded.add(id);
+  }
+  return { dark, light };
+}
 
 // Loaded language ids plus their grammar aliases (ts, js, shell, …).
 const knownLanguages = new Set(highlighter.getLoadedLanguages());
@@ -183,11 +215,13 @@ function tokenHtml(token: ThemedToken): string {
 export function highlightToLines(
   text: string,
   language: string,
+  themes: SyntaxThemePair,
 ): string[] | null {
   try {
     const { tokens } = highlighter.codeToTokens(text, {
       lang: language,
-      ...themedOptions,
+      themes: ensureThemes(themes),
+      ...sharedOptions,
     });
     return tokens.map((line) => line.map(tokenHtml).join(""));
   } catch {
@@ -196,6 +230,10 @@ export function highlightToLines(
 }
 
 // Whole-block variant for markdown code fences.
-export function highlightBlock(text: string, language: string): string | null {
-  return highlightToLines(text, language)?.join("\n") ?? null;
+export function highlightBlock(
+  text: string,
+  language: string,
+  themes: SyntaxThemePair,
+): string | null {
+  return highlightToLines(text, language, themes)?.join("\n") ?? null;
 }

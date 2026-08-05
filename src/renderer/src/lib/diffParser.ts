@@ -1,4 +1,5 @@
 import { escapeHtml, highlightToLines } from "./highlighter";
+import type { SyntaxThemePair } from "./syntaxTheme";
 
 export type LineKind = "hunk" | "add" | "del" | "context" | "meta";
 
@@ -21,14 +22,26 @@ export { escapeHtml, highlightToLines, languageForPath } from "./highlighter";
 // deliberately NOT concatenated: the unseen gap between them could open or
 // close anything, and a wrong carried-over state would poison every hunk
 // after it.
-function highlightSegment(segment: DiffLine[], language: string | null): void {
+function highlightSegment(
+  segment: DiffLine[],
+  language: string | null,
+  themes: SyntaxThemePair,
+): void {
   const newSide = segment.filter((line) => line.kind !== "del");
   const oldSide = segment.filter((line) => line.kind !== "add");
   const newHtml = language
-    ? highlightToLines(newSide.map((line) => line.text).join("\n"), language)
+    ? highlightToLines(
+        newSide.map((line) => line.text).join("\n"),
+        language,
+        themes,
+      )
     : null;
   const oldHtml = language
-    ? highlightToLines(oldSide.map((line) => line.text).join("\n"), language)
+    ? highlightToLines(
+        oldSide.map((line) => line.text).join("\n"),
+        language,
+        themes,
+      )
     : null;
   newSide.forEach((line, index) => {
     line.html =
@@ -45,18 +58,22 @@ function highlightSegment(segment: DiffLine[], language: string | null): void {
   });
 }
 
-function applyHighlighting(lines: DiffLine[], language: string | null): void {
+function applyHighlighting(
+  lines: DiffLine[],
+  language: string | null,
+  themes: SyntaxThemePair,
+): void {
   let segment: DiffLine[] = [];
   for (const line of lines) {
     if (line.kind === "hunk") {
-      highlightSegment(segment, language);
+      highlightSegment(segment, language, themes);
       segment = [];
     } else if (line.kind !== "meta") {
       // "\ No newline" markers sit inside a change block — skip, don't split.
       segment.push(line);
     }
   }
-  highlightSegment(segment, language);
+  highlightSegment(segment, language, themes);
 }
 
 // One row of a side-by-side diff. Context/hunk/meta lines appear on both
@@ -93,7 +110,15 @@ export function buildSplitRows(lines: DiffLine[]): SplitRow[] {
   return rows;
 }
 
-export function parsePatch(patch: string, language: string | null): DiffLine[] {
+// The theme pair is a parameter rather than something the highlighter reads
+// off a global: the returned html depends on it, so a caller that re-parses
+// after a theme change must be able to see that in the arguments (and pass it
+// to a memo's dependency list).
+export function parsePatch(
+  patch: string,
+  language: string | null,
+  themes: SyntaxThemePair,
+): DiffLine[] {
   const lines: DiffLine[] = [];
   let oldNumber = 0;
   let newNumber = 0;
@@ -162,7 +187,7 @@ export function parsePatch(patch: string, language: string | null): DiffLine[] {
     newNumber++;
   }
 
-  applyHighlighting(lines, language);
+  applyHighlighting(lines, language, themes);
   return lines;
 }
 

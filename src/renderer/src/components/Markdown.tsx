@@ -10,7 +10,8 @@ import {
 } from "../lib/githubImages";
 import { highlightBlock, resolveLanguage } from "../lib/highlighter";
 import { scrollbar } from "../lib/scrollbar";
-import { tokenColors } from "../lib/syntaxColors";
+import { syntaxBackground, tokenColors } from "../lib/syntaxColors";
+import { useSyntaxThemes } from "../lib/syntaxTheme";
 import AttachmentMedia from "./AttachmentMedia";
 
 interface Props {
@@ -37,13 +38,14 @@ interface CodeProps {
 // code (no className, no newlines) stays plain neutral text — it renders as
 // a chip, and token colors just add noise at that size.
 function Code({ className, children }: CodeProps) {
+  const themes = useSyntaxThemes();
   const language = resolveLanguage(
     /language-([\w-]+)/.exec(className ?? "")?.[1],
   );
   const code =
     typeof children === "string" ? children.replace(/\n$/, "") : null;
 
-  const html = code && language ? highlightBlock(code, language) : null;
+  const html = code && language ? highlightBlock(code, language, themes) : null;
 
   if (html !== null) {
     return (
@@ -213,8 +215,12 @@ const schema = {
 };
 
 export default function Markdown({ children, fontSize = "sm" }: Props) {
+  // Code blocks sit on the syntax theme's own canvas, like the diffs; the
+  // bg.muted in prose is only the fallback until this rule lands on top.
+  // Inline code keeps its neutral chip — it has no token colours to match.
+  const themes = useSyntaxThemes();
   return (
-    <Box css={prose} fontSize={fontSize}>
+    <Box css={[prose, syntaxBackground(themes, "& pre")]} fontSize={fontSize}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         // GitHub allows inline HTML in markdown (bots lean on it for links),

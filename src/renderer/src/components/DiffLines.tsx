@@ -35,7 +35,8 @@ import {
 } from "../lib/explanationStatus";
 import type { ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
-import { tokenColors } from "../lib/syntaxColors";
+import { syntaxBackground, tokenColors } from "../lib/syntaxColors";
+import { useSyntaxThemes } from "../lib/syntaxTheme";
 import AiExplanationCard from "./AiExplanationCard";
 import DiffCommentComposer from "./DiffCommentComposer";
 import DiffCommentThread from "./DiffCommentThread";
@@ -378,16 +379,20 @@ function InlineRows({
   lines,
   ctx,
   expand,
+  background,
 }: {
   lines: DiffLine[];
   ctx?: CommentContext;
   expand?: ExpandContext;
+  background: ReturnType<typeof syntaxBackground>;
 }) {
   return (
     // minW=max-content: inside a scroll container a block element only gets
     // the visible width, so short rows' backgrounds would stop there when
-    // scrolled right. Sizing this to the widest row lets every row fill it.
-    <Box minW="max-content">
+    // scrolled right. Sizing this to the widest row lets every row fill it —
+    // which is also why the theme background is painted here, not on the
+    // root: the root stops at the scrollport width and would leave a seam.
+    <Box minW="max-content" css={background}>
       {lines.map((line, index) => {
         const style = rowStyles[line.kind];
         const anchor = ctx?.anchorOf(line);
@@ -524,10 +529,12 @@ function SplitRows({
   lines,
   ctx,
   expand,
+  background,
 }: {
   lines: DiffLine[];
   ctx?: CommentContext;
   expand?: ExpandContext;
+  background: ReturnType<typeof syntaxBackground>;
 }) {
   const rows = useMemo(() => buildSplitRows(lines), [lines]);
 
@@ -583,7 +590,7 @@ function SplitRows({
                 borderLeftWidth={side === "new" ? "1px" : undefined}
                 css={scrollbar}
               >
-                <Box minW="max-content">
+                <Box minW="max-content" css={background}>
                   {segment.rows.map((row, index) => (
                     <SplitCell
                       // biome-ignore lint/suspicious/noArrayIndexKey: patch rows have no stable id
@@ -667,9 +674,12 @@ function DiffLines({ file, commenting, expansion }: Props) {
 
   const split = mode === "split" || (mode === "dynamic" && wide);
   const language = languageForPath(file.path);
+  // Changing the theme changes the html of every line, so it belongs in the
+  // dependencies of both highlighting memos below.
+  const themes = useSyntaxThemes();
   const lines = useMemo(
-    () => (file.patch ? parsePatch(file.patch, language) : []),
-    [file.patch, language],
+    () => (file.patch ? parsePatch(file.patch, language, themes) : []),
+    [file.patch, language, themes],
   );
 
   const fullFile = expansion?.fullFile ?? null;
@@ -682,9 +692,9 @@ function DiffLines({ file, commenting, expansion }: Props) {
   const fileHtml = useMemo(
     () =>
       fullFile !== null && language
-        ? highlightToLines(fullFile, language)
+        ? highlightToLines(fullFile, language, themes)
         : null,
-    [fullFile, language],
+    [fullFile, language, themes],
   );
 
   // Guard against the fetched file not matching the diff (stale clone, wrong
@@ -996,12 +1006,23 @@ function DiffLines({ file, commenting, expansion }: Props) {
     };
   }
 
+  const background = syntaxBackground(themes);
   return (
     <Box ref={rootRef} {...diffFontStyles} css={tokenColors}>
       {split ? (
-        <SplitRows lines={displayLines} ctx={ctx} expand={expandCtx} />
+        <SplitRows
+          lines={displayLines}
+          ctx={ctx}
+          expand={expandCtx}
+          background={background}
+        />
       ) : (
-        <InlineRows lines={displayLines} ctx={ctx} expand={expandCtx} />
+        <InlineRows
+          lines={displayLines}
+          ctx={ctx}
+          expand={expandCtx}
+          background={background}
+        />
       )}
     </Box>
   );

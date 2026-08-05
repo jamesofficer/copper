@@ -5,7 +5,8 @@ import {
   highlightToLines,
   languageForPath,
 } from "../lib/diffParser";
-import { tokenColors } from "../lib/syntaxColors";
+import { syntaxBackground, tokenColors } from "../lib/syntaxColors";
+import { useSyntaxThemes } from "../lib/syntaxTheme";
 import { diffFontStyles } from "./DiffLines";
 
 interface Props {
@@ -16,16 +17,21 @@ interface Props {
 // Read-only listing of the whole file at the diff's commit — same font and
 // syntax palette as the diff rows, minus the diff chrome.
 export default function FileView({ path, text }: Props) {
+  const themes = useSyntaxThemes();
   const rows = useMemo(() => {
     const language = languageForPath(path);
     const lines = text.split("\n");
     if (lines.at(-1) === "") lines.pop();
-    const html = language ? highlightToLines(text, language) : null;
+    const html = language ? highlightToLines(text, language, themes) : null;
     return lines.map((line, index) => html?.[index] ?? escapeHtml(line));
-  }, [path, text]);
+  }, [path, text, themes]);
 
   return (
-    <Box {...diffFontStyles} css={tokenColors} minW="max-content">
+    <Box
+      {...diffFontStyles}
+      css={[tokenColors, syntaxBackground(themes)]}
+      minW="max-content"
+    >
       {rows.map((html, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: the index IS the line number
         <Flex key={index}>
