@@ -4,6 +4,13 @@ import { app, BrowserWindow, nativeImage, shell } from "electron";
 import { handleAssetRequests, registerAssetScheme } from "./github/assets";
 import { registerIpcHandlers } from "./ipc/router";
 
+// Pin the name rather than leaving it to whatever bundle we happen to run
+// under: it titles the macOS app menu, and safeStorage keys its keychain item
+// by it, so a dev build with an unbranded Electron.app (a git worktree that
+// hasn't run postinstall) would otherwise encrypt secrets under a second name.
+// Must run before the app is ready, since it also fixes the userData path.
+app.setName("Copper");
+
 // Privileged schemes must be declared before the app is ready.
 registerAssetScheme();
 

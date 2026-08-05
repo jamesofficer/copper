@@ -16,7 +16,7 @@ export const accentPalettes = [
 
 export type AccentPalette = (typeof accentPalettes)[number];
 
-export const defaultAccent: AccentPalette = "green";
+export const defaultAccent: AccentPalette = "orange";
 
 const STORAGE_KEY = "accentPalette";
 
