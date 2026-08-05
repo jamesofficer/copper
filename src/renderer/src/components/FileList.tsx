@@ -50,10 +50,14 @@ export default function FileList({
         const dir = slash === -1 ? "" : file.path.slice(0, slash + 1);
         const name = slash === -1 ? file.path : file.path.slice(slash + 1);
         return (
-          <HStack key={file.path} className="group" gap="0" minW="0">
+          // The action sits over the diff counts rather than beside the row:
+          // a button hanging off the edge shrinks the row and reads as though
+          // it belongs to the list, not the file.
+          <Box key={file.path} className="group" position="relative">
             <Box
               as="button"
-              flex="1"
+              display="block"
+              w="full"
               minW="0"
               onClick={() => onSelect(file.path)}
               textAlign="left"
@@ -102,6 +106,7 @@ export default function FileList({
                   fontFamily="mono"
                   fontSize="2xs"
                   flexShrink="0"
+                  _groupHover={rowAction ? { opacity: 0 } : undefined}
                 >
                   <CommentCountBadge count={comments} />
                   <ExplanationCountBadge count={explanations} />
@@ -121,9 +126,12 @@ export default function FileList({
             </Box>
             {rowAction && (
               <IconButton
+                position="absolute"
+                right="1"
+                top="50%"
+                transform="translateY(-50%)"
                 size="2xs"
                 variant="ghost"
-                flexShrink="0"
                 aria-label={`${rowAction.label} ${file.path}`}
                 title={rowAction.label}
                 opacity="0"
@@ -134,7 +142,7 @@ export default function FileList({
                 {rowAction.icon}
               </IconButton>
             )}
-          </HStack>
+          </Box>
         );
       })}
     </Stack>
