@@ -51,7 +51,7 @@ export default function WorktreeSelect({ worktrees, value, onChange }: Props) {
         <Select.Trigger cursor="pointer" title="Switch worktree">
           <HStack gap="1.5" minW="0" color="fg.muted">
             <LuGitBranch size={12} />
-            <Text fontFamily="mono" fontSize="xs" truncate>
+            <Text as="span" fontFamily="mono" fontSize="xs" truncate>
               <Select.ValueText placeholder="Select worktree" />
             </Text>
           </HStack>
