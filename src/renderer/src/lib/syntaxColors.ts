@@ -14,9 +14,15 @@ export const tokenColors = {
 // code — token colours were designed against it, so a diff keeps the app
 // background only until the user picks a theme whose canvas differs. Like
 // tokenColors, the colour-mode class picks which half of the pair applies.
-export function syntaxBackground(themes: SyntaxThemePair) {
+// The selector targets a descendant instead of the element itself (e.g.
+// "& pre" for markdown's code blocks).
+export function syntaxBackground(themes: SyntaxThemePair, selector = "&") {
   return {
-    ".dark &": { backgroundColor: findSyntaxTheme(themes.dark)?.bg },
-    ".light &": { backgroundColor: findSyntaxTheme(themes.light)?.bg },
+    [`.dark ${selector}`]: {
+      backgroundColor: findSyntaxTheme(themes.dark)?.bg,
+    },
+    [`.light ${selector}`]: {
+      backgroundColor: findSyntaxTheme(themes.light)?.bg,
+    },
   } as const;
 }

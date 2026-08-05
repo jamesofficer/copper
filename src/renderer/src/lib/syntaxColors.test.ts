@@ -21,4 +21,21 @@ describe("syntaxBackground", () => {
     expect(rules[".dark &"].backgroundColor).toBeTruthy();
     expect(rules[".light &"].backgroundColor).toBeTruthy();
   });
+
+  // Markdown scopes the background to its code blocks — the selector must
+  // land inside the mode rule, not replace it, or the wrong mode's canvas
+  // would apply to every block.
+  it("scopes a descendant selector inside each mode rule", () => {
+    const rules = syntaxBackground(
+      { dark: "tokyo-night", light: "kanagawa-lotus" },
+      "& pre",
+    );
+
+    expect(rules[".dark & pre"].backgroundColor).toBe(
+      findSyntaxTheme("tokyo-night")?.bg,
+    );
+    expect(rules[".light & pre"].backgroundColor).toBe(
+      findSyntaxTheme("kanagawa-lotus")?.bg,
+    );
+  });
 });

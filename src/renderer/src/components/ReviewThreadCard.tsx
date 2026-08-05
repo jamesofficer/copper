@@ -5,7 +5,7 @@ import type { ReviewComment } from "../../../shared/types";
 import { type DiffLine, languageForPath, parsePatch } from "../lib/diffParser";
 import { formatThreadRange, type ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
-import { tokenColors } from "../lib/syntaxColors";
+import { syntaxBackground, tokenColors } from "../lib/syntaxColors";
 import { useSyntaxThemes } from "../lib/syntaxTheme";
 import DiffCommentThread from "./DiffCommentThread";
 
@@ -113,7 +113,10 @@ export default function ReviewThreadCard({
         <Box
           overflowX="auto"
           borderBottomWidth="1px"
-          css={[scrollbar, tokenColors]}
+          // The theme background sits on the scroll container: its own
+          // background doesn't scroll with the content, so it always fills
+          // the visible area however wide the hunk is.
+          css={[scrollbar, tokenColors, syntaxBackground(themes)]}
           fontFamily="'JetBrains Mono', monospace"
           fontSize="13px"
           lineHeight="1.6"
