@@ -39,7 +39,7 @@ Analysis is **explicitly user-triggered** (an "Analyse PR" button — never auto
 
 ### Pre-review findings pass
 
-Also explicitly user-triggered (a "Find issues" button in the Review tab). `analysis/findings.ts` runs an **agentic tool loop** — the model gets the same PR context as the analysis plus the repo tools (`read_file`/`grep_repo`/`list_files`/`git_log`, shared with the chat) and ends by calling a `report_findings` structured-output tool. The point of the tools is to look *beyond the diff*: the standout `blast_radius` category greps for callers of a changed function/signature and reports the ones the diff didn't update. Both providers report findings by **calling a `report_findings` tool** rather than via structured-output formatting — the API path is a manual tool loop (final round forces `report_findings` so it always commits); the Codex path (`runFindingsAgentQuery`) exposes `report_findings` as an MCP tool whose handler captures the input, because the SDK's `outputFormat: json_schema` returns empty when combined with MCP repo tools (a "success" result with no `structured_output`). Each finding has a `category`, `severity` (reuses `RiskSeverity`), title, markdown `body`, a single diff anchor (`path` + new-file `line`), and a ready-to-post `suggestion`. `findingsNormalize.ts` (pure, unit-tested) validates every finding against the diff: the path must be a changed file and the line must sit in its diff (snapped to the nearest in-diff line if the model was slightly off, dropped if unanchorable), then assigns a **stable id** = `sha1(category|path|line)` so a re-run of the same issue keeps its identity, and dedups/sorts high→low. Runs are cached by head SHA in `~/.pr-reviewer/findings.json`; the user's per-finding **resolutions** (`accepted`/`dismissed`) live separately in `finding-resolutions.json` keyed per PR, so they survive re-runs and never nag twice — the store joins them onto each finding as `resolution` at read time. IPC: `getFindings` (cache-only, null if never run), `findIssues` (runs the model; `force` skips the cache), `setFindingResolution` (`"open"` clears it). Trust principle: the agent proposes, the human disposes — nothing is posted to GitHub automatically.
+Also explicitly user-triggered (a "Find issues" button in the Review tab). `analysis/findings.ts` runs an **agentic tool loop** — the model gets the same PR context as the analysis plus the repo tools (`read_file`/`grep_repo`/`list_files`/`git_log`, shared with the chat) and ends by calling a `report_findings` structured-output tool. The point of the tools is to look *beyond the diff*: the standout `blast_radius` category greps for callers of a changed function/signature and reports the ones the diff didn't update. Both providers report findings by **calling a `report_findings` tool** rather than via structured-output formatting — the API path is a manual tool loop (final round forces `report_findings` so it always commits); the Codex path (`runFindingsAgentQuery`) exposes `report_findings` as an MCP tool whose handler captures the input, because the SDK's `outputFormat: json_schema` returns empty when combined with MCP repo tools (a "success" result with no `structured_output`). Each finding has a `category`, `severity` (reuses `RiskSeverity`), title, markdown `body`, a single diff anchor (`path` + new-file `line`), and a ready-to-post `suggestion`. `findingsNormalize.ts` (pure, covered by `findingsNormalize.test.ts`) validates every finding against the diff: the path must be a changed file and the line must sit in its diff (snapped to the nearest in-diff line if the model was slightly off, dropped if unanchorable), then assigns a **stable id** = `sha1(category|path|line)` so a re-run of the same issue keeps its identity, and dedups/sorts high→low. Runs are cached by head SHA in `~/.pr-reviewer/findings.json`; the user's per-finding **resolutions** (`accepted`/`dismissed`) live separately in `finding-resolutions.json` keyed per PR, so they survive re-runs and never nag twice — the store joins them onto each finding as `resolution` at read time. IPC: `getFindings` (cache-only, null if never run), `findIssues` (runs the model; `force` skips the cache), `setFindingResolution` (`"open"` clears it). Trust principle: the agent proposes, the human disposes — nothing is posted to GitHub automatically.
 
 ## Project structure
 
@@ -50,13 +50,15 @@ src/
 │   ├── ipc/router.ts       # implements IpcApi, registers ipcMain handlers
 │   ├── github/             # auth.ts (reads stored GitHub token), client.ts (live fetch — open PRs via one GraphQL query + PR file diffs over REST), rateLimit.ts (the single door to api.github.com — concurrency pool + Retry-After backoff), assets.ts (gh-asset:// protocol — token-authenticated fetch of private attachment images)
 │   ├── repo/               # local.ts (repo registry + folder picker), workspace.ts (bare blobless clones under ~/.pr-reviewer/repos), git.ts (git plumbing: fetch PR refs, read files/log at a commit)
-│   ├── analysis/           # pipeline.ts (real — one Codex call, structured output), cache.ts (disk-backed, ~/.pr-reviewer/analyses.json), findings.ts (pre-review agent pass — agentic tool loop → structured findings), findingsNormalize.ts (pure anchor-validation/snapping/dedup, unit-tested)
+│   ├── analysis/           # pipeline.ts (real — one Codex call, structured output), cache.ts (disk-backed, ~/.pr-reviewer/analyses.json), findings.ts (pre-review agent pass — agentic tool loop → structured findings), findingsNormalize.ts (pure anchor-validation/snapping/dedup, covered by findingsNormalize.test.ts)
 │   ├── agent/              # session.ts (Q&A — streaming tool loop), tools.ts (read_file/list_files/grep_repo/git_log against the workspace)
 │   ├── settings/keys.ts    # validate (test API call) + save/clear keys
 │   └── store/              # secrets.ts (safeStorage-encrypted API keys), drafts.ts (draft review comments, ~/.pr-reviewer/drafts.json), findings.ts (findings runs + per-PR resolutions, ~/.pr-reviewer/findings.json + finding-resolutions.json), db.ts (SQLite — stub)
 ├── preload/                # index.ts (window.api bridge), index.d.ts (Window typing)
 ├── renderer/src/           # App.tsx, theme.ts, screens/{Welcome,Review}.tsx (Review = tab shell), components/{PullRequestOverview,PullRequestPreview,PullRequestCard,OpenPullRequestList,UserAvatar,CommentCountBadge,CommentCard,CommentComposer,CommitTimelineGroup,RelativeTime,MarkdownEditor,NewPullRequestDialog,HomeSidebar,RepositoryList,ChangesView,CommitList,ReviewPanel,AnalysisNav,AnalysisDetail,FindingsPane,FindingCard,ChatPanel,FileDiffCard,RiskBadge,RiskSeverityBadge,DiffView,DiffLines,DiffCommentThread,DiffCommentComposer,DraftCommentCard,ReviewThreadCard,FileList,FileView,Markdown,SettingsDialog,ReviewSettings,ui/toaster}.tsx, lib/{diffParser,fileStatus,scrollbar,queryClient,recentPrs,reviewPersonality,reviewComments,usePanelWidth,labelColor,githubImages,prFilters}.ts
 └── shared/                 # types.ts, ipc.ts, rateLimit.ts (RATE_LIMIT_MESSAGE + isRateLimitMessage — main throws it, the renderer's retry rule matches it) — the contract between processes
+
+Tests sit beside their subject: `shared/rateLimit.test.ts`, `main/github/rateLimit.test.ts`, `main/analysis/findingsNormalize.test.ts`, `renderer/src/lib/reviewComments.test.ts`. `vitest.config.ts` is at the repo root.
 ```
 
 ## Current status (as of 2026-07-14)
@@ -84,10 +86,47 @@ Roadmap (rough order):
 ## Development
 
 - `pnpm dev` — run the app. `pnpm typecheck` — both tsconfig projects. `pnpm build` — production build.
+- `pnpm test` — Vitest, single run. `pnpm test:watch` — watch mode. Config in `vitest.config.ts` (deliberately a separate file from `electron.vite.config.ts`, which describes the three app bundles and is irrelevant to unit tests). Tests live beside the code as `*.test.ts`.
+  - **Environment is `node`, not jsdom.** Everything covered so far is main-process code or a renderer module importing nothing but types. Component tests would need jsdom plus a Chakra/TanStack harness — a separate decision, deliberately not paid for yet.
+  - **No `globals: true`** — import `describe`/`it`/`expect` from `vitest`. Both tsconfigs include `src/**/*`, so test files are typechecked by `pnpm typecheck`; explicit imports keep that working without adding a `types` entry to two tsconfigs.
+  - **Module-level state must be reset per test.** `github/rateLimit.ts` keeps its pool and shared pause in module scope, so its tests call `vi.resetModules()` and re-`import()` in a helper rather than sharing one instance — otherwise a `pausedUntil` left behind stalls every later test.
+  - **Use fake timers for backoff, real timers for concurrency.** `vi.advanceTimersByTimeAsync` drives the retry waits so the suite doesn't actually sleep; the concurrency test needs real timers because it has no backoff to skip.
+  - Tests are worth only what they catch: the rate-limit and normalisation suites were checked by mutating the source (breaking the pause loop, the dedup, the snapping, the sort) and confirming a test went red for each. That found one weak test and one assertion that could never fire — both fixed. Where a mutation is *not* caught, check whether it is an equivalent mutant before adding a test: the `-` skip in `validNewLines` is unreachable, since a deleted line already fails the condition below it.
 - `pnpm format` — Biome formatter (write). `pnpm lint` — Biome linter (check only). `pnpm check` — Biome format + lint + import sorting (write). Config in `biome.json`: 2-space indent, double quotes, respects `.gitignore`.
 - pnpm 10 blocks dependency install scripts; `electron` and `esbuild` are allowlisted in package.json (`pnpm.onlyBuiltDependencies`). If `node_modules/electron/dist` is missing after install, run `node node_modules/electron/install.js`.
 - Branding: the app is "Reviewr" (`productName` in package.json). Icon source is `resources/icon.svg` → rendered to `resources/icon.png` (1024px, via `rsvg-convert`) → `build/icon.icns` (via `sips` + `iconutil`). The main process sets the dock icon at runtime (`setDockIcon` in `main/index.ts`). Because dev runs the stock Electron binary, `scripts/brand-dev-electron.sh` (postinstall) rewrites the bundled Electron.app's Info.plist name, swaps its icns, and re-signs it ad-hoc so the dock says "Reviewr" during `pnpm dev`.
-- Pinned: vite 7 + @vitejs/plugin-react 5 (electron-vite 5 doesn't support vite 8 yet).
+- Pinned: vite 7 + @vitejs/plugin-react 5 (electron-vite 5 doesn't support vite 8 yet). Vitest 4 accepts vite ^6/^7/^8 and reuses the installed vite, so it adds no second copy.
+
+## Testing policy — write the test first
+
+**New logic is written test-first, red-green-refactor.** Not a suggestion: the burden is on the change to explain why it is exempt, not on the reviewer to ask for tests.
+
+1. **Red.** Write the failing test and *run it*. A test that has never failed has not been shown to test anything.
+2. **Green.** Write the least code that passes it.
+3. **Refactor.** Clean up with the test as the safety net.
+
+### What must be test-first
+
+- Pure logic anywhere: parsing, normalisation, filtering, sorting, id/hash derivation, formatting.
+- Main-process logic: anything in `main/` that isn't a thin pass-through to an API call.
+- **Bug fixes, without exception.** Reproduce the bug as a failing test *before* the fix. That test is the deliverable — it is what stops the bug coming back.
+- Anything that crosses the main/renderer boundary, since the compiler can't check a string that travels over IPC.
+
+### What is exempt for now
+
+- React components, until the harness in issue #17 exists (jsdom project, provider wrapper, typed `window.api` fake). Do not hand-roll a one-off jsdom setup to get around this — `lib/colorMode.ts` calls `window.matchMedia` at module scope, so it throws on import under jsdom without a setup file, and the 69-method `IpcApi` needs one shared fake rather than 35 ad-hoc ones.
+- Thin wrappers whose whole body is one `fetch`/`git` call with no branching. Test the logic that reads their result instead.
+- Electron lifecycle and window setup.
+
+### Rules that make the tests worth having
+
+- **Prove the test can fail, and check *which* assertion caught it.** Break the code, watch it go red, put it back. Both weak spots in the first suites were found this way: a shared-pause case that passed against the reverted fix, and a fail-fast case where the mutation was caught by the test timeout while the assertion beneath it could never have fired. "Something went red" is not the whole answer.
+- **Never assert on real elapsed time.** A bound like `Date.now() - started < 1000` passes locally forever and fails on a loaded CI runner, so its only possible failures are false ones. Assert the observable behaviour instead — a call count, a resolved value — and let the test timeout catch a genuine hang.
+- **Assert on behaviour, not incidental shape.** Pin the contract a caller depends on, not the exact wording of a log line.
+- **Name the test as the claim it makes** — "promotes an orphaned reply to a root rather than losing it", not "works correctly".
+- **Comment the non-obvious why**, in the same voice as the code: what breaks in the product if this behaviour regresses.
+- **A test that needs the network, the clock, or a real repo is not a unit test.** Inject the seam (`vi.stubGlobal`, fake timers) or move the logic somewhere testable.
+- Run `pnpm test` with `pnpm typecheck` and `pnpm lint` before committing.
 
 ## Conventions
 
@@ -97,4 +136,6 @@ Roadmap (rough order):
 - Component props: `interface Props {}` (or a descriptive exported name if they must be exported).
 - No unnecessary comments; TODOs mark unimplemented stubs.
 - Formatting and linting are handled by Biome (2-space indent, double quotes). Run `pnpm check` before committing.
+- New logic is written test-first — see the Testing policy above.
+- Tests are named `*.test.ts` and sit beside the file they cover.
 - Conventional commits (`feat:`, `fix:`, `chore:`).
