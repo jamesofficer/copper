@@ -322,6 +322,34 @@ describe("stageFiles and unstageFiles", () => {
     expect(changes.untracked).toEqual(["first.txt"]);
     expect(exists("first.txt")).toBe(true);
   });
+
+  it("unstages in a repo with no commits even after the file was edited", async () => {
+    await write("first.txt", "staged\n");
+    await stageFiles(repo, ["first.txt"]);
+    await write("first.txt", "edited after staging\n");
+
+    await unstageFiles(repo, ["first.txt"]);
+
+    const changes = await getLocalChanges(repo);
+    expect(changes.staged).toEqual([]);
+    expect(changes.untracked).toEqual(["first.txt"]);
+    expect(await readFile(join(repo, "first.txt"), "utf8")).toBe(
+      "edited after staging\n",
+    );
+  });
+
+  it("fully unstages a rename when given both of its paths", async () => {
+    await commitInitial();
+    await git("mv", "tracked.txt", "renamed.txt");
+
+    await unstageFiles(repo, ["renamed.txt", "tracked.txt"]);
+
+    expect((await git("diff", "--cached", "--name-only")).trim()).toBe("");
+    const changes = await getLocalChanges(repo);
+    expect(changes.staged).toEqual([]);
+    expect(changes.untracked).toEqual(["renamed.txt"]);
+    expect(changes.unstaged.map((file) => file.path)).toContain("tracked.txt");
+  });
 });
 
 describe("commitChanges", () => {

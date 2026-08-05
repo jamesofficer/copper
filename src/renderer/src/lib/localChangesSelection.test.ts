@@ -3,6 +3,7 @@ import type { PullRequestFile } from "../../../shared/types";
 import {
   localChangesBulkLabel,
   resolveLocalChangeSelection,
+  withRenameSources,
 } from "./localChangesSelection";
 
 function file(path: string, patch: string): PullRequestFile {
@@ -21,6 +22,26 @@ describe("localChangesBulkLabel", () => {
     expect(localChangesBulkLabel("staged", true)).toBe("Unstage shown");
     expect(localChangesBulkLabel("unstaged", true)).toBe("Stage shown");
     expect(localChangesBulkLabel("unstaged", false)).toBe("Stage all");
+  });
+});
+
+describe("withRenameSources", () => {
+  it("adds a staged rename's old path so both index entries unstage", () => {
+    const renamed = { ...file("new.ts", "diff"), previousPath: "old.ts" };
+    const plain = file("plain.ts", "diff");
+
+    expect(withRenameSources([renamed, plain], ["new.ts", "plain.ts"])).toEqual(
+      ["new.ts", "plain.ts", "old.ts"],
+    );
+  });
+
+  it("leaves paths alone when nothing selected is a rename", () => {
+    const renamed = { ...file("new.ts", "diff"), previousPath: "old.ts" };
+    const plain = file("plain.ts", "diff");
+
+    expect(withRenameSources([renamed, plain], ["plain.ts"])).toEqual([
+      "plain.ts",
+    ]);
   });
 });
 

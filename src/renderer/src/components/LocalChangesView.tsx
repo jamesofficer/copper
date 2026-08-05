@@ -36,6 +36,7 @@ import {
   type LocalChangeSelection,
   localChangesBulkLabel,
   resolveLocalChangeSelection,
+  withRenameSources,
 } from "../lib/localChangesSelection";
 import { scrollbar } from "../lib/scrollbar";
 import { usePanelWidth } from "../lib/usePanelWidth";
@@ -230,7 +231,9 @@ export default function LocalChangesView({ path }: Props) {
                     setSelection({ area: "staged", path: file })
                   }
                   bulkLabel={localChangesBulkLabel("staged", Boolean(query))}
-                  onBulk={(paths) => unstage.mutate(paths)}
+                  onBulk={(paths) =>
+                    unstage.mutate(withRenameSources(staged, paths))
+                  }
                   busy={writesPending}
                   nameColor="green.fg"
                   actions={[
@@ -238,7 +241,8 @@ export default function LocalChangesView({ path }: Props) {
                       icon: <LuMinus />,
                       label: "Unstage",
                       disabled: writesPending,
-                      onRun: (path) => unstage.mutate([path]),
+                      onRun: (path) =>
+                        unstage.mutate(withRenameSources(staged, [path])),
                     },
                   ]}
                 />

@@ -15,6 +15,22 @@ export function localChangesBulkLabel(
   return `${verb} ${filtered ? "shown" : "all"}`;
 }
 
+// A staged rename is one row but two index entries; unstaging only the new
+// path would leave the old path's deletion staged.
+export function withRenameSources(
+  files: PullRequestFile[],
+  paths: string[],
+): string[] {
+  const wanted = new Set(paths);
+  const result = [...paths];
+  for (const file of files) {
+    if (file.previousPath && wanted.has(file.path)) {
+      result.push(file.previousPath);
+    }
+  }
+  return result;
+}
+
 interface ResolvedLocalChange {
   file: PullRequestFile | null;
   area: LocalChangeArea | null;

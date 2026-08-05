@@ -355,7 +355,10 @@ export async function unstageFiles(
     } else {
       // No HEAD to restore from yet — the first commit's staged files can
       // only leave the index by being removed from it.
-      await git(repoPath, ["rm", "--cached", "-r", "--", ...paths]);
+      // "-f" because without it git refuses when the staged content matches
+      // neither the working file nor HEAD (and there is no HEAD here); with
+      // "--cached" it never touches the working tree.
+      await git(repoPath, ["rm", "--cached", "-r", "-f", "--", ...paths]);
     }
   } catch (error) {
     throw gitError(error, "Couldn't unstage those files.");
