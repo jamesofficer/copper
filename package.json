@@ -1,6 +1,6 @@
 {
   "name": "pr-reviewer",
-  "productName": "Reviewr",
+  "productName": "Copper",
   "version": "0.1.0",
   "description": "Guided, agent-assisted pull request review",
   "author": "James Officer",

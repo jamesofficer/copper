@@ -1,5 +1,5 @@
-appId: com.jamesofficer.reviewr
-productName: Reviewr
+appId: com.jamesofficer.copper
+productName: Copper
 directories:
   output: dist
 files:
