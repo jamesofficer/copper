@@ -2,6 +2,7 @@ import {
   Box,
   Button,
   Center,
+  Collapsible,
   Flex,
   Heading,
   HStack,
@@ -13,7 +14,13 @@ import {
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { LuMinus, LuPlus, LuSearch, LuUndo2 } from "react-icons/lu";
+import {
+  LuChevronRight,
+  LuMinus,
+  LuPlus,
+  LuSearch,
+  LuUndo2,
+} from "react-icons/lu";
 import { useDebounce } from "use-debounce";
 import type { PullRequestFile } from "../../../shared/types";
 import { scrollbar } from "../lib/scrollbar";
@@ -222,6 +229,7 @@ export default function LocalChangesView({ path }: Props) {
                   bulkLabel="Unstage all"
                   onBulk={(paths) => unstage.mutate(paths)}
                   busy={unstage.isPending}
+                  nameColor="green.fg"
                   actions={[
                     {
                       icon: <LuMinus />,
@@ -312,6 +320,8 @@ interface GroupProps {
   onBulk(paths: string[]): void;
   actions: RowAction[];
   busy: boolean;
+  // Tints the file names; the staged group carries its state on every row.
+  nameColor?: string;
 }
 
 // One side of the index, with its bulk action in the header. Empty groups
@@ -325,20 +335,34 @@ function FileGroup({
   onBulk,
   actions,
   busy,
+  nameColor,
 }: GroupProps) {
   if (files.length === 0) return null;
 
   return (
-    <Stack gap="1">
-      <HStack px="1" justify="space-between" className="group">
-        <Heading
-          size="xs"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          {title} ({files.length})
-        </Heading>
+    // Open by default: a collapsed group would hide work from the person
+    // deciding what to commit. The trigger and the bulk action are siblings,
+    // not nested — Collapsible.Trigger is itself a button.
+    <Collapsible.Root defaultOpen>
+      <HStack px="1" gap="1">
+        <Collapsible.Trigger flex="1" cursor="pointer" textAlign="left">
+          <HStack gap="1.5" color="fg.muted">
+            <Collapsible.Indicator
+              transition="transform 0.2s"
+              _open={{ transform: "rotate(90deg)" }}
+            >
+              <LuChevronRight size="12" />
+            </Collapsible.Indicator>
+            <Heading
+              size="xs"
+              color="fg.muted"
+              textTransform="uppercase"
+              letterSpacing="wider"
+            >
+              {title} ({files.length})
+            </Heading>
+          </HStack>
+        </Collapsible.Trigger>
         <Button
           size="2xs"
           variant="ghost"
@@ -348,12 +372,17 @@ function FileGroup({
           {bulkLabel}
         </Button>
       </HStack>
-      <FileList
-        files={files}
-        selectedPath={selectedPath}
-        onSelect={onSelect}
-        rowActions={actions}
-      />
-    </Stack>
+      <Collapsible.Content>
+        <Box pt="1">
+          <FileList
+            files={files}
+            selectedPath={selectedPath}
+            onSelect={onSelect}
+            rowActions={actions}
+            nameColor={nameColor}
+          />
+        </Box>
+      </Collapsible.Content>
+    </Collapsible.Root>
   );
 }

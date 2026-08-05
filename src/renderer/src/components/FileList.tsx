@@ -22,6 +22,9 @@ interface Props {
   // stage/discard in the Current changes view. Undefined leaves the rows
   // action-free, as the PR views want them.
   rowActions?: RowAction[];
+  // Tints the file name — the staged group uses it so a row carries its own
+  // state, rather than that state living only in the heading above it.
+  nameColor?: string;
 }
 
 export interface RowAction {
@@ -49,6 +52,7 @@ export default function FileList({
   commentCounts,
   explanationCounts,
   rowActions,
+  nameColor,
 }: Props) {
   const display = useFilePathDisplay();
 
@@ -95,7 +99,13 @@ export default function FileList({
                   {meta.label}
                 </Text>
                 <Box flex="1" minW="0" title={file.path}>
-                  <Text as="span" fontSize="xs" display="block" truncate>
+                  <Text
+                    as="span"
+                    fontSize="xs"
+                    display="block"
+                    color={nameColor}
+                    truncate
+                  >
                     {display === "inline" && (
                       <Text as="span" color="fg.muted">
                         {dir}
