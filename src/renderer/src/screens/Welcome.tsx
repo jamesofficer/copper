@@ -25,6 +25,7 @@ import {
 } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
 import LocalChangesView, {
+  localChangeCountQueryOptions,
   localChangesQueryOptions,
 } from "../components/LocalChangesView";
 import NewPullRequestDialog from "../components/NewPullRequestDialog";
@@ -100,15 +101,18 @@ export default function Welcome({
       ? selectedWorktree
       : (active?.path ?? "");
 
-  // Same query LocalChangesView owns — this observer feeds the tab label's
-  // file count and, while that tab is showing, the top bar's branch label and
-  // refresh button. Enabled whichever tab is up so the count shows before the
-  // tab is opened; it's a cheap local git call.
-  const changesQuery = useQuery({
-    ...localChangesQueryOptions(worktreePath),
+  // The always-visible badge uses porcelain status only. Building every file
+  // patch is deferred until Current changes opens, where this second observer
+  // shares LocalChangesView's detailed query.
+  const countQuery = useQuery({
+    ...localChangeCountQueryOptions(worktreePath),
     enabled: Boolean(active),
   });
-  const changedCount = changesQuery.data?.files.length;
+  const changesQuery = useQuery({
+    ...localChangesQueryOptions(worktreePath),
+    enabled: Boolean(active) && localChangesTab,
+  });
+  const changedCount = countQuery.data;
 
   function openCreatedPullRequest(pr: PullRequest) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
@@ -183,6 +187,7 @@ export default function Welcome({
                   loading={changesQuery.isFetching}
                   onClick={() => {
                     void worktreesQuery.refetch();
+                    void countQuery.refetch();
                     void changesQuery.refetch();
                   }}
                 >
@@ -273,7 +278,9 @@ export default function Welcome({
 
           <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
             {active ? (
-              <LocalChangesView key={worktreePath} path={worktreePath} />
+              localChangesTab ? (
+                <LocalChangesView key={worktreePath} path={worktreePath} />
+              ) : null
             ) : (
               <Center h="full" p="4">
                 <Text color="fg.muted" fontSize="sm">

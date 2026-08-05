@@ -295,13 +295,26 @@ export interface Worktree {
   isMain: boolean;
 }
 
-// Uncommitted work in a registered local checkout — staged + unstaged changes
-// plus untracked files, shaped like a PR's changed files so the diff UI
-// renders them unchanged.
+// Uncommitted work in a registered local checkout, split the way git sees it.
+// Each entry is shaped like a PR's changed file so the diff UI renders them
+// unchanged.
 export interface LocalChanges {
   // Current branch of the checkout; null on a detached HEAD.
   branch: string | null;
-  files: PullRequestFile[];
+  // The index against HEAD — what a commit would record.
+  staged: PullRequestFile[];
+  // The working tree against the index, untracked files included. A partially
+  // staged path appears here AND in staged — that is git's model.
+  unstaged: PullRequestFile[];
+  // Which of the unstaged paths git doesn't track yet. Discarding one deletes
+  // it instead of reverting it, so the confirmation needs to know for certain.
+  untracked: string[];
+}
+
+// The commit a Current-changes commit produced, for the confirmation toast.
+export interface CommitResult {
+  sha: string;
+  subject: string;
 }
 
 // "attention" = changed logic worth careful thought, "routine" = ordinary

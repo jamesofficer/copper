@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type {
+  CommitResult,
   FileStatus,
   LocalChanges,
   PullRequestFile,
@@ -23,7 +24,13 @@ async function git(repoPath: string, args: string[]): Promise<string> {
   const { stdout } = await run(
     "git",
     ["-C", repoPath, "-c", "core.quotepath=off", ...args],
-    { maxBuffer: 64 * 1024 * 1024 },
+    {
+      maxBuffer: 64 * 1024 * 1024,
+      // Every path supplied by the renderer is a filename, never a pathspec.
+      // Without literal mode, names such as pages/[id].tsx can match and
+      // mutate different files than the user selected.
+      env: { ...process.env, GIT_LITERAL_PATHSPECS: "1" },
+    },
   );
   return stdout;
 }
@@ -152,18 +159,32 @@ export function parseGitDiff(output: string): PullRequestFile[] {
   return files;
 }
 
-// Staged + unstaged changes in one diff against HEAD.
-async function trackedChanges(repoPath: string): Promise<PullRequestFile[]> {
-  const diffArgs = ["-M", "--no-color", "--no-ext-diff"];
-  let output: string;
+const diffArgs = ["-M", "--no-color", "--no-ext-diff"];
+
+async function hasHead(repoPath: string): Promise<boolean> {
   try {
-    output = await git(repoPath, ["diff", "HEAD", ...diffArgs]);
+    await git(repoPath, ["rev-parse", "--verify", "HEAD"]);
+    return true;
   } catch {
-    // A repo with no commits yet has no HEAD — diff against the empty tree
-    // so staged files still show.
-    output = await git(repoPath, ["diff", emptyTree, ...diffArgs]);
+    return false;
   }
-  return parseGitDiff(output);
+}
+
+// The index against HEAD — what a commit would record.
+async function stagedChanges(repoPath: string): Promise<PullRequestFile[]> {
+  // Only an unborn repository uses the empty tree. A valid HEAD whose diff
+  // fails must surface that failure rather than making the whole index look
+  // newly added.
+  const base = (await hasHead(repoPath)) ? "HEAD" : emptyTree;
+  return parseGitDiff(
+    await git(repoPath, ["diff", "--cached", base, ...diffArgs]),
+  );
+}
+
+// The working tree against the index — what a commit would leave behind.
+// Needs no HEAD, so it works in a repo with no commits.
+async function unstagedChanges(repoPath: string): Promise<PullRequestFile[]> {
+  return parseGitDiff(await git(repoPath, ["diff", ...diffArgs]));
 }
 
 async function untrackedFile(
@@ -233,23 +254,160 @@ async function currentBranch(repoPath: string): Promise<string | null> {
   }
 }
 
-// Uncommitted work in a registered local checkout — staged + unstaged changes
-// plus untracked files — shaped like a PR's changed files so the diff UI
+function byPath(files: PullRequestFile[]): PullRequestFile[] {
+  // "git rm --cached" leaves a path both deleted-in-index and untracked;
+  // keep the first (tracked) entry so paths stay unique within a group.
+  const unique = new Map<string, PullRequestFile>();
+  for (const file of files) {
+    if (!unique.has(file.path)) unique.set(file.path, file);
+  }
+  return [...unique.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
+// Cheap count for the always-visible tab badge. Porcelain reports one record
+// per changed path, even when it differs in both the index and working tree;
+// rename/copy records carry one extra NUL-delimited source path to skip.
+export async function getLocalChangeCount(repoPath: string): Promise<number> {
+  const output = await git(repoPath, [
+    "status",
+    "--porcelain=v1",
+    "-z",
+    "--renames",
+    "--untracked-files=all",
+  ]);
+  const records = output.split("\0");
+  let count = 0;
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index];
+    if (record.length < 3) continue;
+    count++;
+    if (
+      record[0] === "R" ||
+      record[0] === "C" ||
+      record[1] === "R" ||
+      record[1] === "C"
+    ) {
+      index++;
+    }
+  }
+  return count;
+}
+
+// Uncommitted work in a registered local checkout, split the way git sees it:
+// the index (staged) and the working tree (unstaged, untracked files
+// included). A partially staged path appears in both — that is git's model,
+// not a bug. Each entry is shaped like a PR's changed file so the diff UI
 // renders them unchanged.
 export async function getLocalChanges(repoPath: string): Promise<LocalChanges> {
-  const [branch, tracked, untracked] = await Promise.all([
+  const [branch, staged, unstaged, untracked] = await Promise.all([
     currentBranch(repoPath),
-    trackedChanges(repoPath),
+    stagedChanges(repoPath),
+    unstagedChanges(repoPath),
     untrackedChanges(repoPath),
   ]);
-  // "git rm --cached" leaves a path both deleted-in-index and untracked;
-  // keep the tracked entry so paths stay unique.
-  const byPath = new Map<string, PullRequestFile>();
-  for (const file of [...tracked, ...untracked]) {
-    if (!byPath.has(file.path)) byPath.set(file.path, file);
+  return {
+    branch,
+    staged: byPath(staged),
+    unstaged: byPath([...unstaged, ...untracked]),
+    // Reported rather than inferred from the status letter: discarding an
+    // untracked file deletes it, and that warning must not rest on a guess.
+    untracked: untracked.map((file) => file.path).sort(),
+  };
+}
+
+// git reports a failed command through the error's stderr; the message alone
+// is the whole command line, which tells the user nothing. Pre-commit hooks,
+// an unset user.email, and index locks all surface here.
+//
+// stdout is consulted too, and not for symmetry: "nothing to commit" — the
+// commonest commit failure there is — goes to stdout, as does the output of
+// many pre-commit hooks. Reading stderr alone left those cases showing the
+// generic fallback, which says nothing at all.
+function gitError(error: unknown, fallback: string): Error {
+  const streams = error as { stderr?: unknown; stdout?: unknown };
+  const text = [streams.stderr, streams.stdout]
+    .map((stream) => (typeof stream === "string" ? stream.trim() : ""))
+    .find((stream) => stream !== "");
+  return new Error(text ?? fallback);
+}
+
+// "add -A" so a deleted or untracked path stages like any other.
+export async function stageFiles(
+  repoPath: string,
+  paths: string[],
+): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    await git(repoPath, ["add", "-A", "--", ...paths]);
+  } catch (error) {
+    throw gitError(error, "Couldn't stage those files.");
   }
-  const files = [...byPath.values()].sort((a, b) =>
-    a.path.localeCompare(b.path),
-  );
-  return { branch, files };
+}
+
+export async function unstageFiles(
+  repoPath: string,
+  paths: string[],
+): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    if (await hasHead(repoPath)) {
+      await git(repoPath, ["restore", "--staged", "--", ...paths]);
+    } else {
+      // No HEAD to restore from yet — the first commit's staged files can
+      // only leave the index by being removed from it.
+      // "-f" because without it git refuses when the staged content matches
+      // neither the working file nor HEAD (and there is no HEAD here); with
+      // "--cached" it never touches the working tree.
+      await git(repoPath, ["rm", "--cached", "-r", "-f", "--", ...paths]);
+    }
+  } catch (error) {
+    throw gitError(error, "Couldn't unstage those files.");
+  }
+}
+
+// Throws away uncommitted work: tracked paths are restored from the index
+// (so staged work survives — only the unstaged edits go), untracked paths are
+// deleted outright. Nothing here is recoverable through git, which is why the
+// renderer confirms first.
+export async function discardChanges(
+  repoPath: string,
+  paths: string[],
+): Promise<void> {
+  if (paths.length === 0) return;
+  // Ask git what it tracks, rather than trusting the caller — and ask it that
+  // way round deliberately. Classifying by "--others" instead would put an
+  // ignored path (listed by neither) on the restore side, where it errors as
+  // an unknown pathspec and takes the whole batch down with it.
+  const listed = await git(repoPath, ["ls-files", "-z", "--", ...paths]);
+  const tracked = [...new Set(listed.split("\0").filter(Boolean))];
+  const rest = paths.filter((path) => !tracked.includes(path));
+  try {
+    if (tracked.length > 0) {
+      await git(repoPath, ["restore", "--worktree", "--", ...tracked]);
+    }
+    if (rest.length > 0) {
+      // No -x, so an ignored path here is passed over in silence rather than
+      // deleted — a .env or a build artefact is never what was meant.
+      await git(repoPath, ["clean", "-f", "--", ...rest]);
+    }
+  } catch (error) {
+    throw gitError(error, "Couldn't discard those changes.");
+  }
+}
+
+// Commits what is staged, and only that — never "commit -a". The message is
+// passed as an argument, not a shell string, so newlines and quotes are safe.
+export async function commitChanges(
+  repoPath: string,
+  message: string,
+): Promise<CommitResult> {
+  const trimmed = message.trim();
+  if (trimmed === "") throw new Error("A commit needs a message.");
+  try {
+    await git(repoPath, ["commit", "-m", trimmed]);
+  } catch (error) {
+    throw gitError(error, "Couldn't create the commit.");
+  }
+  const sha = (await git(repoPath, ["rev-parse", "--short", "HEAD"])).trim();
+  return { sha, subject: trimmed.split("\n")[0] };
 }

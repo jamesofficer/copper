@@ -5,6 +5,7 @@ import type {
   AttachmentFile,
   AttachmentUpload,
   ChatMessage,
+  CommitResult,
   DraftReviewComment,
   ExplainRequest,
   Explanation,
@@ -45,6 +46,9 @@ export interface IpcApi {
   removeRepository(path: string): Promise<Repository[]>;
   // Persists a drag-reordered sidebar list; paths in their new order.
   reorderRepositories(paths: string[]): Promise<Repository[]>;
+  // Cheap unique changed-path count for the always-visible tab badge. Does
+  // not build file patches.
+  getLocalChangeCount(repoPath: string): Promise<number>;
   // Uncommitted work in a registered checkout (staged + unstaged + untracked),
   // for the home screen's Current changes tab. Read from local git only — no
   // GitHub token needed.
@@ -52,6 +56,15 @@ export interface IpcApi {
   // The repo's checkouts — the main worktree plus any linked git worktrees —
   // so Current changes can switch between them. [] when listing fails.
   listWorktrees(repoPath: string): Promise<Worktree[]>;
+  // Move paths into the index, or back out of it. Both are no-ops on an empty
+  // list and reject with git's stderr so the reason reaches the user.
+  stageFiles(repoPath: string, paths: string[]): Promise<void>;
+  unstageFiles(repoPath: string, paths: string[]): Promise<void>;
+  // Throws uncommitted work away — tracked paths revert to the index,
+  // untracked paths are deleted. Irreversible; the renderer confirms first.
+  discardChanges(repoPath: string, paths: string[]): Promise<void>;
+  // Commits the index — never the working tree — in the given checkout.
+  commitChanges(repoPath: string, message: string): Promise<CommitResult>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
   // Open PRs across the registered repos where the logged-in user's review is
   // requested.
@@ -301,6 +314,10 @@ export const ipcChannels = [
   "reorderRepositories",
   "getLocalChanges",
   "listWorktrees",
+  "stageFiles",
+  "unstageFiles",
+  "discardChanges",
+  "commitChanges",
   "listPullRequests",
   "listReviewRequestedPullRequests",
   "listMyPullRequests",
