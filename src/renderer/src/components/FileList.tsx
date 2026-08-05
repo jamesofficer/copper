@@ -30,11 +30,16 @@ export interface RowAction {
   onRun(path: string): void;
 }
 
-// The counts and the actions occupy the same slot, so one condition has to
-// drive both — hover alone left the buttons showing over the counts once the
-// discard dialog closed and returned focus to its trigger with the pointer
-// elsewhere. Same selectors, inverse values.
-const revealed = ".group:hover &, .group:focus-within &";
+// The counts and the actions occupy the same slot, so one condition drives
+// both — same selectors, inverse values, so they can never draw at once.
+//
+// :focus-visible, not :focus-within: closing the discard dialog hands focus
+// back to the button that opened it, and :focus-within can't tell that from a
+// deliberate tab, so the row stayed stuck showing its buttons. The browser
+// only marks programmatically restored focus as visible when the user was
+// already navigating by keyboard — which is exactly when the row should keep
+// showing them.
+const revealed = ".group:hover &, .group:has(:focus-visible) &";
 
 export default function FileList({
   files,
