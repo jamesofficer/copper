@@ -276,10 +276,17 @@ export async function getLocalChanges(repoPath: string): Promise<LocalChanges> {
 // git reports a failed command through the error's stderr; the message alone
 // is the whole command line, which tells the user nothing. Pre-commit hooks,
 // an unset user.email, and index locks all surface here.
+//
+// stdout is consulted too, and not for symmetry: "nothing to commit" — the
+// commonest commit failure there is — goes to stdout, as does the output of
+// many pre-commit hooks. Reading stderr alone left those cases showing the
+// generic fallback, which says nothing at all.
 function gitError(error: unknown, fallback: string): Error {
-  const stderr = (error as { stderr?: unknown }).stderr;
-  const text = typeof stderr === "string" ? stderr.trim() : "";
-  return new Error(text === "" ? fallback : text);
+  const streams = error as { stderr?: unknown; stdout?: unknown };
+  const text = [streams.stderr, streams.stdout]
+    .map((stream) => (typeof stream === "string" ? stream.trim() : ""))
+    .find((stream) => stream !== "");
+  return new Error(text ?? fallback);
 }
 
 // "add -A" so a deleted or untracked path stages like any other.
@@ -322,23 +329,21 @@ export async function discardChanges(
   paths: string[],
 ): Promise<void> {
   if (paths.length === 0) return;
-  // Ask git which of these it doesn't track, rather than trusting the caller.
-  const listed = await git(repoPath, [
-    "ls-files",
-    "--others",
-    "--exclude-standard",
-    "-z",
-    "--",
-    ...paths,
-  ]);
-  const untracked = new Set(listed.split("\0").filter(Boolean));
-  const tracked = paths.filter((path) => !untracked.has(path));
+  // Ask git what it tracks, rather than trusting the caller — and ask it that
+  // way round deliberately. Classifying by "--others" instead would put an
+  // ignored path (listed by neither) on the restore side, where it errors as
+  // an unknown pathspec and takes the whole batch down with it.
+  const listed = await git(repoPath, ["ls-files", "-z", "--", ...paths]);
+  const tracked = [...new Set(listed.split("\0").filter(Boolean))];
+  const rest = paths.filter((path) => !tracked.includes(path));
   try {
     if (tracked.length > 0) {
       await git(repoPath, ["restore", "--worktree", "--", ...tracked]);
     }
-    if (untracked.size > 0) {
-      await git(repoPath, ["clean", "-f", "--", ...untracked]);
+    if (rest.length > 0) {
+      // No -x, so an ignored path here is passed over in silence rather than
+      // deleted — a .env or a build artefact is never what was meant.
+      await git(repoPath, ["clean", "-f", "--", ...rest]);
     }
   } catch (error) {
     throw gitError(error, "Couldn't discard those changes.");
