@@ -97,6 +97,36 @@ Roadmap (rough order):
 - Branding: the app is "Reviewr" (`productName` in package.json). Icon source is `resources/icon.svg` → rendered to `resources/icon.png` (1024px, via `rsvg-convert`) → `build/icon.icns` (via `sips` + `iconutil`). The main process sets the dock icon at runtime (`setDockIcon` in `main/index.ts`). Because dev runs the stock Electron binary, `scripts/brand-dev-electron.sh` (postinstall) rewrites the bundled Electron.app's Info.plist name, swaps its icns, and re-signs it ad-hoc so the dock says "Reviewr" during `pnpm dev`.
 - Pinned: vite 7 + @vitejs/plugin-react 5 (electron-vite 5 doesn't support vite 8 yet). Vitest 4 accepts vite ^6/^7/^8 and reuses the installed vite, so it adds no second copy.
 
+## Testing policy — write the test first
+
+**New logic is written test-first, red-green-refactor.** Not a suggestion: the burden is on the change to explain why it is exempt, not on the reviewer to ask for tests.
+
+1. **Red.** Write the failing test and *run it*. A test that has never failed has not been shown to test anything.
+2. **Green.** Write the least code that passes it.
+3. **Refactor.** Clean up with the test as the safety net.
+
+### What must be test-first
+
+- Pure logic anywhere: parsing, normalisation, filtering, sorting, id/hash derivation, formatting.
+- Main-process logic: anything in `main/` that isn't a thin pass-through to an API call.
+- **Bug fixes, without exception.** Reproduce the bug as a failing test *before* the fix. That test is the deliverable — it is what stops the bug coming back.
+- Anything that crosses the main/renderer boundary, since the compiler can't check a string that travels over IPC.
+
+### What is exempt for now
+
+- React components, until the harness in issue #17 exists (jsdom project, provider wrapper, typed `window.api` fake). Do not hand-roll a one-off jsdom setup to get around this — `lib/colorMode.ts` calls `window.matchMedia` at module scope, so it throws on import under jsdom without a setup file, and the 69-method `IpcApi` needs one shared fake rather than 35 ad-hoc ones.
+- Thin wrappers whose whole body is one `fetch`/`git` call with no branching. Test the logic that reads their result instead.
+- Electron lifecycle and window setup.
+
+### Rules that make the tests worth having
+
+- **Prove the test can fail.** Break the code, watch it go red, put it back. The one weak test found while writing the first suites — a shared-pause case that passed against the reverted fix — was found exactly this way and would have shipped false confidence otherwise.
+- **Assert on behaviour, not incidental shape.** Pin the contract a caller depends on, not the exact wording of a log line.
+- **Name the test as the claim it makes** — "promotes an orphaned reply to a root rather than losing it", not "works correctly".
+- **Comment the non-obvious why**, in the same voice as the code: what breaks in the product if this behaviour regresses.
+- **A test that needs the network, the clock, or a real repo is not a unit test.** Inject the seam (`vi.stubGlobal`, fake timers) or move the logic somewhere testable.
+- Run `pnpm test` with `pnpm typecheck` and `pnpm lint` before committing.
+
 ## Conventions
 
 - UI is Chakra UI v3 (`@chakra-ui/react` + `@emotion/react`, icons from `react-icons/lu`). Use Chakra components and style props, not CSS files. A Chakra MCP server is available for component examples and props.
@@ -105,4 +135,6 @@ Roadmap (rough order):
 - Component props: `interface Props {}` (or a descriptive exported name if they must be exported).
 - No unnecessary comments; TODOs mark unimplemented stubs.
 - Formatting and linting are handled by Biome (2-space indent, double quotes). Run `pnpm check` before committing.
+- New logic is written test-first — see the Testing policy above.
+- Tests are named `*.test.ts` and sit beside the file they cover.
 - Conventional commits (`feat:`, `fix:`, `chore:`).
