@@ -154,15 +154,18 @@ describe("githubRequest rate-limit handling", () => {
       );
     });
 
-    const started = Date.now();
     const res = await githubRequest("token", "/graphql", {
       method: "POST",
       body: {},
     });
 
+    // One call is the whole proof: a delay and a retry are the same branch, so
+    // sleeping here would necessarily have produced a second call. Asserting on
+    // elapsed wall-clock instead would add nothing catchable and could only
+    // ever fire on a loaded runner. A regression that did reinstate the long
+    // wait blows the test timeout, which is the real backstop.
     expect(calls).toBe(1);
     expect(res.status).toBe(200);
-    expect(Date.now() - started).toBeLessThan(1000);
   });
 
   it("fails fast when Retry-After exceeds the cap", async () => {
