@@ -70,17 +70,25 @@ export default function ChangesView({ pr }: Props) {
   // waits out the typing burst.
   const [debouncedFilter] = useDebounce(filter, 150);
   const query = debouncedFilter.trim().toLowerCase();
-  const filtering = Boolean(query) || hideTestFiles;
-  const visibleFiles = useMemo(() => {
-    if (!files || !filtering) return files;
+  // The search filter applies first, so the hidden-test-file count reflects
+  // what's hidden from the current search results, not the full file list.
+  const queryFilteredFiles = useMemo(() => {
+    if (!files || !query) return files;
     return files.filter(
       (file) =>
-        (!query ||
-          file.path.toLowerCase().includes(query) ||
-          file.previousPath?.toLowerCase().includes(query)) &&
-        (!hideTestFiles || !isTestFile(file.path)),
+        file.path.toLowerCase().includes(query) ||
+        file.previousPath?.toLowerCase().includes(query),
     );
-  }, [files, query, hideTestFiles, filtering]);
+  }, [files, query]);
+  const hiddenTestFileCount = useMemo(() => {
+    if (!queryFilteredFiles || !hideTestFiles) return 0;
+    return queryFilteredFiles.filter((file) => isTestFile(file.path)).length;
+  }, [queryFilteredFiles, hideTestFiles]);
+  const filtering = Boolean(query) || hideTestFiles;
+  const visibleFiles = useMemo(() => {
+    if (!queryFilteredFiles || !hideTestFiles) return queryFilteredFiles;
+    return queryFilteredFiles.filter((file) => !isTestFile(file.path));
+  }, [queryFilteredFiles, hideTestFiles]);
   const selectedFile =
     visibleFiles?.find((file) => file.path === selectedPath) ??
     visibleFiles?.[0] ??
@@ -360,14 +368,15 @@ export default function ChangesView({ pr }: Props) {
               </Text>
             )}
           </Box>
-          <HStack
-            justifyContent="flex-end"
-            px="3"
-            py="2"
-            flexShrink="0"
-            borderTopWidth="1px"
-          >
+          <HStack px="3" py="2" flexShrink="0" borderTopWidth="1px">
+            {hiddenTestFileCount > 0 && (
+              <Text fontSize="xs" color="fg.muted">
+                {hiddenTestFileCount} file
+                {hiddenTestFileCount === 1 ? "" : "s"} hidden
+              </Text>
+            )}
             <Checkbox.Root
+              ml="auto"
               size="sm"
               cursor="pointer"
               checked={hideTestFiles}
