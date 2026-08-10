@@ -1,16 +1,6 @@
-import {
-  createListCollection,
-  Select,
-  Stack,
-  Switch,
-  Text,
-} from "@chakra-ui/react";
+import { createListCollection, Select, Stack, Text } from "@chakra-ui/react";
 import { useState } from "react";
 import type { ReviewPersonality } from "../../../shared/types";
-import {
-  getFindIssuesOnAnalyse,
-  setFindIssuesOnAnalyse,
-} from "../lib/findIssuesOnAnalyse";
 import {
   getReviewPersonality,
   personalityOptions,
@@ -36,22 +26,16 @@ function descriptionFor(personality: ReviewPersonality): string {
 export default function ReviewSettings() {
   const [personality, setPersonality] =
     useState<ReviewPersonality>(getReviewPersonality);
-  const [findIssues, setFindIssues] = useState<boolean>(getFindIssuesOnAnalyse);
 
   function selectPersonality(value: ReviewPersonality) {
     setReviewPersonality(value);
     setPersonality(value);
   }
 
-  function toggleFindIssues(enabled: boolean) {
-    setFindIssuesOnAnalyse(enabled);
-    setFindIssues(enabled);
-  }
-
   return (
     <SettingsPanel
       title="Review"
-      description="How the agent reads a pull request, and how much of it runs on its own."
+      description="How the agent reads a pull request. How deep each review goes is picked per run, on the Review tab."
     >
       <SettingsGroup>
         <SettingRow
@@ -103,20 +87,6 @@ export default function ReviewSettings() {
               {descriptionFor(personality)}
             </Text>
           </Stack>
-        </SettingRow>
-
-        <SettingRow
-          title="Find issues when analysing"
-          description="After each analysis, run the deeper agent pass that checks the repo beyond the diff and verifies the flagged risks. Roughly doubles the cost of a scan."
-        >
-          <Switch.Root
-            checked={findIssues}
-            onCheckedChange={(event) => toggleFindIssues(event.checked)}
-            size="lg"
-          >
-            <Switch.HiddenInput />
-            <Switch.Control />
-          </Switch.Root>
         </SettingRow>
       </SettingsGroup>
     </SettingsPanel>

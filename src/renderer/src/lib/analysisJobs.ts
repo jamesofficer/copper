@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { PullRequest, ReviewPersonality } from "../../../shared/types";
 import { toaster } from "../components/ui/toaster";
-import { getFindIssuesOnAnalyse } from "./findIssuesOnAnalyse";
 import { cleanIpcError } from "./ipcError";
 import { queryClient } from "./queryClient";
 import { getReviewPersonality } from "./reviewPersonality";
@@ -12,6 +11,12 @@ import { getReviewPersonality } from "./reviewPersonality";
 // sidebar shows a spinner while it runs and a toast says how it ended, so you
 // can go and read something else meanwhile.
 export type AnalysisStage = "analysing" | "checking";
+
+// How far a review goes. A quick review is the analysis on its own; a deep one
+// chases it with the findings pass, which reads the repo beyond the diff and
+// verifies each flagged risk. The user picks per run — there is no default
+// hidden in settings, because the two cost noticeably different amounts.
+export type ReviewDepth = "quick" | "deep";
 
 export interface AnalysisJob {
   pr: PullRequest;
@@ -60,10 +65,13 @@ export function useAnalysisJob(
   );
 }
 
-// Runs the analysis and, when the setting is on, the findings pass after it.
-// Never throws: how it went is reported by a toast.
+// Runs the analysis and, on a deep review, the findings pass after it. Depth is
+// a required argument rather than an option with a default, so every entry point
+// has to say which review the user asked for. Never throws: how it went is
+// reported by a toast.
 export async function startAnalysis(
   pr: PullRequest,
+  depth: ReviewDepth,
   options: StartAnalysisOptions = {},
 ): Promise<void> {
   const key = jobKey(pr.repo, pr.number);
@@ -72,7 +80,7 @@ export async function startAnalysis(
 
   const analysisKey = ["analysis", pr.repo, pr.number];
   const findingsKey = ["findings", pr.repo, pr.number];
-  const chained = getFindIssuesOnAnalyse();
+  const chained = depth === "deep";
 
   jobs.set(key, { pr, stage: "analysing" });
   publish();
@@ -112,7 +120,7 @@ export async function startAnalysis(
   }
 
   if (!chained) {
-    finish(key, "Analysis ready", key);
+    finish(key, "Quick review ready", key);
     return;
   }
 
@@ -128,7 +136,7 @@ export async function startAnalysis(
     const count = findings.findings.length;
     finish(
       key,
-      "Analysis ready",
+      "Deep review ready",
       `${key} — ${count} issue${count === 1 ? "" : "s"} found`,
     );
   } catch (cause) {
