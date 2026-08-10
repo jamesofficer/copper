@@ -37,6 +37,12 @@ window.ResizeObserver =
 // there is nothing to scroll and nothing to assert beyond "it was called".
 Element.prototype.scrollIntoView = () => {};
 
+// Opening a Chakra select scrolls its list back to the top. jsdom has no
+// layout, so the call is a no-op — but without the method Ark UI throws from a
+// state machine action, outside any test's call stack, which fails the run
+// rather than the assertion.
+Element.prototype.scrollTo = () => {};
+
 // Ark UI (under Chakra v3) captures the pointer on every drag interaction, and
 // the diff's drag-to-select does the same. jsdom ships neither method.
 Element.prototype.setPointerCapture = () => {};

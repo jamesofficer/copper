@@ -24,6 +24,7 @@ import type {
   ReviewStatus,
   ReviewVerdict,
 } from "../../shared/types";
+import { REPO_ISSUE_LIMIT } from "../../shared/types";
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
@@ -535,7 +536,7 @@ export async function listRepoIssues(repo: string): Promise<RepoIssue[]> {
           issues(
             states: OPEN
             orderBy: { field: UPDATED_AT, direction: DESC }
-            first: 50
+            first: ${REPO_ISSUE_LIMIT}
           ) {
             nodes { ${ISSUE_FIELDS} }
           }
@@ -565,7 +566,7 @@ interface GitHubIssueDetail {
   title: string;
   body: string | null;
   state: "open" | "closed";
-  state_reason: "completed" | "not_planned" | "reopened" | null;
+  state_reason: "completed" | "not_planned" | "duplicate" | "reopened" | null;
   user: { login: string } | null;
   labels: Array<{ name: string; color: string }>;
   assignees: Array<{ login: string }> | null;

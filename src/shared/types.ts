@@ -63,6 +63,11 @@ export interface PullRequestDetail {
   url: string;
 }
 
+// How many issues one listRepoIssues call returns. Part of the contract, not a
+// private detail: the renderer filters and sorts the list it was given, so it
+// has to be able to say when the list is only the newest slice.
+export const REPO_ISSUE_LIMIT = 50;
+
 // A GitHub issue, not to be confused with a ReviewIssue — the app's own name
 // for a finding the analysis agent reported. Labels sit on the summary, unlike
 // PullRequest, because issue lists lean on them and they cost nothing extra in
@@ -84,8 +89,9 @@ export interface RepoIssueDetail extends RepoIssue {
   body: string | null;
   state: "open" | "closed";
   // Why it closed. Null on open issues, and on ones closed before GitHub
-  // recorded a reason.
-  stateReason: "completed" | "not_planned" | "reopened" | null;
+  // recorded a reason — which is why "closed" alone can't be read as
+  // "completed".
+  stateReason: "completed" | "not_planned" | "duplicate" | "reopened" | null;
 }
 
 // A lightweight snapshot of a PR's activity signals, for the background poll

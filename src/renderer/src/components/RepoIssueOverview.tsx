@@ -23,9 +23,11 @@ interface Props {
   issue: RepoIssue;
 }
 
-// One badge with three outcomes, so it lives here rather than in its own file.
-// The list only carries open issues, so it rarely says anything else — but a
-// preview left open while the issue closes elsewhere should tell the truth.
+// One badge with a handful of outcomes, so it lives here rather than in its own
+// file. The list only carries open issues, so it rarely says anything else —
+// but a preview left open while the issue closes elsewhere should tell the
+// truth. Only "completed" claims the issue was done: GitHub recorded no reason
+// at all before 2022, and a plain "Closed" is the honest reading of that.
 function IssueStateBadge({ detail }: { detail: RepoIssueDetail }) {
   if (detail.state === "open") {
     return (
@@ -34,16 +36,21 @@ function IssueStateBadge({ detail }: { detail: RepoIssueDetail }) {
       </Badge>
     );
   }
-  if (detail.stateReason === "not_planned") {
+  if (detail.stateReason === "completed") {
     return (
-      <Badge colorPalette="gray" variant="surface" size="lg">
-        <LuCircleSlash size={12} /> Closed as not planned
+      <Badge colorPalette="purple" variant="surface" size="lg">
+        <LuCircleCheck size={12} /> Closed as completed
       </Badge>
     );
   }
   return (
-    <Badge colorPalette="purple" variant="surface" size="lg">
-      <LuCircleCheck size={12} /> Closed as completed
+    <Badge colorPalette="gray" variant="surface" size="lg">
+      <LuCircleSlash size={12} />
+      {detail.stateReason === "not_planned"
+        ? "Closed as not planned"
+        : detail.stateReason === "duplicate"
+          ? "Closed as duplicate"
+          : "Closed"}
     </Badge>
   );
 }
