@@ -331,22 +331,6 @@ export default function ChangesView({ pr }: Props) {
               />
             </InputGroup>
           </Box>
-          <Box px="3" pb="2" flexShrink="0">
-            <Checkbox.Root
-              size="sm"
-              cursor="pointer"
-              checked={hideTestFiles}
-              onCheckedChange={(event) =>
-                setHideTestFiles(Boolean(event.checked))
-              }
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control />
-              <Checkbox.Label fontSize="xs" color="fg.muted">
-                Hide test files
-              </Checkbox.Label>
-            </Checkbox.Root>
-          </Box>
           <Box flex="1" overflowY="auto" px="3" pb="3" css={scrollbar}>
             {filesQuery.isPending ? (
               <HStack color="fg.muted" px="1">
@@ -376,6 +360,28 @@ export default function ChangesView({ pr }: Props) {
               </Text>
             )}
           </Box>
+          <HStack
+            justifyContent="flex-end"
+            px="3"
+            py="2"
+            flexShrink="0"
+            borderTopWidth="1px"
+          >
+            <Checkbox.Root
+              size="sm"
+              cursor="pointer"
+              checked={hideTestFiles}
+              onCheckedChange={(event) =>
+                setHideTestFiles(Boolean(event.checked))
+              }
+            >
+              <Checkbox.HiddenInput />
+              <Checkbox.Control />
+              <Checkbox.Label fontSize="xs" color="fg.muted">
+                Hide test files
+              </Checkbox.Label>
+            </Checkbox.Root>
+          </HStack>
         </Flex>
         <Box
           w="1"
