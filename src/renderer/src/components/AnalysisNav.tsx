@@ -18,6 +18,7 @@ import type {
   ChangeGroupRisk,
   PullRequestFile,
 } from "../../../shared/types";
+import type { IssueAnchorCommits } from "../lib/issueMarkdown";
 import type { IssueSets } from "../lib/issues";
 import CopyIssuesButton from "./CopyIssuesButton";
 import { severityDotColor } from "./RiskSeverityBadge";
@@ -36,6 +37,9 @@ interface Props {
   prNumber: number;
   // The PR's diffs, for the copy-all button's quoted code.
   files: PullRequestFile[] | undefined;
+  // Which commit the anchors were measured against, so a copy taken after the
+  // branch moved doesn't quote code cut from the wrong version.
+  anchorCommits: IssueAnchorCommits;
   // Whether a findings run exists — decides between "find" and "re-run".
   hasFindings: boolean;
   // A findings run is in flight.
@@ -122,6 +126,7 @@ export default function AnalysisNav({
   repo,
   prNumber,
   files,
+  anchorCommits,
   hasFindings,
   checking,
   issuesError,
@@ -156,6 +161,7 @@ export default function AnalysisNav({
               repo={repo}
               prNumber={prNumber}
               files={files}
+              anchorCommits={anchorCommits}
             />
             {!checking && (
               <IconButton

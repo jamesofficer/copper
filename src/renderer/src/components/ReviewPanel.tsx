@@ -124,6 +124,21 @@ export default function ReviewPanel({ pr }: Props) {
   const checking = job?.stage === "checking" || manualCheck;
 
   const findings = findingsQuery.data ?? null;
+
+  // Which commit each kind of anchor was measured against. Built here, the one
+  // place that holds the analysis, the findings run and the PR's head at once,
+  // and handed to every copy path — the nav's copy-all and each issue's own
+  // button — so the two can't disagree about whether a line still points at the
+  // code it was reported against.
+  const anchorCommits = useMemo(
+    () => ({
+      analysisSha: analysis?.headSha ?? "",
+      findingsSha: findings?.headSha ?? null,
+      currentSha: currentHeadSha,
+    }),
+    [analysis?.headSha, findings?.headSha, currentHeadSha],
+  );
+
   const issues = useMemo(
     () =>
       analysis
@@ -262,6 +277,7 @@ export default function ReviewPanel({ pr }: Props) {
             repo={pr.repo}
             prNumber={pr.number}
             files={filesQuery.data}
+            anchorCommits={anchorCommits}
             hasFindings={Boolean(findings)}
             checking={checking}
             issuesError={
@@ -284,6 +300,7 @@ export default function ReviewPanel({ pr }: Props) {
             findings={findings}
             issues={issues}
             files={filesQuery.data}
+            anchorCommits={anchorCommits}
             currentHeadSha={currentHeadSha}
             selection={selection}
             onSelect={setSelection}

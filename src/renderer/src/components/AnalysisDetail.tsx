@@ -10,6 +10,7 @@ import type {
   PullRequestFile,
 } from "../../../shared/types";
 import type { AskContext } from "../lib/askContext";
+import type { IssueAnchorCommits } from "../lib/issueMarkdown";
 import type { IssueSets } from "../lib/issues";
 import type { AnalysisSelection } from "./AnalysisNav";
 import {
@@ -31,6 +32,8 @@ interface Props {
   findings: FindingsResult | null;
   issues: IssueSets;
   files: PullRequestFile[] | undefined;
+  // Which commit each kind of anchor was measured against, for the copy paths.
+  anchorCommits: IssueAnchorCommits;
   currentHeadSha: string | undefined;
   selection: AnalysisSelection;
   onSelect(selection: AnalysisSelection): void;
@@ -162,6 +165,7 @@ export default function AnalysisDetail({
   findings,
   issues,
   files,
+  anchorCommits,
   currentHeadSha,
   selection,
   onSelect,
@@ -191,6 +195,7 @@ export default function AnalysisDetail({
             prNumber={pr.number}
             commitId={commitId}
             canDraft={!findingsOutdated}
+            anchorCommits={anchorCommits}
             files={files}
             fileByPath={fileByPath}
             onAskAbout={onAskAbout}

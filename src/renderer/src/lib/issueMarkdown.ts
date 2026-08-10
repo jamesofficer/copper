@@ -7,12 +7,53 @@ import {
 } from "./issues";
 import { patchSnippet } from "./patchSnippet";
 
-interface Source {
+// Which commit each kind of anchor was measured against, and where the PR is
+// now. Built once by the review screen and handed to every copy path, so the
+// single-issue and copy-all buttons can't disagree about staleness.
+export interface IssueAnchorCommits {
+  // Risks come from the analysis, findings from the findings run — the two can
+  // be different commits, so an issue's kind decides which one applies.
+  analysisSha: string;
+  findingsSha?: string | null;
+  // The PR's head now. Undefined while the detail query is in flight, which
+  // reads as "no reason to doubt the anchors".
+  currentSha?: string | null;
+}
+
+export interface IssueMarkdownSource extends IssueAnchorCommits {
   repo: string;
   prNumber: number;
   // The PR's changed files, for quoting the code each anchor points at. Empty
   // while the diffs are still loading, which just omits the code.
   fileByPath: Map<string, PullRequestFile>;
+}
+
+type Source = IssueMarkdownSource;
+
+// The commit the issue's own anchors were computed against.
+function anchorCommit(issue: ReviewIssue, source: IssueAnchorCommits): string {
+  if (issue.kind === "finding") {
+    return source.findingsSha ?? source.analysisSha;
+  }
+  return source.analysisSha;
+}
+
+// Anchors are line numbers in the diff of one commit. Once the PR moves past
+// it, an edit anywhere earlier in a file renumbers everything below, so the
+// line may now point at unrelated code. Exported so a button can say in advance
+// that its copy will carry no code, rather than the two disagreeing.
+export function anchorsMayHaveMoved(
+  issue: ReviewIssue,
+  source: IssueAnchorCommits,
+): boolean {
+  const measured = anchorCommit(issue, source);
+  return Boolean(
+    source.currentSha && measured && source.currentSha !== measured,
+  );
+}
+
+function shortSha(sha: string): string {
+  return sha.slice(0, 7);
 }
 
 interface Anchor {
@@ -41,6 +82,11 @@ function describeAnchor(anchor: Anchor): string {
 // A diff fence rather than a plain one because the +/− markers are the point:
 // they say which lines the PR is adding, which a bare snippet loses.
 function codeBlocks(issue: ReviewIssue, source: Source): string[] {
+  // Cut from the *current* diff at a line measured against an older one, so the
+  // window can hold code that has nothing to do with the issue. Quoting it
+  // would present the wrong evidence as evidence — worse than quoting none.
+  if (anchorsMayHaveMoved(issue, source)) return [];
+
   const lines: string[] = [];
 
   for (const anchor of anchorsOf(issue)) {
@@ -87,10 +133,26 @@ export function issueToMarkdown(issue: ReviewIssue, source: Source): string {
     lines.push(`${label}: ${locations.map((one) => `\`${one}\``).join(", ")}`);
   }
 
+  // Which commit the lines above were numbered against. Cheap to carry, and
+  // without it a paste can't be checked against anything.
+  const measured = anchorCommit(issue, source);
+  if (measured) {
+    lines.push(`Reported against commit \`${shortSha(measured)}\`.`);
+  }
+
   lines.push(
     "",
     issue.kind === "finding" ? issue.finding.body : issue.risk.text,
   );
+
+  // Said in the document rather than left to the reader: whoever receives this
+  // has no way to know the review is behind the branch.
+  if (anchorsMayHaveMoved(issue, source) && source.currentSha) {
+    lines.push(
+      "",
+      `> The pull request has moved on to \`${shortSha(source.currentSha)}\` since this was reported, so the line numbers above may have shifted and the code isn't quoted. Re-run the review to refresh it.`,
+    );
+  }
 
   // The agent's reason for clearing a risk matters as much as the risk itself —
   // pasting the concern without it would send someone chasing a non-issue.

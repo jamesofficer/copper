@@ -27,6 +27,9 @@ const source = {
   repo: "acme/app",
   prNumber: 7,
   fileByPath: new Map(files.map((file) => [file.path, file])),
+  analysisSha: "1111111aaaa",
+  findingsSha: "1111111aaaa",
+  currentSha: "1111111aaaa",
 };
 
 const finding = {
@@ -121,6 +124,58 @@ describe("issueToMarkdown", () => {
       "Locations: `src/fetch.ts:10`, `src/retry.ts:88`",
     );
     expect(markdown).not.toContain("### Suggested comment");
+  });
+
+  it("names the commit the lines were numbered against", () => {
+    const markdown = issueToMarkdown(findingIssue, source);
+
+    // Without it a paste can't be checked against anything — the line numbers
+    // are only meaningful next to the commit they were measured in.
+    expect(markdown).toContain("Reported against commit `1111111`.");
+  });
+
+  it("quotes no code once the PR has moved past the reported commit", () => {
+    const markdown = issueToMarkdown(findingIssue, {
+      ...source,
+      currentSha: "2222222bbbb",
+    });
+
+    // The snippet is cut from the current diff at a line numbered against an
+    // older one, so the window can hold unrelated code. Wrong evidence is worse
+    // than none, and the mismatch is stated rather than left to the reader.
+    expect(markdown).not.toContain("### Relevant changes");
+    expect(markdown).not.toContain("```diff");
+    expect(markdown).toContain("Reported against commit `1111111`.");
+    expect(markdown).toContain("has moved on to `2222222`");
+    // The report itself still copies in full.
+    expect(markdown).toContain(finding.body);
+    expect(markdown).toContain(finding.suggestion);
+  });
+
+  it("judges a risk by the analysis commit, not the findings run", () => {
+    // A quick review's risks are anchored by the analysis; a later findings run
+    // on a newer commit says nothing about whether those risks moved.
+    const markdown = issueToMarkdown(riskIssue({}), {
+      ...source,
+      findingsSha: "2222222bbbb",
+      currentSha: "1111111aaaa",
+    });
+
+    // Reported against the analysis's commit, and not treated as moved —
+    // the newer findings SHA is irrelevant to a risk.
+    expect(markdown).toContain("Reported against commit `1111111`.");
+    expect(markdown).not.toContain("has moved on to");
+  });
+
+  it("keeps quoting while the PR's head is still unknown", () => {
+    // The detail query is in flight. That's no reason to doubt the anchors.
+    const markdown = issueToMarkdown(findingIssue, {
+      ...source,
+      currentSha: undefined,
+    });
+
+    expect(markdown).toContain("### Relevant changes");
+    expect(markdown).not.toContain("has moved on to");
   });
 
   it("carries the agent's note when a risk was cleared", () => {

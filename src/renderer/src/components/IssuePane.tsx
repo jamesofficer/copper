@@ -25,7 +25,11 @@ import type {
   ReviewFinding,
 } from "../../../shared/types";
 import type { AskContext } from "../lib/askContext";
-import { issueToMarkdown } from "../lib/issueMarkdown";
+import {
+  anchorsMayHaveMoved,
+  type IssueAnchorCommits,
+  issueToMarkdown,
+} from "../lib/issueMarkdown";
 import {
   categoryMeta,
   issueVerdict,
@@ -55,6 +59,10 @@ interface Props {
   // False when the findings run is behind the PR's current commit — the line
   // anchor may be wrong, so drafting is blocked until a re-run.
   canDraft: boolean;
+  // The same staleness facts the draft guard uses, for the copy button: a
+  // snippet cut at a line measured against an older commit can hold unrelated
+  // code, so the copy omits it and says why.
+  anchorCommits: IssueAnchorCommits;
   files: PullRequestFile[] | undefined;
   fileByPath: FileMap;
   onAskAbout(context: AskContext, question?: string): void;
@@ -81,6 +89,7 @@ export default function IssuePane({
   prNumber,
   commitId,
   canDraft,
+  anchorCommits,
   files,
   fileByPath,
   onAskAbout,
@@ -135,6 +144,10 @@ export default function IssuePane({
     },
   });
 
+  // Same fact the markdown acts on, so the tooltip can't promise code the
+  // document then leaves out.
+  const copyOmitsCode = anchorsMayHaveMoved(issue, anchorCommits);
+
   const finding = issue.kind === "finding" ? issue.finding : null;
   const resolution =
     issue.kind === "finding" ? issue.finding.resolution : issue.risk.resolution;
@@ -181,14 +194,23 @@ export default function IssuePane({
               )}
               <IconButton
                 aria-label="Copy issue as markdown"
-                title="Copy as markdown — to paste into an agent or a message"
+                title={
+                  copyOmitsCode
+                    ? "Copy as markdown — the findings run is behind the branch, so the code isn’t quoted"
+                    : "Copy as markdown — to paste into an agent or a message"
+                }
                 size="2xs"
                 variant="ghost"
                 color="fg.muted"
                 flexShrink="0"
                 onClick={() =>
                   void clipboard.copy(
-                    issueToMarkdown(issue, { repo, prNumber, fileByPath }),
+                    issueToMarkdown(issue, {
+                      repo,
+                      prNumber,
+                      fileByPath,
+                      ...anchorCommits,
+                    }),
                   )
                 }
               >
