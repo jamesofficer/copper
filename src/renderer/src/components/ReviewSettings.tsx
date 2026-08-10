@@ -8,10 +8,6 @@ import {
 import { useState } from "react";
 import type { ReviewPersonality } from "../../../shared/types";
 import {
-  getFindIssuesOnAnalyse,
-  setFindIssuesOnAnalyse,
-} from "../lib/findIssuesOnAnalyse";
-import {
   getHideTestFilesByDefault,
   setHideTestFilesByDefault,
 } from "../lib/hideTestFiles";
@@ -40,7 +36,6 @@ function descriptionFor(personality: ReviewPersonality): string {
 export default function ReviewSettings() {
   const [personality, setPersonality] =
     useState<ReviewPersonality>(getReviewPersonality);
-  const [findIssues, setFindIssues] = useState<boolean>(getFindIssuesOnAnalyse);
   const [hideTestFiles, setHideTestFiles] = useState<boolean>(
     getHideTestFilesByDefault,
   );
@@ -48,11 +43,6 @@ export default function ReviewSettings() {
   function selectPersonality(value: ReviewPersonality) {
     setReviewPersonality(value);
     setPersonality(value);
-  }
-
-  function toggleFindIssues(enabled: boolean) {
-    setFindIssuesOnAnalyse(enabled);
-    setFindIssues(enabled);
   }
 
   function toggleHideTestFiles(enabled: boolean) {
@@ -63,7 +53,7 @@ export default function ReviewSettings() {
   return (
     <SettingsPanel
       title="Review"
-      description="How the agent reads a pull request, and how much of it runs on its own."
+      description="How the agent reads a pull request. How deep each review goes is picked per run, on the Review tab."
     >
       <SettingsGroup>
         <SettingRow
@@ -115,20 +105,6 @@ export default function ReviewSettings() {
               {descriptionFor(personality)}
             </Text>
           </Stack>
-        </SettingRow>
-
-        <SettingRow
-          title="Find issues when analysing"
-          description="After each analysis, run the deeper agent pass that checks the repo beyond the diff and verifies the flagged risks. Roughly doubles the cost of a scan."
-        >
-          <Switch.Root
-            checked={findIssues}
-            onCheckedChange={(event) => toggleFindIssues(event.checked)}
-            size="lg"
-          >
-            <Switch.HiddenInput />
-            <Switch.Control />
-          </Switch.Root>
         </SettingRow>
 
         <SettingRow

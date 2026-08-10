@@ -13,7 +13,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuBot } from "react-icons/lu";
 import type { PullRequest, ReviewPersonality } from "../../../shared/types";
-import { startAnalysis, useAnalysisJob } from "../lib/analysisJobs";
+import {
+  type ReviewDepth,
+  startAnalysis,
+  useAnalysisJob,
+} from "../lib/analysisJobs";
 import {
   getReviewPersonality,
   personalityOptions,
@@ -27,6 +31,22 @@ const personalityCollection = createListCollection({
   })),
 });
 
+const depthCollection = createListCollection({
+  items: [
+    {
+      label: "Deep review",
+      value: "deep" satisfies ReviewDepth,
+      description:
+        "Also checks the repo beyond the diff. About twice the cost.",
+    },
+    {
+      label: "Quick review",
+      value: "quick" satisfies ReviewDepth,
+      description: "Reads the diff only.",
+    },
+  ],
+});
+
 interface Props {
   pr: PullRequest;
   size?: "xs" | "2xs";
@@ -38,6 +58,7 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
   const [open, setOpen] = useState(false);
   const [personality, setPersonality] =
     useState<ReviewPersonality>(getReviewPersonality);
+  const [depth, setDepth] = useState<ReviewDepth>("deep");
 
   const { data: analysis } = useQuery({
     queryKey: ["analysis", pr.repo, pr.number],
@@ -58,7 +79,10 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
         setOpen(event.open);
         // Start each confirmation from the global setting, not a leftover
         // override from a previous run.
-        if (event.open) setPersonality(getReviewPersonality());
+        if (event.open) {
+          setPersonality(getReviewPersonality());
+          setDepth("deep");
+        }
       }}
       size="sm"
       lazyMount
@@ -91,6 +115,43 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
                   the review chat. The existing summary, issues, and
                   conversation will be replaced.
                 </Text>
+                <Field.Root>
+                  <Field.Label>Depth</Field.Label>
+                  <Select.Root
+                    collection={depthCollection}
+                    value={[depth]}
+                    onValueChange={(details) => {
+                      const value = details.value[0];
+                      if (value) setDepth(value as ReviewDepth);
+                    }}
+                    size="sm"
+                  >
+                    <Select.HiddenSelect />
+                    <Select.Control>
+                      <Select.Trigger cursor="pointer">
+                        <Select.ValueText />
+                      </Select.Trigger>
+                      <Select.IndicatorGroup>
+                        <Select.Indicator />
+                      </Select.IndicatorGroup>
+                    </Select.Control>
+                    <Select.Positioner>
+                      <Select.Content>
+                        {depthCollection.items.map((item) => (
+                          <Select.Item item={item} key={item.value}>
+                            <VStack gap="0" alignItems="flex-start">
+                              <Text>{item.label}</Text>
+                              <Text fontSize="xs" color="fg.muted">
+                                {item.description}
+                              </Text>
+                            </VStack>
+                            <Select.ItemIndicator />
+                          </Select.Item>
+                        ))}
+                      </Select.Content>
+                    </Select.Positioner>
+                  </Select.Root>
+                </Field.Root>
                 <Field.Root>
                   <Field.Label>Personality</Field.Label>
                   <Select.Root
@@ -146,7 +207,7 @@ export default function ReanalyzeButton({ pr, size = "xs" }: Props) {
                 size="sm"
                 onClick={() => {
                   setOpen(false);
-                  void startAnalysis(pr, {
+                  void startAnalysis(pr, depth, {
                     force: true,
                     personality,
                     clearChat: true,

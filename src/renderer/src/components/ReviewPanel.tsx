@@ -16,7 +16,12 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { LuPanelRightOpen, LuSparkles, LuTriangleAlert } from "react-icons/lu";
+import {
+  LuPanelRightOpen,
+  LuSparkles,
+  LuTelescope,
+  LuTriangleAlert,
+} from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import { startAnalysis, useAnalysisJob } from "../lib/analysisJobs";
 import type { AskContext, AskRequest } from "../lib/askContext";
@@ -110,8 +115,8 @@ export default function ReviewPanel({ pr }: Props) {
   });
 
   // The analysis runs as a background job, so it keeps going — and keeps
-  // reporting — after you leave this screen. It chases itself with the
-  // findings pass when the setting is on.
+  // reporting — after you leave this screen. A deep review chases itself with
+  // the findings pass.
   const job = useAnalysisJob(pr.repo, pr.number);
   const manualCheck =
     useIsMutating({ mutationKey: ["findIssues", pr.repo, pr.number] }) > 0;
@@ -119,6 +124,21 @@ export default function ReviewPanel({ pr }: Props) {
   const checking = job?.stage === "checking" || manualCheck;
 
   const findings = findingsQuery.data ?? null;
+
+  // Which commit each kind of anchor was measured against. Built here, the one
+  // place that holds the analysis, the findings run and the PR's head at once,
+  // and handed to every copy path — the nav's copy-all and each issue's own
+  // button — so the two can't disagree about whether a line still points at the
+  // code it was reported against.
+  const anchorCommits = useMemo(
+    () => ({
+      analysisSha: analysis?.headSha ?? "",
+      findingsSha: findings?.headSha ?? null,
+      currentSha: currentHeadSha,
+    }),
+    [analysis?.headSha, findings?.headSha, currentHeadSha],
+  );
+
   const issues = useMemo(
     () =>
       analysis
@@ -159,24 +179,53 @@ export default function ReviewPanel({ pr }: Props) {
   if (!analysis) {
     return (
       <Center h="full" p="8">
-        <VStack gap="4" maxW="sm" textAlign="center">
+        <VStack gap="4" maxW="md" textAlign="center">
           <Box color="colorPalette.fg">
             <LuSparkles size={28} />
           </Box>
-          <Heading size="md">Analyse this pull request</Heading>
+          <Heading size="md">Review this pull request</Heading>
           <Text fontSize="sm" color="fg.muted">
             Claude reads the full diff and builds a guided review: a summary,
             candidate issues for you to verify, and the changes grouped into a
             reading order — every claim tied to the code it came from.
           </Text>
-          <Button
-            onClick={() => void startAnalysis(pr)}
-            loading={Boolean(job)}
-            loadingText="Analysing…"
-          >
-            <LuSparkles />
-            Analyse PR
-          </Button>
+
+          <HStack gap="3" pt="1">
+            <Button
+              variant="outline"
+              onClick={() => void startAnalysis(pr, "quick")}
+              loading={Boolean(job)}
+              loadingText="Reviewing…"
+            >
+              <LuSparkles />
+              Quick review
+            </Button>
+            <Button
+              onClick={() => void startAnalysis(pr, "deep")}
+              loading={Boolean(job)}
+              loadingText="Reviewing…"
+            >
+              <LuTelescope />
+              Deep review
+            </Button>
+          </HStack>
+
+          <VStack gap="1.5" fontSize="xs" color="fg.subtle" textAlign="left">
+            <Text>
+              <Text as="span" fontWeight="medium" color="fg.muted">
+                Quick
+              </Text>{" "}
+              reads the diff — summary, reading order, and the risks it spots.
+            </Text>
+            <Text>
+              <Text as="span" fontWeight="medium" color="fg.muted">
+                Deep
+              </Text>{" "}
+              also searches the repo beyond the diff to check each risk and find
+              callers the PR missed. Slower, and about twice the cost.
+            </Text>
+          </VStack>
+
           <Text fontSize="xs" color="fg.subtle">
             {analyzing
               ? "This can take a minute on large PRs."
@@ -225,6 +274,10 @@ export default function ReviewPanel({ pr }: Props) {
           <AnalysisNav
             analysis={analysis}
             issues={issues}
+            repo={pr.repo}
+            prNumber={pr.number}
+            files={filesQuery.data}
+            anchorCommits={anchorCommits}
             hasFindings={Boolean(findings)}
             checking={checking}
             issuesError={
@@ -247,6 +300,7 @@ export default function ReviewPanel({ pr }: Props) {
             findings={findings}
             issues={issues}
             files={filesQuery.data}
+            anchorCommits={anchorCommits}
             currentHeadSha={currentHeadSha}
             selection={selection}
             onSelect={setSelection}
