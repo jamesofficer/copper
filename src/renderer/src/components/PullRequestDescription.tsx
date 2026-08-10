@@ -1,10 +1,11 @@
-import { Box, Button, Heading, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuPencil } from "react-icons/lu";
 import type { PullRequestDetail } from "../../../shared/types";
 import Markdown from "./Markdown";
 import MarkdownEditor, { type MarkdownEditorMode } from "./MarkdownEditor";
+import SectionHeading from "./SectionHeading";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -62,14 +63,7 @@ export default function PullRequestDescription({ detail, editable }: Props) {
   return (
     <Box>
       <HStack justifyContent="space-between" mb="3">
-        <Heading
-          size="xs"
-          color="fg.muted"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          Description
-        </Heading>
+        <SectionHeading mb="0">Description</SectionHeading>
         {editable && !editing && (
           <Button size="2xs" variant="ghost" onClick={startEditing}>
             <LuPencil /> Edit

@@ -27,7 +27,8 @@ export interface PullRequest {
   updatedAt: string;
 }
 
-export interface PullRequestLabel {
+// GitHub labels are one shape across pull requests and issues.
+export interface GitHubLabel {
   name: string;
   color: string;
 }
@@ -49,7 +50,7 @@ export interface PullRequestDetail {
   baseRef: string;
   headRef: string;
   headSha: string;
-  labels: PullRequestLabel[];
+  labels: GitHubLabel[];
   reviewers: string[];
   assignees: string[];
   additions: number;
@@ -60,6 +61,37 @@ export interface PullRequestDetail {
   createdAt: string;
   updatedAt: string;
   url: string;
+}
+
+// How many issues one listRepoIssues call returns. Part of the contract, not a
+// private detail: the renderer filters and sorts the list it was given, so it
+// has to be able to say when the list is only the newest slice.
+export const REPO_ISSUE_LIMIT = 50;
+
+// A GitHub issue, not to be confused with a ReviewIssue — the app's own name
+// for a finding the analysis agent reported. Labels sit on the summary, unlike
+// PullRequest, because issue lists lean on them and they cost nothing extra in
+// the same query.
+export interface RepoIssue {
+  repo: string;
+  number: number;
+  title: string;
+  author: string;
+  url: string;
+  labels: GitHubLabel[];
+  assignees: string[];
+  comments: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RepoIssueDetail extends RepoIssue {
+  body: string | null;
+  state: "open" | "closed";
+  // Why it closed. Null on open issues, and on ones closed before GitHub
+  // recorded a reason — which is why "closed" alone can't be read as
+  // "completed".
+  stateReason: "completed" | "not_planned" | "duplicate" | "reopened" | null;
 }
 
 // A lightweight snapshot of a PR's activity signals, for the background poll

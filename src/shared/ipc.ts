@@ -29,6 +29,8 @@ import type {
   PullRequestReview,
   ReactionContent,
   RepoBranchInfo,
+  RepoIssue,
+  RepoIssueDetail,
   RepoMergeSettings,
   Repository,
   ReviewComment,
@@ -132,6 +134,15 @@ export interface IpcApi {
   listPullRequestComments(
     repo: string,
     prNumber: number,
+  ): Promise<PullRequestComment[]>;
+  // A repository's open GitHub issues, most recently updated first. "Issue"
+  // elsewhere in this app means a finding from the analysis agent — these are
+  // the real thing on GitHub.
+  listRepoIssues(repo: string): Promise<RepoIssue[]>;
+  getRepoIssue(repo: string, issueNumber: number): Promise<RepoIssueDetail>;
+  listRepoIssueComments(
+    repo: string,
+    issueNumber: number,
   ): Promise<PullRequestComment[]>;
   listPullRequestReviews(
     repo: string,
@@ -338,6 +349,9 @@ export const ipcChannels = [
   "listCommitFiles",
   "getFileAtCommit",
   "listPullRequestComments",
+  "listRepoIssues",
+  "getRepoIssue",
+  "listRepoIssueComments",
   "listPullRequestReviews",
   "addPullRequestComment",
   "listReviewComments",
