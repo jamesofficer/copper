@@ -1,8 +1,12 @@
 import { Badge, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { LuUndo2 } from "react-icons/lu";
-import { issueVerdict, type ReviewIssue } from "../lib/issues";
+import {
+  categoryMeta,
+  issueVerdict,
+  type ReviewIssue,
+  verdictMeta,
+} from "../lib/issues";
 import { useIssueResolution } from "../lib/useIssueResolution";
-import { categoryMeta, verdictMeta } from "./IssuePane";
 
 interface Props {
   issues: ReviewIssue[];

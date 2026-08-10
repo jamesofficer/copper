@@ -1,10 +1,26 @@
 import type {
   AnalysisResult,
+  FindingCategory,
   FindingsResult,
   ReviewFinding,
   RiskClaim,
   RiskSeverity,
 } from "../../../shared/types";
+
+// The words the app uses for the model's enums — one table each, so a category
+// or verdict reads the same in a badge, in copied markdown, and anywhere else.
+export const categoryMeta: Record<
+  FindingCategory,
+  { label: string; palette: string }
+> = {
+  bug: { label: "Bug", palette: "red" },
+  blast_radius: { label: "Blast radius", palette: "purple" },
+  edge_case: { label: "Edge case", palette: "orange" },
+  security: { label: "Security", palette: "red" },
+  performance: { label: "Performance", palette: "yellow" },
+  maintainability: { label: "Maintainability", palette: "gray" },
+  test_gap: { label: "Test gap", palette: "blue" },
+};
 
 // One entry in the unified Issues list. "finding" = verified by the agent
 // pass (tools, evidence, a ready-to-post suggestion). "risk" = an unverified
@@ -37,6 +53,16 @@ export interface IssueSets {
 // cleared it, otherwise checking/unverified. Appearance (badge label,
 // colour) is keyed off this — see verdictMeta in IssuePane.
 export type IssueVerdict = "verified" | "non_issue" | "checking" | "unverified";
+
+export const verdictMeta: Record<
+  IssueVerdict,
+  { label: string; palette: string; solid: boolean }
+> = {
+  verified: { label: "Verified", palette: "green", solid: true },
+  non_issue: { label: "Non-issue", palette: "green", solid: true },
+  checking: { label: "Checking", palette: "gray", solid: false },
+  unverified: { label: "Unverified", palette: "gray", solid: false },
+};
 
 export function issueVerdict(issue: ReviewIssue): IssueVerdict {
   if (issue.kind === "finding") return "verified";

@@ -4,6 +4,7 @@ import {
   Button,
   Heading,
   HStack,
+  IconButton,
   Spinner,
   Text,
   VStack,
@@ -11,6 +12,8 @@ import {
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   LuBadgeCheck,
+  LuCheck,
+  LuCopy,
   LuMessageSquarePlus,
   LuShieldCheck,
   LuUndo2,
@@ -18,16 +21,18 @@ import {
 } from "react-icons/lu";
 import type {
   DraftReviewComment,
-  FindingCategory,
   PullRequestFile,
   ReviewFinding,
 } from "../../../shared/types";
 import type { AskContext } from "../lib/askContext";
+import { issueToMarkdown } from "../lib/issueMarkdown";
 import {
-  type IssueVerdict,
+  categoryMeta,
   issueVerdict,
   type ReviewIssue,
+  verdictMeta,
 } from "../lib/issues";
+import { useCopyToClipboard } from "../lib/useCopyToClipboard";
 import { useIssueResolution } from "../lib/useIssueResolution";
 import {
   AnchorChips,
@@ -40,19 +45,6 @@ import {
 import Markdown from "./Markdown";
 import RiskSeverityBadge from "./RiskSeverityBadge";
 import { toaster } from "./ui/toaster";
-
-export const categoryMeta: Record<
-  FindingCategory,
-  { label: string; palette: string }
-> = {
-  bug: { label: "Bug", palette: "red" },
-  blast_radius: { label: "Blast radius", palette: "purple" },
-  edge_case: { label: "Edge case", palette: "orange" },
-  security: { label: "Security", palette: "red" },
-  performance: { label: "Performance", palette: "yellow" },
-  maintainability: { label: "Maintainability", palette: "gray" },
-  test_gap: { label: "Test gap", palette: "blue" },
-};
 
 interface Props {
   issue: ReviewIssue;
@@ -67,17 +59,6 @@ interface Props {
   fileByPath: FileMap;
   onAskAbout(context: AskContext, question?: string): void;
 }
-
-// How each verification verdict looks — one place to add new verdicts.
-export const verdictMeta: Record<
-  IssueVerdict,
-  { label: string; palette: string; solid: boolean }
-> = {
-  verified: { label: "Verified", palette: "green", solid: true },
-  non_issue: { label: "Non-issue", palette: "green", solid: true },
-  checking: { label: "Checking", palette: "gray", solid: false },
-  unverified: { label: "Unverified", palette: "gray", solid: false },
-};
 
 function VerdictBadge({ issue }: { issue: ReviewIssue }) {
   const verdict = issueVerdict(issue);
@@ -106,6 +87,9 @@ export default function IssuePane({
 }: Props) {
   const queryClient = useQueryClient();
   const resolve = useIssueResolution(repo, prNumber);
+  const clipboard = useCopyToClipboard({
+    errorTitle: "Couldn’t copy the issue",
+  });
 
   // Accept = draft the suggested comment, then mark the finding accepted so
   // it leaves the open list and won't return on a re-run.
@@ -183,18 +167,34 @@ export default function IssuePane({
               </Badge>
             )}
             <VerdictBadge issue={issue} />
-            {finding && (
-              <Text
-                fontSize="xs"
-                fontFamily="mono"
-                color="fg.subtle"
-                ml="auto"
-                truncate
-                title={`${finding.path}:${finding.line}`}
+            <HStack gap="1" ml="auto" minW="0">
+              {finding && (
+                <Text
+                  fontSize="xs"
+                  fontFamily="mono"
+                  color="fg.subtle"
+                  truncate
+                  title={`${finding.path}:${finding.line}`}
+                >
+                  {finding.path}:{finding.line}
+                </Text>
+              )}
+              <IconButton
+                aria-label="Copy issue as markdown"
+                title="Copy as markdown — to paste into an agent or a message"
+                size="2xs"
+                variant="ghost"
+                color="fg.muted"
+                flexShrink="0"
+                onClick={() =>
+                  void clipboard.copy(
+                    issueToMarkdown(issue, { repo, prNumber, fileByPath }),
+                  )
+                }
               >
-                {finding.path}:{finding.line}
-              </Text>
-            )}
+                {clipboard.copied ? <LuCheck /> : <LuCopy />}
+              </IconButton>
+            </HStack>
           </HStack>
           <Heading size="md">{issue.title}</Heading>
         </VStack>
