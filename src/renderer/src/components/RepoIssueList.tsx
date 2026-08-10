@@ -1,6 +1,6 @@
 import { HStack, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
-import type { PullRequest } from "../../../shared/types";
+import type { RepoIssue } from "../../../shared/types";
 import {
   assigneeOptions,
   authorOptions,
@@ -10,34 +10,28 @@ import {
   sortOptions,
 } from "../lib/listFilters";
 import FilterSelect from "./FilterSelect";
-import PullRequestCard from "./PullRequestCard";
+import RepoIssueCard from "./RepoIssueCard";
 
 interface Props {
-  prs: PullRequest[];
-  preview: PullRequest | null;
-  onSelect(pr: PullRequest): void;
-  onOpen(pr: PullRequest): void;
+  issues: RepoIssue[];
+  preview: RepoIssue | null;
+  onSelect(issue: RepoIssue): void;
 }
 
-// The selected repo's open PRs with GitHub-style filters. Filtering is
-// client-side — the full open list is already loaded. Mounted with
-// key={repo slug} so filters reset when switching repos.
-export default function OpenPullRequestList({
-  prs,
-  preview,
-  onSelect,
-  onOpen,
-}: Props) {
+// The selected repo's open issues, filtered client-side like the PR list —
+// the whole open list is already loaded. Mounted with key={repo slug} so
+// filters reset when switching repos.
+export default function RepoIssueList({ issues, preview, onSelect }: Props) {
   const [author, setAuthor] = useState("all");
   const [assignee, setAssignee] = useState("all");
   const [sort, setSort] = useState<ListSort>("newest");
 
-  const authorItems = useMemo(() => authorOptions(prs), [prs]);
-  const assigneeItems = useMemo(() => assigneeOptions(prs), [prs]);
+  const authorItems = useMemo(() => authorOptions(issues), [issues]);
+  const assigneeItems = useMemo(() => assigneeOptions(issues), [issues]);
 
   const visible = useMemo(
-    () => sortListItems(filterByPeople(prs, author, assignee), sort),
-    [prs, author, assignee, sort],
+    () => sortListItems(filterByPeople(issues, author, assignee), sort),
+    [issues, author, assignee, sort],
   );
 
   return (
@@ -66,17 +60,16 @@ export default function OpenPullRequestList({
 
       {visible.length === 0 ? (
         <Text fontSize="sm" color="fg.muted" py="4">
-          No pull requests match these filters.
+          No issues match these filters.
         </Text>
       ) : (
-        visible.map((pr) => (
-          <PullRequestCard
-            key={`${pr.repo}#${pr.number}`}
-            pr={pr}
+        visible.map((issue) => (
+          <RepoIssueCard
+            key={`${issue.repo}#${issue.number}`}
+            issue={issue}
             onSelect={onSelect}
-            onOpen={onOpen}
             selected={
-              preview?.repo === pr.repo && preview?.number === pr.number
+              preview?.repo === issue.repo && preview?.number === issue.number
             }
             maxW="2xl"
           />

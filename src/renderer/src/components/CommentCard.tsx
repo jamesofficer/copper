@@ -8,10 +8,20 @@ import UserAvatar from "./UserAvatar";
 interface Props {
   comment: PullRequestComment;
   repo: string;
-  prNumber: number;
+  // The pull request or issue the comment belongs to. GitHub numbers both in
+  // one sequence per repo, so this identifies either.
+  number: number;
+  // Reactions are read through a PR-shaped lookup, so issue comments turn them
+  // off until that has an issue twin.
+  showReactions?: boolean;
 }
 
-export default function CommentCard({ comment, repo, prNumber }: Props) {
+export default function CommentCard({
+  comment,
+  repo,
+  number,
+  showReactions = true,
+}: Props) {
   return (
     <Box borderWidth="1px" rounded="lg" overflow="hidden">
       <HStack gap="2" px="4" py="2.5" bg="bg.subtle" borderBottomWidth="1px">
@@ -29,12 +39,14 @@ export default function CommentCard({ comment, repo, prNumber }: Props) {
             No comment text.
           </Text>
         )}
-        <ReactionBar
-          repo={repo}
-          prNumber={prNumber}
-          commentId={comment.id}
-          commentNodeId={comment.nodeId}
-        />
+        {showReactions && (
+          <ReactionBar
+            repo={repo}
+            prNumber={number}
+            commentId={comment.id}
+            commentNodeId={comment.nodeId}
+          />
+        )}
       </Box>
     </Box>
   );

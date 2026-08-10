@@ -23,16 +23,18 @@ import {
   getBranchInfo,
   getOpenPullRequestCounts,
   getPullRequest,
+  getRepoIssue,
   getRepoMergeSettings,
   getReviewDecision,
   getViewer,
   listCommitFiles,
+  listIssueComments,
   listMyPullRequests,
-  listPullRequestComments,
   listPullRequestCommits,
   listPullRequestFiles,
   listPullRequestReviews,
   listReactions,
+  listRepoIssues,
   listResolvedReviewThreads,
   listReviewComments,
   listReviewRequestedPullRequests,
@@ -107,7 +109,11 @@ const handlers: IpcApi = {
   listCommitFiles: (repo, commitSha) => listCommitFiles(repo, commitSha),
   getFileAtCommit: (repo, sha, path) => readFileAtCommit(repo, sha, path),
   listPullRequestComments: (repo, prNumber) =>
-    listPullRequestComments(repo, prNumber),
+    listIssueComments(repo, prNumber),
+  listRepoIssues: (repo) => listRepoIssues(repo),
+  getRepoIssue: (repo, issueNumber) => getRepoIssue(repo, issueNumber),
+  listRepoIssueComments: (repo, issueNumber) =>
+    listIssueComments(repo, issueNumber),
   listPullRequestReviews: (repo, prNumber) =>
     listPullRequestReviews(repo, prNumber),
   addPullRequestComment: (repo, prNumber, body) =>
