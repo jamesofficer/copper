@@ -1,5 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { REPO_ISSUE_LIMIT, type RepoIssue } from "../../../shared/types";
 import {
   assigneeOptions,
@@ -25,6 +25,8 @@ interface Props {
 // the whole loaded list is already in memory. Mounted with key={repo slug} so
 // filters reset when switching repos.
 export default function RepoIssueList({ issues, preview, onSelect }: Props) {
+  const topRef = useRef<HTMLDivElement>(null);
+
   const [author, setAuthor] = useState("all");
   const [assignee, setAssignee] = useState("all");
   const [sort, setSort] = useState<ListSort>("newest");
@@ -51,9 +53,18 @@ export default function RepoIssueList({ issues, preview, onSelect }: Props) {
     setRequestedPage(1);
   }
 
+  // The controls sit at the foot of the list, so the click that turns the page
+  // leaves the reader at the bottom of it — looking at the last card of the new
+  // page instead of the first. scrollIntoView finds whichever ancestor scrolls,
+  // which this component deliberately doesn't know.
+  function goToPage(next: number) {
+    setRequestedPage(next);
+    topRef.current?.scrollIntoView({ block: "start" });
+  }
+
   return (
     <>
-      <HStack gap="2" maxW="2xl" flexWrap="wrap">
+      <HStack ref={topRef} gap="2" maxW="2xl" flexWrap="wrap">
         <FilterSelect
           label="Author"
           items={authorItems}
@@ -106,7 +117,7 @@ export default function RepoIssueList({ issues, preview, onSelect }: Props) {
         count={visible.length}
         pageSize={PAGE_SIZE}
         page={page}
-        onPageChange={setRequestedPage}
+        onPageChange={goToPage}
       />
     </>
   );
