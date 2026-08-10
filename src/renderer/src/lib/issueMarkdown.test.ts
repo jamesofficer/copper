@@ -4,7 +4,7 @@ import type {
   ReviewFinding,
   RiskClaim,
 } from "../../../shared/types";
-import { issueToMarkdown } from "./issueMarkdown";
+import { issuesToMarkdown, issueToMarkdown } from "./issueMarkdown";
 import type { ReviewIssue } from "./issues";
 
 const userPatch = [
@@ -133,5 +133,34 @@ describe("issueToMarkdown", () => {
     expect(markdown).toContain(
       "> Checked and cleared by the review agent: The caller already guards this.",
     );
+  });
+});
+
+describe("issuesToMarkdown", () => {
+  it("collects every issue under a counted heading, split by a rule", () => {
+    const markdown = issuesToMarkdown([findingIssue, riskIssue({})], source);
+
+    expect(markdown.startsWith("# 2 issues on acme/app#7")).toBe(true);
+    expect(markdown).toContain(findingIssue.title);
+    expect(markdown).toContain("The retry loop may never exit");
+    // One rule between the two issues, and none before the first or after the
+    // last — the separator is there to divide, not to decorate.
+    expect(markdown.split("\n---\n")).toHaveLength(2);
+  });
+
+  it("keeps each issue self-contained", () => {
+    const markdown = issuesToMarkdown([findingIssue, riskIssue({})], source);
+
+    // A long paste often gets split up again at the other end, so both halves
+    // have to carry their own verdict and location.
+    expect(markdown.match(/acme\/app#7/g)).toHaveLength(3);
+    expect(markdown).toContain("Verified");
+    expect(markdown).toContain("Unverified");
+  });
+
+  it("says one issue, not 1 issues", () => {
+    const markdown = issuesToMarkdown([findingIssue], source);
+
+    expect(markdown.startsWith("# 1 issue on acme/app#7")).toBe(true);
   });
 });

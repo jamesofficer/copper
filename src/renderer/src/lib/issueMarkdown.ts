@@ -107,3 +107,22 @@ export function issueToMarkdown(issue: ReviewIssue, source: Source): string {
 
   return `${lines.join("\n")}\n`;
 }
+
+// Every issue in one document, for handing a whole review to an agent instead
+// of copying each one in turn. Each issue keeps the same self-contained form it
+// has on its own — repeated PR reference included — because a long paste often
+// gets split up again at the other end.
+export function issuesToMarkdown(
+  issues: ReviewIssue[],
+  source: Source,
+): string {
+  const count = issues.length;
+  const heading = `# ${count} issue${count === 1 ? "" : "s"} on ${source.repo}#${source.prNumber}`;
+  // A rule between issues — but not under the heading, which the first issue's
+  // own heading already follows. It's there so where one issue ends and the
+  // next begins survives a paste into something that doesn't render headings.
+  const body = issues
+    .map((issue) => issueToMarkdown(issue, source).trim())
+    .join("\n\n---\n\n");
+  return `${heading}\n\n${body}\n`;
+}

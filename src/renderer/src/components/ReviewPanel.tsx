@@ -259,6 +259,9 @@ export default function ReviewPanel({ pr }: Props) {
           <AnalysisNav
             analysis={analysis}
             issues={issues}
+            repo={pr.repo}
+            prNumber={pr.number}
+            files={filesQuery.data}
             hasFindings={Boolean(findings)}
             checking={checking}
             issuesError={

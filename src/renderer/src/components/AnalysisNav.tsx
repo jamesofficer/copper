@@ -13,8 +13,13 @@ import {
   LuScrollText,
   LuTelescope,
 } from "react-icons/lu";
-import type { AnalysisResult, ChangeGroupRisk } from "../../../shared/types";
+import type {
+  AnalysisResult,
+  ChangeGroupRisk,
+  PullRequestFile,
+} from "../../../shared/types";
 import type { IssueSets } from "../lib/issues";
+import CopyIssuesButton from "./CopyIssuesButton";
 import { severityDotColor } from "./RiskSeverityBadge";
 
 export type AnalysisSelection =
@@ -27,6 +32,10 @@ export type AnalysisSelection =
 interface Props {
   analysis: AnalysisResult;
   issues: IssueSets;
+  repo: string;
+  prNumber: number;
+  // The PR's diffs, for the copy-all button's quoted code.
+  files: PullRequestFile[] | undefined;
   // Whether a findings run exists — decides between "find" and "re-run".
   hasFindings: boolean;
   // A findings run is in flight.
@@ -110,6 +119,9 @@ function Dot({ color }: { color: string }) {
 export default function AnalysisNav({
   analysis,
   issues,
+  repo,
+  prNumber,
+  files,
   hasFindings,
   checking,
   issuesError,
@@ -138,24 +150,30 @@ export default function AnalysisNav({
       <VStack alignItems="stretch" gap="1">
         <HStack gap="1">
           <SectionLabel>Issues ({issues.open.length})</SectionLabel>
-          {!checking && (
-            <IconButton
-              aria-label={hasFindings ? "Re-run findings" : "Find issues"}
-              title={
-                hasFindings
-                  ? "Re-run the deeper agent pass"
-                  : "Run the deeper agent pass over the repo"
-              }
-              size="2xs"
-              variant="ghost"
-              color="fg.muted"
-              ml="auto"
-              mr="1"
-              onClick={onFindIssues}
-            >
-              {hasFindings ? <LuRefreshCw /> : <LuTelescope />}
-            </IconButton>
-          )}
+          <HStack gap="0" ml="auto" mr="1">
+            <CopyIssuesButton
+              issues={issues.open}
+              repo={repo}
+              prNumber={prNumber}
+              files={files}
+            />
+            {!checking && (
+              <IconButton
+                aria-label={hasFindings ? "Re-run findings" : "Find issues"}
+                title={
+                  hasFindings
+                    ? "Re-run the deeper agent pass"
+                    : "Run the deeper agent pass over the repo"
+                }
+                size="2xs"
+                variant="ghost"
+                color="fg.muted"
+                onClick={onFindIssues}
+              >
+                {hasFindings ? <LuRefreshCw /> : <LuTelescope />}
+              </IconButton>
+            )}
+          </HStack>
         </HStack>
 
         {issues.open.map((issue) => (
