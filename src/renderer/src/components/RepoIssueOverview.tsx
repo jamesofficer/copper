@@ -15,7 +15,7 @@ import CommentCard from "./CommentCard";
 import LabelBadges from "./LabelBadges";
 import Markdown from "./Markdown";
 import OpenedUpdatedLine from "./OpenedUpdatedLine";
-import { PanelError, PanelLoading } from "./PanelState";
+import { PanelError, PanelLoading, PanelSectionError } from "./PanelState";
 import SectionHeading from "./SectionHeading";
 import UserAvatar from "./UserAvatar";
 
@@ -144,6 +144,17 @@ export default function RepoIssueOverview({ issue }: Props) {
             </Text>
           )}
         </Box>
+
+        {commentsQuery.isError && (
+          <>
+            <Separator />
+            <PanelSectionError
+              message="Couldn’t load the comments on this issue."
+              retrying={commentsQuery.isFetching}
+              onRetry={() => void commentsQuery.refetch()}
+            />
+          </>
+        )}
 
         {comments && comments.length > 0 && (
           <>

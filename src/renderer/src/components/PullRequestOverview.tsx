@@ -24,7 +24,7 @@ import CommentComposer from "./CommentComposer";
 import CommitTimelineGroup from "./CommitTimelineGroup";
 import LabelBadges from "./LabelBadges";
 import OpenedUpdatedLine from "./OpenedUpdatedLine";
-import { PanelError, PanelLoading } from "./PanelState";
+import { PanelError, PanelLoading, PanelSectionError } from "./PanelState";
 import PrStateBadge from "./PrStateBadge";
 import PullRequestDescription from "./PullRequestDescription";
 import ReviewCard from "./ReviewCard";
@@ -164,9 +164,13 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
   }
 
   const detail = detailQuery.data;
-  const timeline = comments
-    ? buildTimeline(comments, reviews, reviewComments, commits)
-    : [];
+  // A failed comment fetch used to hide the whole conversation — reviews,
+  // commits and the comment box included. The rest of the timeline doesn't
+  // depend on comments, so it still builds without them and the gap is
+  // reported where it is.
+  const timeline = commentsQuery.isPending
+    ? []
+    : buildTimeline(comments ?? [], reviews, reviewComments, commits);
   const rendered = groupTimeline(timeline);
   // The header count reflects discussion, not commits.
   const discussionCount = timeline.filter(
@@ -247,12 +251,19 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
 
         <PullRequestDescription detail={detail} editable={showActions} />
 
-        {comments && (
+        {!commentsQuery.isPending && (
           <>
             <Separator />
             <Box>
               <SectionHeading>Conversation ({discussionCount})</SectionHeading>
               <VStack gap="3" alignItems="stretch">
+                {commentsQuery.isError && (
+                  <PanelSectionError
+                    message="Couldn’t load the comments on this pull request."
+                    retrying={commentsQuery.isFetching}
+                    onRetry={() => void commentsQuery.refetch()}
+                  />
+                )}
                 {rendered.map((item) =>
                   item.kind === "comment" ? (
                     <CommentCard
