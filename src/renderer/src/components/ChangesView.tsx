@@ -1,6 +1,7 @@
 import {
   Box,
   Center,
+  Checkbox,
   Collapsible,
   Flex,
   Heading,
@@ -19,8 +20,10 @@ import type {
   Explanation,
   PullRequest,
 } from "../../../shared/types";
+import { getHideTestFilesByDefault } from "../lib/hideTestFiles";
 import { buildReviewThreads } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
+import { isTestFile } from "../lib/testFiles";
 import { usePanelWidth } from "../lib/usePanelWidth";
 import CommitList from "./CommitList";
 import DiffView from "./DiffView";
@@ -36,6 +39,7 @@ export default function ChangesView({ pr }: Props) {
   // null = the full changelist (base...head); a sha = just that commit.
   const [selectedCommit, setSelectedCommit] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [hideTestFiles, setHideTestFiles] = useState(getHideTestFilesByDefault);
   const { width: sidebarWidth, startResize: startSidebarResize } =
     usePanelWidth({
       storageKey: "changesFileListWidth",
@@ -66,7 +70,9 @@ export default function ChangesView({ pr }: Props) {
   // waits out the typing burst.
   const [debouncedFilter] = useDebounce(filter, 150);
   const query = debouncedFilter.trim().toLowerCase();
-  const visibleFiles = useMemo(() => {
+  // The search filter applies first, so the hidden-test-file count reflects
+  // what's hidden from the current search results, not the full file list.
+  const queryFilteredFiles = useMemo(() => {
     if (!files || !query) return files;
     return files.filter(
       (file) =>
@@ -74,13 +80,22 @@ export default function ChangesView({ pr }: Props) {
         file.previousPath?.toLowerCase().includes(query),
     );
   }, [files, query]);
+  const hiddenTestFileCount = useMemo(() => {
+    if (!queryFilteredFiles || !hideTestFiles) return 0;
+    return queryFilteredFiles.filter((file) => isTestFile(file.path)).length;
+  }, [queryFilteredFiles, hideTestFiles]);
+  const filtering = Boolean(query) || hideTestFiles;
+  const visibleFiles = useMemo(() => {
+    if (!queryFilteredFiles || !hideTestFiles) return queryFilteredFiles;
+    return queryFilteredFiles.filter((file) => !isTestFile(file.path));
+  }, [queryFilteredFiles, hideTestFiles]);
   const selectedFile =
     visibleFiles?.find((file) => file.path === selectedPath) ??
     visibleFiles?.[0] ??
     null;
 
   const fileCount = files
-    ? query
+    ? filtering
       ? `${visibleFiles?.length ?? 0}/${files.length}`
       : `${files.length}`
     : null;
@@ -353,6 +368,29 @@ export default function ChangesView({ pr }: Props) {
               </Text>
             )}
           </Box>
+          <HStack px="3" py="2" flexShrink="0" borderTopWidth="1px">
+            {hiddenTestFileCount > 0 && (
+              <Text fontSize="xs" color="fg.muted">
+                {hiddenTestFileCount} file
+                {hiddenTestFileCount === 1 ? "" : "s"} hidden
+              </Text>
+            )}
+            <Checkbox.Root
+              ml="auto"
+              size="sm"
+              cursor="pointer"
+              checked={hideTestFiles}
+              onCheckedChange={(event) =>
+                setHideTestFiles(Boolean(event.checked))
+              }
+            >
+              <Checkbox.HiddenInput />
+              <Checkbox.Control />
+              <Checkbox.Label fontSize="xs" color="fg.muted">
+                Hide test files
+              </Checkbox.Label>
+            </Checkbox.Root>
+          </HStack>
         </Flex>
         <Box
           w="1"

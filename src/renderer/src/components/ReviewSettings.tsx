@@ -12,6 +12,10 @@ import {
   setFindIssuesOnAnalyse,
 } from "../lib/findIssuesOnAnalyse";
 import {
+  getHideTestFilesByDefault,
+  setHideTestFilesByDefault,
+} from "../lib/hideTestFiles";
+import {
   getReviewPersonality,
   personalityOptions,
   setReviewPersonality,
@@ -37,6 +41,9 @@ export default function ReviewSettings() {
   const [personality, setPersonality] =
     useState<ReviewPersonality>(getReviewPersonality);
   const [findIssues, setFindIssues] = useState<boolean>(getFindIssuesOnAnalyse);
+  const [hideTestFiles, setHideTestFiles] = useState<boolean>(
+    getHideTestFilesByDefault,
+  );
 
   function selectPersonality(value: ReviewPersonality) {
     setReviewPersonality(value);
@@ -46,6 +53,11 @@ export default function ReviewSettings() {
   function toggleFindIssues(enabled: boolean) {
     setFindIssuesOnAnalyse(enabled);
     setFindIssues(enabled);
+  }
+
+  function toggleHideTestFiles(enabled: boolean) {
+    setHideTestFilesByDefault(enabled);
+    setHideTestFiles(enabled);
   }
 
   return (
@@ -112,6 +124,20 @@ export default function ReviewSettings() {
           <Switch.Root
             checked={findIssues}
             onCheckedChange={(event) => toggleFindIssues(event.checked)}
+            size="lg"
+          >
+            <Switch.HiddenInput />
+            <Switch.Control />
+          </Switch.Root>
+        </SettingRow>
+
+        <SettingRow
+          title="Hide test files by default"
+          description="Start the Changes tab's file list with test files hidden. Can still be toggled per PR with the checkbox above the file list."
+        >
+          <Switch.Root
+            checked={hideTestFiles}
+            onCheckedChange={(event) => toggleHideTestFiles(event.checked)}
             size="lg"
           >
             <Switch.HiddenInput />
