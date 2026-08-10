@@ -1,6 +1,16 @@
-import { createListCollection, Select, Stack, Text } from "@chakra-ui/react";
+import {
+  createListCollection,
+  Select,
+  Stack,
+  Switch,
+  Text,
+} from "@chakra-ui/react";
 import { useState } from "react";
 import type { ReviewPersonality } from "../../../shared/types";
+import {
+  getHideTestFilesByDefault,
+  setHideTestFilesByDefault,
+} from "../lib/hideTestFiles";
 import {
   getReviewPersonality,
   personalityOptions,
@@ -26,10 +36,18 @@ function descriptionFor(personality: ReviewPersonality): string {
 export default function ReviewSettings() {
   const [personality, setPersonality] =
     useState<ReviewPersonality>(getReviewPersonality);
+  const [hideTestFiles, setHideTestFiles] = useState<boolean>(
+    getHideTestFilesByDefault,
+  );
 
   function selectPersonality(value: ReviewPersonality) {
     setReviewPersonality(value);
     setPersonality(value);
+  }
+
+  function toggleHideTestFiles(enabled: boolean) {
+    setHideTestFilesByDefault(enabled);
+    setHideTestFiles(enabled);
   }
 
   return (
@@ -87,6 +105,20 @@ export default function ReviewSettings() {
               {descriptionFor(personality)}
             </Text>
           </Stack>
+        </SettingRow>
+
+        <SettingRow
+          title="Hide test files by default"
+          description="Start the Changes tab's file list with test files hidden. Can still be toggled per PR with the checkbox above the file list."
+        >
+          <Switch.Root
+            checked={hideTestFiles}
+            onCheckedChange={(event) => toggleHideTestFiles(event.checked)}
+            size="lg"
+          >
+            <Switch.HiddenInput />
+            <Switch.Control />
+          </Switch.Root>
         </SettingRow>
       </SettingsGroup>
     </SettingsPanel>

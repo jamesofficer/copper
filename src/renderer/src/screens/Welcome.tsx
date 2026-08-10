@@ -1,8 +1,6 @@
 import {
   Alert,
-  Button,
   Center,
-  EmptyState,
   Flex,
   HStack,
   IconButton,
@@ -10,26 +8,27 @@ import {
   Stack,
   Tabs,
   Text,
-  VStack,
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
+  LuCircleDot,
   LuFileDiff,
-  LuFolderGit2,
-  LuFolderPlus,
   LuGitBranch,
   LuGitPullRequest,
   LuRefreshCw,
 } from "react-icons/lu";
-import type { PullRequest, Repository } from "../../../shared/types";
+import type { PullRequest, RepoIssue, Repository } from "../../../shared/types";
 import LocalChangesView, {
   localChangeCountQueryOptions,
   localChangesQueryOptions,
 } from "../components/LocalChangesView";
 import NewPullRequestDialog from "../components/NewPullRequestDialog";
+import NoRepositoriesEmptyState from "../components/NoRepositoriesEmptyState";
 import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
+import RepoIssueList from "../components/RepoIssueList";
+import RepoIssuePreview from "../components/RepoIssuePreview";
 import SetupBanner from "../components/SetupBanner";
 import ShowSidebarButton from "../components/ShowSidebarButton";
 import WorktreeSelect from "../components/WorktreeSelect";
@@ -77,6 +76,31 @@ export default function Welcome({
     : null;
 
   const localChangesTab = tab === "local-changes";
+  const issuesTab = tab === "issues";
+  const noRepositories =
+    !reposPending && (!repositories || repositories.length === 0);
+
+  // Only fetched while the tab is showing, so a user who never opens Issues
+  // never spends the request. That's also why the trigger carries no count.
+  const issuesQuery = useQuery({
+    queryKey: ["repoIssues", active?.slug],
+    queryFn: () => window.api.listRepoIssues(active?.slug ?? ""),
+    enabled: Boolean(active?.slug) && issuesTab,
+  });
+  const issues = issuesQuery.data;
+  const issuesError = issuesQuery.error
+    ? issuesQuery.error instanceof Error
+      ? issuesQuery.error.message
+      : "Couldn't load issues."
+    : null;
+
+  // Kept here rather than in App: unlike the PR preview it has no full screen
+  // to survive a trip to, so it never needs to outlive this screen.
+  const [previewIssue, setPreviewIssue] = useState<RepoIssue | null>(null);
+  // Guarding on the slug drops a panel left over from the previous repo
+  // without an effect to clear it.
+  const shownIssue =
+    previewIssue && previewIssue.repo === active?.slug ? previewIssue : null;
 
   // The repo's checkouts — main worktree plus any linked git worktrees, so
   // Current changes can jump between agents working in parallel. Worktrees
@@ -142,9 +166,20 @@ export default function Welcome({
             css={dragRegion}
           >
             <ShowSidebarButton />
-            <Tabs.List h="full" border="none" alignItems="stretch">
+            {/* A third tab plus the preview panel is enough to wrap the
+                labels onto two lines, which fights the title bar's height. */}
+            <Tabs.List
+              h="full"
+              border="none"
+              alignItems="stretch"
+              flexShrink="0"
+              whiteSpace="nowrap"
+            >
               <Tabs.Trigger value="pull-requests" h="full">
                 <LuGitPullRequest /> Open pull requests
+              </Tabs.Trigger>
+              <Tabs.Trigger value="issues" h="full">
+                <LuCircleDot /> Issues
               </Tabs.Trigger>
               <Tabs.Trigger value="local-changes" h="full">
                 <LuFileDiff /> Current changes
@@ -173,6 +208,20 @@ export default function Welcome({
                   repo={active.slug}
                   onCreated={openCreatedPullRequest}
                 />
+              </HStack>
+            )}
+            {active?.slug && issuesTab && (
+              <HStack ml="auto" gap="2">
+                <IconButton
+                  aria-label="Refresh issues"
+                  title="Refresh"
+                  variant="outline"
+                  size="xs"
+                  loading={issuesQuery.isFetching}
+                  onClick={() => void issuesQuery.refetch()}
+                >
+                  <LuRefreshCw />
+                </IconButton>
               </HStack>
             )}
             {active && localChangesTab && (
@@ -223,29 +272,11 @@ export default function Welcome({
             >
               <SetupBanner onOpenSettings={onOpenSettings} />
 
-              {!reposPending && (!repositories || repositories.length === 0) ? (
-                <EmptyState.Root
-                  borderWidth="1px"
-                  borderStyle="dashed"
-                  rounded="xl"
-                  maxW="2xl"
-                >
-                  <EmptyState.Content>
-                    <EmptyState.Indicator>
-                      <LuFolderGit2 />
-                    </EmptyState.Indicator>
-                    <VStack textAlign="center">
-                      <EmptyState.Title>No repositories yet</EmptyState.Title>
-                      <EmptyState.Description>
-                        Add a local git repository to start reviewing its pull
-                        requests.
-                      </EmptyState.Description>
-                    </VStack>
-                    <Button onClick={onAddRepo}>
-                      <LuFolderPlus /> Add repository
-                    </Button>
-                  </EmptyState.Content>
-                </EmptyState.Root>
+              {noRepositories ? (
+                <NoRepositoriesEmptyState
+                  purpose="start reviewing its pull requests"
+                  onAddRepo={onAddRepo}
+                />
               ) : (
                 <>
                   {active && !active.slug && (
@@ -290,6 +321,66 @@ export default function Welcome({
             </Stack>
           </Tabs.Content>
 
+          <Tabs.Content value="issues" flex="1" minH="0" p="0">
+            <Stack
+              h="full"
+              minH="0"
+              overflowY="auto"
+              gap="3"
+              px="4"
+              py="4"
+              css={scrollbar}
+            >
+              <SetupBanner onOpenSettings={onOpenSettings} />
+
+              {noRepositories ? (
+                <NoRepositoriesEmptyState
+                  purpose="see its issues"
+                  onAddRepo={onAddRepo}
+                />
+              ) : (
+                <>
+                  {active && !active.slug && (
+                    <Text fontSize="sm" color="fg.muted">
+                      This repository has no GitHub remote, so issues can’t be
+                      loaded.
+                    </Text>
+                  )}
+
+                  {issuesError && (
+                    <Alert.Root status="error" rounded="lg" maxW="2xl">
+                      <Alert.Indicator />
+                      <Alert.Content>
+                        <Alert.Title>Couldn’t load issues</Alert.Title>
+                        <Alert.Description>{issuesError}</Alert.Description>
+                      </Alert.Content>
+                    </Alert.Root>
+                  )}
+
+                  {active?.slug &&
+                    !issuesError &&
+                    (issuesQuery.isPending || !issues ? (
+                      <HStack color="fg.muted" py="4">
+                        <Spinner size="sm" />
+                        <Text fontSize="sm">Loading open issues…</Text>
+                      </HStack>
+                    ) : issues.length === 0 ? (
+                      <Text fontSize="sm" color="fg.muted" py="4">
+                        No open issues. Nothing to fix.
+                      </Text>
+                    ) : (
+                      <RepoIssueList
+                        key={active.slug}
+                        issues={issues}
+                        preview={shownIssue}
+                        onSelect={setPreviewIssue}
+                      />
+                    ))}
+                </>
+              )}
+            </Stack>
+          </Tabs.Content>
+
           <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
             {active ? (
               localChangesTab ? (
@@ -311,6 +402,13 @@ export default function Welcome({
           pr={preview}
           onView={onSelect}
           onClose={() => onPreviewChange(null)}
+        />
+      )}
+
+      {issuesTab && shownIssue && (
+        <RepoIssuePreview
+          issue={shownIssue}
+          onClose={() => setPreviewIssue(null)}
         />
       )}
     </>

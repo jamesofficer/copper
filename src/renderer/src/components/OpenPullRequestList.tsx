@@ -1,85 +1,22 @@
-import {
-  createListCollection,
-  HStack,
-  Portal,
-  Select,
-  Text,
-} from "@chakra-ui/react";
+import { HStack, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import type { PullRequest } from "../../../shared/types";
 import {
-  filterPullRequests,
-  type PullRequestSort,
+  assigneeOptions,
+  authorOptions,
+  filterByPeople,
+  type ListSort,
+  sortListItems,
   sortOptions,
-  sortPullRequests,
-} from "../lib/prFilters";
+} from "../lib/listFilters";
+import FilterSelect from "./FilterSelect";
 import PullRequestCard from "./PullRequestCard";
-import UserAvatar from "./UserAvatar";
 
 interface Props {
   prs: PullRequest[];
   preview: PullRequest | null;
   onSelect(pr: PullRequest): void;
   onOpen(pr: PullRequest): void;
-}
-
-interface FilterItem {
-  value: string;
-  label: string;
-  // GitHub login to show an avatar for — absent on "All …"/sort options.
-  avatar?: string;
-}
-
-interface FilterSelectProps {
-  label: string;
-  items: FilterItem[];
-  value: string;
-  width?: string;
-  onChange(value: string): void;
-}
-
-function FilterSelect({
-  label,
-  items,
-  value,
-  width = "150px",
-  onChange,
-}: FilterSelectProps) {
-  const collection = useMemo(() => createListCollection({ items }), [items]);
-  return (
-    <Select.Root
-      collection={collection}
-      value={[value]}
-      onValueChange={(event) => onChange(event.value[0] ?? "all")}
-      size="xs"
-      width={width}
-    >
-      <Select.HiddenSelect />
-      <Select.Control>
-        <Select.Trigger cursor="pointer">
-          <Select.ValueText placeholder={label} />
-        </Select.Trigger>
-        <Select.IndicatorGroup>
-          <Select.Indicator />
-        </Select.IndicatorGroup>
-      </Select.Control>
-      <Portal>
-        <Select.Positioner>
-          <Select.Content>
-            {collection.items.map((item) => (
-              <Select.Item item={item} key={item.value}>
-                <HStack gap="2" flex="1" minW="0">
-                  {item.avatar && <UserAvatar username={item.avatar} />}
-                  <Select.ItemText>{item.label}</Select.ItemText>
-                </HStack>
-                <Select.ItemIndicator />
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Positioner>
-      </Portal>
-    </Select.Root>
-  );
 }
 
 // The selected repo's open PRs with GitHub-style filters. Filtering is
@@ -93,27 +30,13 @@ export default function OpenPullRequestList({
 }: Props) {
   const [author, setAuthor] = useState("all");
   const [assignee, setAssignee] = useState("all");
-  const [sort, setSort] = useState<PullRequestSort>("newest");
+  const [sort, setSort] = useState<ListSort>("newest");
 
-  const authorItems = useMemo(() => {
-    const logins = [...new Set(prs.map((pr) => pr.author))].sort();
-    return [
-      { value: "all", label: "All authors" },
-      ...logins.map((login) => ({ value: login, label: login, avatar: login })),
-    ];
-  }, [prs]);
-
-  const assigneeItems = useMemo(() => {
-    const logins = [...new Set(prs.flatMap((pr) => pr.assignees ?? []))].sort();
-    return [
-      { value: "all", label: "All assignees" },
-      { value: "none", label: "Assigned to nobody" },
-      ...logins.map((login) => ({ value: login, label: login, avatar: login })),
-    ];
-  }, [prs]);
+  const authorItems = useMemo(() => authorOptions(prs), [prs]);
+  const assigneeItems = useMemo(() => assigneeOptions(prs), [prs]);
 
   const visible = useMemo(
-    () => sortPullRequests(filterPullRequests(prs, author, assignee), sort),
+    () => sortListItems(filterByPeople(prs, author, assignee), sort),
     [prs, author, assignee, sort],
   );
 
@@ -137,7 +60,7 @@ export default function OpenPullRequestList({
           items={sortOptions}
           value={sort}
           width="180px"
-          onChange={(value) => setSort(value as PullRequestSort)}
+          onChange={(value) => setSort(value as ListSort)}
         />
       </HStack>
 

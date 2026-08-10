@@ -61,6 +61,11 @@ const api: WindowApi = {
     ipcRenderer.invoke("getFileAtCommit", repo, sha, path),
   listPullRequestComments: (repo, prNumber) =>
     ipcRenderer.invoke("listPullRequestComments", repo, prNumber),
+  listRepoIssues: (repo) => ipcRenderer.invoke("listRepoIssues", repo),
+  getRepoIssue: (repo, issueNumber) =>
+    ipcRenderer.invoke("getRepoIssue", repo, issueNumber),
+  listRepoIssueComments: (repo, issueNumber) =>
+    ipcRenderer.invoke("listRepoIssueComments", repo, issueNumber),
   listPullRequestReviews: (repo, prNumber) =>
     ipcRenderer.invoke("listPullRequestReviews", repo, prNumber),
   addPullRequestComment: (repo, prNumber, body) =>

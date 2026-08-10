@@ -15,6 +15,8 @@ import type {
   ReactionContent,
   ReactionGroup,
   RepoBranchInfo,
+  RepoIssue,
+  RepoIssueDetail,
   RepoMergeSettings,
   ReviewComment,
   ReviewDecision,
@@ -22,6 +24,7 @@ import type {
   ReviewStatus,
   ReviewVerdict,
 } from "../../shared/types";
+import { REPO_ISSUE_LIMIT } from "../../shared/types";
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
@@ -459,6 +462,156 @@ export function listMyPullRequests(): Promise<PullRequest[]> {
   return searchOpenPullRequests("author:@me");
 }
 
+const ISSUE_FIELDS = `
+  number
+  title
+  url
+  createdAt
+  updatedAt
+  author { __typename login }
+  assignees(first: 20) { nodes { login } }
+  labels(first: 20) { nodes { name color } }
+  repository { nameWithOwner }
+  comments { totalCount }
+`;
+
+interface GraphQlIssue {
+  number: number;
+  title: string;
+  url: string;
+  createdAt: string;
+  updatedAt: string;
+  author: { __typename: string; login: string } | null;
+  assignees: { nodes: Array<{ login: string } | null> };
+  labels: { nodes: Array<{ name: string; color: string } | null> } | null;
+  repository: { nameWithOwner: string };
+  comments: { totalCount: number };
+}
+
+function fromGraphQlIssue(issue: GraphQlIssue): RepoIssue {
+  return {
+    repo: issue.repository.nameWithOwner,
+    number: issue.number,
+    title: issue.title,
+    author: actorLogin(issue.author),
+    url: issue.url,
+    labels: (issue.labels?.nodes ?? []).flatMap((label) =>
+      label ? [{ name: label.name, color: label.color }] : [],
+    ),
+    assignees: (issue.assignees.nodes ?? []).flatMap((assignee) =>
+      assignee ? [assignee.login] : [],
+    ),
+    comments: issue.comments.totalCount,
+    createdAt: issue.createdAt,
+    updatedAt: issue.updatedAt,
+  };
+}
+
+// GraphQL rather than REST because `GET /repos/{repo}/issues` returns pull
+// requests mixed in — every caller has to filter them out by hand. The issues
+// connection excludes them by construction.
+export async function listRepoIssues(repo: string): Promise<RepoIssue[]> {
+  if (!repo.includes("/")) {
+    throw new Error(
+      "This repository has no GitHub remote, so issues can't be loaded.",
+    );
+  }
+
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to load issues.");
+  }
+
+  const [owner, name] = repo.split("/");
+  const response = await githubFetch<{
+    data?: {
+      repository?: { issues: { nodes: Array<GraphQlIssue | null> } };
+    };
+    errors?: Array<{ message: string }>;
+  }>(token, "/graphql", {
+    method: "POST",
+    body: {
+      query: `query ($owner: String!, $name: String!) {
+        repository(owner: $owner, name: $name) {
+          issues(
+            states: OPEN
+            orderBy: { field: UPDATED_AT, direction: DESC }
+            first: ${REPO_ISSUE_LIMIT}
+          ) {
+            nodes { ${ISSUE_FIELDS} }
+          }
+        }
+      }`,
+      variables: { owner, name },
+    },
+  });
+
+  // As in listReviewRequests: GraphQL answers partial errors with the data it
+  // could resolve, so only the absence of nodes is fatal.
+  const nodes = response.data?.repository?.issues.nodes;
+  if (!nodes) {
+    const detail = response.errors?.[0]?.message;
+    throw new Error(
+      detail
+        ? `GitHub: ${detail}`
+        : "Couldn't find this repository on GitHub. Check its origin remote.",
+    );
+  }
+
+  return nodes.flatMap((issue) => (issue ? [fromGraphQlIssue(issue)] : []));
+}
+
+interface GitHubIssueDetail {
+  number: number;
+  title: string;
+  body: string | null;
+  state: "open" | "closed";
+  state_reason: "completed" | "not_planned" | "duplicate" | "reopened" | null;
+  user: { login: string } | null;
+  labels: Array<{ name: string; color: string }>;
+  assignees: Array<{ login: string }> | null;
+  comments: number;
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+}
+
+// REST here, unlike the list: one issue's body is the point of the call, and
+// the list deliberately leaves bodies off the wire.
+export async function getRepoIssue(
+  repo: string,
+  issueNumber: number,
+): Promise<RepoIssueDetail> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to load issues.");
+  }
+
+  const issue = await githubFetch<GitHubIssueDetail>(
+    token,
+    `/repos/${repo}/issues/${issueNumber}`,
+  );
+
+  return {
+    repo,
+    number: issue.number,
+    title: issue.title,
+    body: issue.body,
+    author: issue.user?.login ?? "unknown",
+    state: issue.state,
+    stateReason: issue.state_reason,
+    url: issue.html_url,
+    labels: issue.labels.map((label) => ({
+      name: label.name,
+      color: label.color,
+    })),
+    assignees: (issue.assignees ?? []).map((assignee) => assignee.login),
+    comments: issue.comments,
+    createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
+  };
+}
+
 export async function getPullRequest(
   repo: string,
   prNumber: number,
@@ -682,24 +835,24 @@ interface GitHubIssueComment {
   created_at: string;
 }
 
-// Conversation comments on the PR (GitHub's issue comments), oldest first.
+// Conversation comments, oldest first. One endpoint serves both a PR's
+// conversation and a real issue's — GitHub numbers issues and pull requests in
+// a single sequence per repo, so the number alone picks the right thread.
 // Inline review comments on diff lines are a separate endpoint.
-export async function listPullRequestComments(
+export async function listIssueComments(
   repo: string,
-  prNumber: number,
+  issueNumber: number,
 ): Promise<PullRequestComment[]> {
   const token = await getGitHubToken();
   if (!token) {
-    throw new Error(
-      "Connect a GitHub token in settings to load pull requests.",
-    );
+    throw new Error("Connect a GitHub token in settings to load comments.");
   }
 
   const comments: GitHubIssueComment[] = [];
   for (let page = 1; page <= 10; page++) {
     const batch = await githubFetch<GitHubIssueComment[]>(
       token,
-      `/repos/${repo}/issues/${prNumber}/comments?per_page=100&page=${page}`,
+      `/repos/${repo}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
     );
     comments.push(...batch);
     if (batch.length < 100) break;

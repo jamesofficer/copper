@@ -1,14 +1,11 @@
 import {
   Badge,
   Box,
-  Center,
   Heading,
   HStack,
   Separator,
-  Spinner,
   Text,
   VStack,
-  Wrap,
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { LuGitCommitHorizontal } from "react-icons/lu";
@@ -19,20 +16,22 @@ import type {
   PullRequestReview,
   ReviewComment,
 } from "../../../shared/types";
-import { labelPalette } from "../lib/labelColor";
 import { listReviewThreads, type ReviewThread } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import BaseBranchSelect from "./BaseBranchSelect";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import CommitTimelineGroup from "./CommitTimelineGroup";
+import LabelBadges from "./LabelBadges";
+import OpenedUpdatedLine from "./OpenedUpdatedLine";
+import { PanelError, PanelLoading, PanelSectionError } from "./PanelState";
 import PrStateBadge from "./PrStateBadge";
 import PullRequestDescription from "./PullRequestDescription";
-import RelativeTime from "./RelativeTime";
 import ReviewCard from "./ReviewCard";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
 import ReviewSummary from "./ReviewSummary";
 import ReviewThreadCard from "./ReviewThreadCard";
+import SectionHeading from "./SectionHeading";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
@@ -149,32 +148,29 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
   const resolvedIds = new Set(resolvedQuery.data ?? []);
 
   if (detailQuery.isPending) {
-    return (
-      <Center h="full">
-        <HStack color="fg.muted">
-          <Spinner size="sm" />
-          <Text fontSize="sm">Loading pull request…</Text>
-        </HStack>
-      </Center>
-    );
+    return <PanelLoading label="Loading pull request…" />;
   }
 
   if (detailQuery.isError || !detailQuery.data) {
     return (
-      <Center h="full" p="8">
-        <Text fontSize="sm" color="fg.error" textAlign="center">
-          {detailQuery.error instanceof Error
+      <PanelError
+        message={
+          detailQuery.error instanceof Error
             ? detailQuery.error.message
-            : "Couldn't load this pull request."}
-        </Text>
-      </Center>
+            : "Couldn't load this pull request."
+        }
+      />
     );
   }
 
   const detail = detailQuery.data;
-  const timeline = comments
-    ? buildTimeline(comments, reviews, reviewComments, commits)
-    : [];
+  // A failed comment fetch used to hide the whole conversation — reviews,
+  // commits and the comment box included. The rest of the timeline doesn't
+  // depend on comments, so it still builds without them and the gap is
+  // reported where it is.
+  const timeline = commentsQuery.isPending
+    ? []
+    : buildTimeline(comments ?? [], reviews, reviewComments, commits);
   const rendered = groupTimeline(timeline);
   // The header count reflects discussion, not commits.
   const discussionCount = timeline.filter(
@@ -222,19 +218,7 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
           </HStack>
         </VStack>
 
-        {detail.labels.length > 0 && (
-          <Wrap gap="2">
-            {detail.labels.map((label) => (
-              <Badge
-                key={label.name}
-                variant="surface"
-                colorPalette={labelPalette(label.color)}
-              >
-                {label.name}
-              </Badge>
-            ))}
-          </Wrap>
-        )}
+        <LabelBadges labels={detail.labels} />
 
         <HStack
           fontFamily="mono"
@@ -267,27 +251,26 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
 
         <PullRequestDescription detail={detail} editable={showActions} />
 
-        {comments && (
+        {!commentsQuery.isPending && (
           <>
             <Separator />
             <Box>
-              <Heading
-                size="xs"
-                color="fg.muted"
-                textTransform="uppercase"
-                letterSpacing="wider"
-                mb="3"
-              >
-                Conversation ({discussionCount})
-              </Heading>
+              <SectionHeading>Conversation ({discussionCount})</SectionHeading>
               <VStack gap="3" alignItems="stretch">
+                {commentsQuery.isError && (
+                  <PanelSectionError
+                    message="Couldn’t load the comments on this pull request."
+                    retrying={commentsQuery.isFetching}
+                    onRetry={() => void commentsQuery.refetch()}
+                  />
+                )}
                 {rendered.map((item) =>
                   item.kind === "comment" ? (
                     <CommentCard
                       key={`comment-${item.comment.id}`}
                       comment={item.comment}
                       repo={pr.repo}
-                      prNumber={pr.number}
+                      number={pr.number}
                     />
                   ) : item.kind === "review" ? (
                     <ReviewCard
@@ -311,15 +294,7 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
                   ),
                 )}
                 <Box mt={timeline.length > 0 ? "3" : "0"}>
-                  <Heading
-                    size="xs"
-                    color="fg.muted"
-                    textTransform="uppercase"
-                    letterSpacing="wider"
-                    mb="3"
-                  >
-                    Add a comment
-                  </Heading>
+                  <SectionHeading>Add a comment</SectionHeading>
                   <CommentComposer pr={pr} />
                 </Box>
               </VStack>
@@ -329,14 +304,10 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
 
         <Separator />
 
-        <HStack fontSize="xs" color="fg.subtle" gap="4" flexWrap="wrap">
-          <Text>
-            Opened <RelativeTime iso={detail.createdAt} />
-          </Text>
-          <Text>
-            Updated <RelativeTime iso={detail.updatedAt} />
-          </Text>
-        </HStack>
+        <OpenedUpdatedLine
+          createdAt={detail.createdAt}
+          updatedAt={detail.updatedAt}
+        />
       </VStack>
     </Box>
   );
