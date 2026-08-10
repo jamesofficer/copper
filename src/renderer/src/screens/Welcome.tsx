@@ -1,6 +1,5 @@
 import {
   Alert,
-  Box,
   Button,
   Center,
   EmptyState,
@@ -153,13 +152,28 @@ export default function Welcome({
               </Tabs.Trigger>
             </Tabs.List>
             {active?.slug && tab === "pull-requests" && (
-              <Box ml="auto">
+              <HStack ml="auto" gap="2">
+                <IconButton
+                  aria-label="Refresh pull requests"
+                  title="Refresh"
+                  variant="outline"
+                  size="xs"
+                  loading={prsQuery.isFetching}
+                  onClick={() => {
+                    void prsQuery.refetch();
+                    void queryClient.invalidateQueries({
+                      queryKey: ["openPrCounts"],
+                    });
+                  }}
+                >
+                  <LuRefreshCw />
+                </IconButton>
                 <NewPullRequestDialog
                   key={active.slug}
                   repo={active.slug}
                   onCreated={openCreatedPullRequest}
                 />
-              </Box>
+              </HStack>
             )}
             {active && localChangesTab && (
               <HStack ml="auto" gap="2">

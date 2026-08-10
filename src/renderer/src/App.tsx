@@ -66,6 +66,14 @@ export default function App() {
     setActivePath(path);
     setSelected(null);
     setPreview(null);
+    // Picking a repo is a deliberate "show me what's open here", so the list
+    // is always refetched — the cached one can be up to a minute old
+    // (staleTime) or a whole session old (it's persisted), which is how a PR
+    // opened moments ago goes missing.
+    const slug = repos.repositories?.find((repo) => repo.path === path)?.slug;
+    if (slug) {
+      void queryClient.invalidateQueries({ queryKey: ["pullRequests", slug] });
+    }
   }
 
   function clearRecent() {
