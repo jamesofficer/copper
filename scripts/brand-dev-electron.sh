@@ -12,6 +12,17 @@ APP="node_modules/electron/dist/Electron.app"
 plutil -replace CFBundleName -string "Copper" "$APP/Contents/Info.plist"
 plutil -replace CFBundleDisplayName -string "Copper" "$APP/Contents/Info.plist"
 
+# The dock tile's tooltip shows the running process's name, which is the
+# executable's filename — not CFBundleName — so it says "Electron" however the
+# plist reads. Rename the binary and point the bundle at it, plus the electron
+# package's path.txt, which is how electron-vite finds the binary to spawn.
+# path.txt is read raw with no trim, so it gets no trailing newline.
+if [ -f "$APP/Contents/MacOS/Electron" ]; then
+  mv "$APP/Contents/MacOS/Electron" "$APP/Contents/MacOS/Copper"
+fi
+plutil -replace CFBundleExecutable -string "Copper" "$APP/Contents/Info.plist"
+printf 'Electron.app/Contents/MacOS/Copper' > node_modules/electron/path.txt
+
 # Stock Electron ships CFBundleIdentifier com.github.Electron, which every
 # other Electron app's dev build on the machine also claims. LaunchServices
 # resolves a running app's name by identifier, so with several bundles sharing

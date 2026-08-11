@@ -176,7 +176,7 @@ export default function Welcome({
               whiteSpace="nowrap"
             >
               <Tabs.Trigger value="pull-requests" h="full">
-                <LuGitPullRequest /> Open pull requests
+                <LuGitPullRequest /> Pull requests
               </Tabs.Trigger>
               <Tabs.Trigger value="issues" h="full">
                 <LuCircleDot /> Issues
