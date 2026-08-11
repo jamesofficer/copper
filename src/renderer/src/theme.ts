@@ -53,13 +53,14 @@ const config = defineConfig({
     },
     tokens: {
       fonts: {
-        // Outfit, bundled as a variable font (@fontsource-variable/outfit) —
-        // shipped with the app rather than fetched from Google, since the
-        // renderer's CSP allows no outside connections and a desktop app
-        // shouldn't wait on a font CDN to paint. The system stack stays behind
-        // it for the glyphs Outfit's Latin subsets don't cover.
-        heading: { value: `'Outfit Variable', ${uiFallback}` },
-        body: { value: `'Outfit Variable', ${uiFallback}` },
+        // Google Sans Flex, bundled as a variable font
+        // (@fontsource-variable/google-sans-flex, weight axis only) — shipped
+        // with the app rather than fetched from Google, since the renderer's
+        // CSP allows no outside connections and a desktop app shouldn't wait on
+        // a font CDN to paint. The system stack stays behind it for the glyphs
+        // its subsets don't cover.
+        heading: { value: `'Google Sans Flex Variable', ${uiFallback}` },
+        body: { value: `'Google Sans Flex Variable', ${uiFallback}` },
         mono: {
           value: "'SF Mono', ui-monospace, Menlo, Consolas, monospace",
         },

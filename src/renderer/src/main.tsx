@@ -1,4 +1,4 @@
-import "@fontsource-variable/outfit";
+import "@fontsource-variable/google-sans-flex";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/700.css";
 import { ChakraProvider } from "@chakra-ui/react";
