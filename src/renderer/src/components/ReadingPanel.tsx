@@ -20,18 +20,31 @@ const layoutCss: SystemStyleObject = {
 // Sticky, so the standing facts stay put while the conversation scrolls — but
 // only while the rail is a column; stacked underneath there is nothing to
 // stick to.
+//
+// The height cap is the trap in that: a stuck element taller than the
+// scrollport can never scroll further, so the bottom of a long rail (a PR with
+// a dozen reviewers and as many labels) would be unreachable. Capped and
+// scrollable, it degrades to a second scroll area instead of hiding its own
+// content. The subtraction is the top bar plus this panel's padding —
+// approximate on purpose: it only has to keep the cap under the scrollport,
+// and being a few pixels out costs nothing.
 const railCss: SystemStyleObject = {
   borderLeftWidth: "1px",
   pl: "6",
   position: "sticky",
   top: "0",
   alignSelf: "start",
+  maxH: "calc(100vh - 5rem)",
+  overflowY: "auto",
+  ...scrollbar,
   [RAIL_BREAKPOINT]: {
     borderLeftWidth: "0",
     borderTopWidth: "1px",
     pl: "0",
     pt: "6",
     position: "static",
+    maxH: "none",
+    overflowY: "visible",
   },
 };
 

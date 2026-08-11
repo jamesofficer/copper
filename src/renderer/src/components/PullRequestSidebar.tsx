@@ -1,4 +1,4 @@
-import { HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Separator, Text, VStack } from "@chakra-ui/react";
 import type {
   PullRequestDetail,
   PullRequestReview,
@@ -6,9 +6,9 @@ import type {
 import LabelBadges from "./LabelBadges";
 import OpenedUpdatedLine from "./OpenedUpdatedLine";
 import RailSection from "./RailSection";
+import ReviewerList from "./ReviewerList";
 import ReviewProgress from "./ReviewProgress";
-import ReviewSummary from "./ReviewSummary";
-import UserAvatar from "./UserAvatar";
+import UserList from "./UserList";
 
 interface Props {
   detail: PullRequestDetail;
@@ -37,26 +37,12 @@ export default function PullRequestSidebar({
       )}
 
       <RailSection title="Reviewers">
-        <ReviewSummary
-          reviews={reviews}
-          requestedReviewers={detail.reviewers}
-        />
+        <ReviewerList reviews={reviews} requestedReviewers={detail.reviewers} />
       </RailSection>
 
-      {detail.assignees.length > 0 && (
-        <RailSection title="Assignees">
-          <VStack gap="2" alignItems="stretch">
-            {detail.assignees.map((login) => (
-              <HStack key={login} gap="2">
-                <UserAvatar username={login} />
-                <Text fontFamily="mono" fontSize="sm" truncate>
-                  {login}
-                </Text>
-              </HStack>
-            ))}
-          </VStack>
-        </RailSection>
-      )}
+      <RailSection title="Assignees">
+        <UserList logins={detail.assignees} empty="Nobody assigned" />
+      </RailSection>
 
       <RailSection title="Labels">
         {detail.labels.length > 0 ? (

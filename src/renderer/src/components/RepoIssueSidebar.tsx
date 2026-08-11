@@ -1,9 +1,9 @@
-import { HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Separator, Text, VStack } from "@chakra-ui/react";
 import type { RepoIssueDetail } from "../../../shared/types";
 import LabelBadges from "./LabelBadges";
 import OpenedUpdatedLine from "./OpenedUpdatedLine";
 import RailSection from "./RailSection";
-import UserAvatar from "./UserAvatar";
+import UserList from "./UserList";
 
 interface Props {
   detail: RepoIssueDetail;
@@ -16,22 +16,7 @@ export default function RepoIssueSidebar({ detail }: Props) {
   return (
     <VStack gap="5" alignItems="stretch" separator={<Separator />}>
       <RailSection title="Assignees">
-        {detail.assignees.length > 0 ? (
-          <VStack gap="2" alignItems="stretch">
-            {detail.assignees.map((assignee) => (
-              <HStack key={assignee} gap="2">
-                <UserAvatar username={assignee} />
-                <Text fontFamily="mono" fontSize="sm" truncate>
-                  {assignee}
-                </Text>
-              </HStack>
-            ))}
-          </VStack>
-        ) : (
-          <Text fontSize="sm" color="fg.muted">
-            Nobody assigned
-          </Text>
-        )}
+        <UserList logins={detail.assignees} empty="Nobody assigned" />
       </RailSection>
 
       <RailSection title="Labels">

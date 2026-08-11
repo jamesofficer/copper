@@ -51,7 +51,7 @@ const decisionMeta: Record<
 // carries no heading of its own and states the empty case rather than
 // vanishing — an empty "Reviewers" section is the answer to "who's looking at
 // this?", not clutter.
-export default function ReviewSummary({ reviews, requestedReviewers }: Props) {
+export default function ReviewerList({ reviews, requestedReviewers }: Props) {
   const decisions = decisionsByReviewer(reviews);
   const decided = new Set(decisions.map((d) => d.author));
   const awaiting = requestedReviewers.filter((login) => !decided.has(login));

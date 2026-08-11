@@ -30,6 +30,7 @@ describe("PullRequestSidebar", () => {
     );
 
     expect(screen.getByText("No reviewers yet")).toBeTruthy();
+    expect(screen.getByText("Nobody assigned")).toBeTruthy();
     expect(screen.getByText("No labels")).toBeTruthy();
   });
 
