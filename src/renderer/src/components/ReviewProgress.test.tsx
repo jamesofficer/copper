@@ -56,6 +56,17 @@ describe("buildReviewSteps", () => {
     expect(steps({ viewedFiles }).files.state).toBe("done");
   });
 
+  it("finishes the file step when the PR changes no files at all", () => {
+    // A force push can leave head matching base. Nothing to inspect is a
+    // finished step, not one stuck at pending for the life of the PR.
+    const empty = { ...detail, changedFiles: 0 } as PullRequestDetail;
+    const step = steps({ detail: empty }).files;
+
+    expect(step.state).toBe("done");
+    expect(step.label).toBe("Inspect files");
+    expect(step.detail).toBe("Nothing to inspect");
+  });
+
   it("treats drafted comments as a review in progress", () => {
     const step = steps({ draftCount: 3 }).submit;
     expect(step.state).toBe("in_progress");

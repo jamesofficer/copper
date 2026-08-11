@@ -179,11 +179,13 @@ export default function Review({ pr, initialTab, onBack }: Props) {
         {detail && <PullRequestActionsMenu pr={pr} detail={detail} />}
       </HStack>
 
-      {/* Keyed by PR so opening another one starts on its own entry tab —
-          without it the tabs keep whichever one the last PR was left on, and
-          "Review changes" would land on the overview. */}
+      {/* Keyed by PR *and* entry tab, since `defaultValue` only applies on
+          mount: without the PR the tabs would keep whichever one the last PR
+          was left on ("Review changes" landing on the overview), and without
+          the tab a caller reopening the same PR on a different one would be
+          silently ignored. */}
       <Tabs.Root
-        key={`${pr.repo}#${pr.number}`}
+        key={`${pr.repo}#${pr.number}#${initialTab ?? "overview"}`}
         defaultValue={initialTab ?? "overview"}
         display="flex"
         flexDirection="column"

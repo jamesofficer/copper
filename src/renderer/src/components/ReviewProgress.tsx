@@ -52,16 +52,31 @@ function summaryStep(
   };
 }
 
+// Counting is enough here, without intersecting the paths against the
+// changelist: listViewedFiles reads the PR's own `files` connection and keeps
+// the VIEWED ones, so a path that left the PR in a force push is already gone
+// from the answer. GitHub also drops a file's checkbox when the file changes
+// again, so the count can only ever undershoot the total — the clamp is belt
+// and braces against rendering "5 of 4".
 function filesStep(
   detail: PullRequestDetail,
   viewedFiles: string[],
 ): ReviewStep {
   const total = detail.changedFiles;
-  // GitHub drops a file's checkbox when it changes again, so viewed can only
-  // ever undershoot the total; clamp anyway rather than render "5 of 4".
   const viewed = Math.min(viewedFiles.length, total);
   const label = `Inspect ${total} file${total === 1 ? "" : "s"}`;
-  if (total > 0 && viewed >= total) {
+  // A PR can genuinely have no changed files (a force push that made head
+  // match base). There is nothing to inspect, so the step is finished rather
+  // than stuck at pending forever.
+  if (total === 0) {
+    return {
+      id: "files",
+      label: "Inspect files",
+      state: "done",
+      detail: "Nothing to inspect",
+    };
+  }
+  if (viewed >= total) {
     return { id: "files", label, state: "done", detail: "All viewed" };
   }
   if (viewed > 0) {

@@ -10,6 +10,11 @@ const RAIL_BREAKPOINT = "@container (max-width: 900px)";
 
 const panelCss: SystemStyleObject = { containerType: "inline-size" };
 
+// The scrollport. `containerType: size` makes its height the reference for the
+// rail's cap (`cqh`); safe here because this box takes its size from its
+// parent, never from its contents.
+const scrollCss: SystemStyleObject = { ...scrollbar, containerType: "size" };
+
 const layoutCss: SystemStyleObject = {
   display: "grid",
   gridTemplateColumns: "minmax(0, 1fr) 260px",
@@ -25,16 +30,21 @@ const layoutCss: SystemStyleObject = {
 // scrollport can never scroll further, so the bottom of a long rail (a PR with
 // a dozen reviewers and as many labels) would be unreachable. Capped and
 // scrollable, it degrades to a second scroll area instead of hiding its own
-// content. The subtraction is the top bar plus this panel's padding —
-// approximate on purpose: it only has to keep the cap under the scrollport,
-// and being a few pixels out costs nothing.
+// content.
+//
+// The cap is measured in `cqh` against the scroll box below, NOT in `vh`:
+// the panel is not the viewport. It sits under one bar on the home screen and
+// two on the review screen (top bar + tabs), so any viewport subtraction is a
+// guess that goes stale the moment the chrome above changes. The scroll box
+// declares `containerType: size` to be that reference; the leftover 4rem is
+// this panel's own top padding plus a gutter at the foot.
 const railCss: SystemStyleObject = {
   borderLeftWidth: "1px",
   pl: "6",
   position: "sticky",
   top: "0",
   alignSelf: "start",
-  maxH: "calc(100vh - 5rem)",
+  maxH: "calc(100cqh - 4rem)",
   overflowY: "auto",
   ...scrollbar,
   [RAIL_BREAKPOINT]: {
@@ -63,7 +73,7 @@ interface Props {
 // survives if the measurements live in one place.
 export default function ReadingPanel({ hero, rail, children }: Props) {
   return (
-    <Box h="full" overflowY="auto" css={scrollbar}>
+    <Box h="full" overflowY="auto" css={scrollCss}>
       <Box maxW="6xl" mx="auto" px="8" py="8" css={panelCss}>
         {hero}
 
