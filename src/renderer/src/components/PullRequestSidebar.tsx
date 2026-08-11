@@ -1,11 +1,11 @@
-import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import type { ReactNode } from "react";
+import { HStack, Separator, Text, VStack } from "@chakra-ui/react";
 import type {
   PullRequestDetail,
   PullRequestReview,
 } from "../../../shared/types";
 import LabelBadges from "./LabelBadges";
 import OpenedUpdatedLine from "./OpenedUpdatedLine";
+import RailSection from "./RailSection";
 import ReviewProgress from "./ReviewProgress";
 import ReviewSummary from "./ReviewSummary";
 import UserAvatar from "./UserAvatar";
@@ -17,23 +17,6 @@ interface Props {
   // act on (viewed files, draft comments), and each read is a request; the
   // home-screen preview is a quick look, so it doesn't spend them.
   showProgress?: boolean;
-}
-
-function RailSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <Box>
-      <Text fontSize="sm" fontWeight="semibold" mb="3">
-        {title}
-      </Text>
-      {children}
-    </Box>
-  );
 }
 
 // The overview's right-hand rail: the PR's standing facts — where the review

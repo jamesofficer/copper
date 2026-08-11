@@ -1,9 +1,4 @@
-import {
-  Box,
-  Separator,
-  type SystemStyleObject,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Separator, VStack } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import type {
   PullRequest,
@@ -13,7 +8,6 @@ import type {
   ReviewComment,
 } from "../../../shared/types";
 import { listReviewThreads, type ReviewThread } from "../lib/reviewComments";
-import { scrollbar } from "../lib/scrollbar";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import CommitTimelineGroup from "./CommitTimelineGroup";
@@ -21,6 +15,7 @@ import { PanelError, PanelLoading, PanelSectionError } from "./PanelState";
 import PullRequestDescription from "./PullRequestDescription";
 import PullRequestHero from "./PullRequestHero";
 import PullRequestSidebar from "./PullRequestSidebar";
+import ReadingPanel from "./ReadingPanel";
 import ReviewCard from "./ReviewCard";
 import ReviewThreadCard from "./ReviewThreadCard";
 import SectionHeading from "./SectionHeading";
@@ -100,39 +95,6 @@ function groupTimeline(items: TimelineItem[]): RenderItem[] {
   return grouped;
 }
 
-// The panel is a column beside the queue on the home screen and the whole
-// window on the review screen, so the rail can't key off viewport breakpoints —
-// a container query asks the only question that matters: is there room here for
-// two columns?
-const RAIL_BREAKPOINT = "@container (max-width: 900px)";
-
-const panelCss: SystemStyleObject = { containerType: "inline-size" };
-
-const layoutCss: SystemStyleObject = {
-  display: "grid",
-  gridTemplateColumns: "minmax(0, 1fr) 260px",
-  gap: "8",
-  [RAIL_BREAKPOINT]: { gridTemplateColumns: "minmax(0, 1fr)" },
-};
-
-// Sticky, so the PR's standing facts stay put while the conversation scrolls —
-// but only while it is a column; stacked underneath there is nothing to stick
-// to.
-const railCss: SystemStyleObject = {
-  borderLeftWidth: "1px",
-  pl: "6",
-  position: "sticky",
-  top: "0",
-  alignSelf: "start",
-  [RAIL_BREAKPOINT]: {
-    borderLeftWidth: "0",
-    borderTopWidth: "1px",
-    pl: "0",
-    pt: "6",
-    position: "static",
-  },
-};
-
 export default function PullRequestOverview({ pr, showActions }: Props) {
   const detailQuery = useQuery({
     queryKey: ["pullRequest", pr.repo, pr.number],
@@ -202,79 +164,70 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
   ).length;
 
   return (
-    <Box h="full" overflowY="auto" css={scrollbar}>
-      <Box maxW="6xl" mx="auto" px="8" py="8" css={panelCss}>
-        <PullRequestHero detail={detail} />
+    <ReadingPanel
+      hero={<PullRequestHero detail={detail} />}
+      rail={
+        <PullRequestSidebar
+          detail={detail}
+          reviews={reviews}
+          showProgress={showActions}
+        />
+      }
+    >
+      <VStack gap="6" alignItems="stretch">
+        <PullRequestDescription detail={detail} editable={showActions} />
 
-        <Separator my="6" />
-
-        <Box css={layoutCss}>
-          <VStack gap="6" alignItems="stretch" minW="0">
-            <PullRequestDescription detail={detail} editable={showActions} />
-
-            {!commentsQuery.isPending && (
-              <>
-                <Separator />
-                <Box>
-                  <SectionHeading>
-                    Conversation ({discussionCount})
-                  </SectionHeading>
-                  <VStack gap="3" alignItems="stretch">
-                    {commentsQuery.isError && (
-                      <PanelSectionError
-                        message="Couldn’t load the comments on this pull request."
-                        retrying={commentsQuery.isFetching}
-                        onRetry={() => void commentsQuery.refetch()}
-                      />
-                    )}
-                    {rendered.map((item) =>
-                      item.kind === "comment" ? (
-                        <CommentCard
-                          key={`comment-${item.comment.id}`}
-                          comment={item.comment}
-                          repo={pr.repo}
-                          number={pr.number}
-                        />
-                      ) : item.kind === "review" ? (
-                        <ReviewCard
-                          key={`review-${item.review.id}`}
-                          review={item.review}
-                        />
-                      ) : item.kind === "thread" ? (
-                        <ReviewThreadCard
-                          key={`thread-${item.thread.root.id}`}
-                          thread={item.thread}
-                          repo={pr.repo}
-                          prNumber={pr.number}
-                          resolved={resolvedIds.has(item.thread.root.id)}
-                        />
-                      ) : (
-                        <CommitTimelineGroup
-                          key={`commits-${item.commits[0].sha}`}
-                          repo={pr.repo}
-                          commits={item.commits}
-                        />
-                      ),
-                    )}
-                    <Box mt={timeline.length > 0 ? "3" : "0"}>
-                      <SectionHeading>Add a comment</SectionHeading>
-                      <CommentComposer pr={pr} />
-                    </Box>
-                  </VStack>
+        {!commentsQuery.isPending && (
+          <>
+            <Separator />
+            <Box>
+              <SectionHeading>Conversation ({discussionCount})</SectionHeading>
+              <VStack gap="3" alignItems="stretch">
+                {commentsQuery.isError && (
+                  <PanelSectionError
+                    message="Couldn’t load the comments on this pull request."
+                    retrying={commentsQuery.isFetching}
+                    onRetry={() => void commentsQuery.refetch()}
+                  />
+                )}
+                {rendered.map((item) =>
+                  item.kind === "comment" ? (
+                    <CommentCard
+                      key={`comment-${item.comment.id}`}
+                      comment={item.comment}
+                      repo={pr.repo}
+                      number={pr.number}
+                    />
+                  ) : item.kind === "review" ? (
+                    <ReviewCard
+                      key={`review-${item.review.id}`}
+                      review={item.review}
+                    />
+                  ) : item.kind === "thread" ? (
+                    <ReviewThreadCard
+                      key={`thread-${item.thread.root.id}`}
+                      thread={item.thread}
+                      repo={pr.repo}
+                      prNumber={pr.number}
+                      resolved={resolvedIds.has(item.thread.root.id)}
+                    />
+                  ) : (
+                    <CommitTimelineGroup
+                      key={`commits-${item.commits[0].sha}`}
+                      repo={pr.repo}
+                      commits={item.commits}
+                    />
+                  ),
+                )}
+                <Box mt={timeline.length > 0 ? "3" : "0"}>
+                  <SectionHeading>Add a comment</SectionHeading>
+                  <CommentComposer pr={pr} />
                 </Box>
-              </>
-            )}
-          </VStack>
-
-          <Box css={railCss}>
-            <PullRequestSidebar
-              detail={detail}
-              reviews={reviews}
-              showProgress={showActions}
-            />
-          </Box>
-        </Box>
-      </Box>
-    </Box>
+              </VStack>
+            </Box>
+          </>
+        )}
+      </VStack>
+    </ReadingPanel>
   );
 }

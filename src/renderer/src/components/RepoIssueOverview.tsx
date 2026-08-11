@@ -1,63 +1,22 @@
-import {
-  Badge,
-  Box,
-  Heading,
-  HStack,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Separator, Text, VStack } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
-import { LuCircleCheck, LuCircleDot, LuCircleSlash } from "react-icons/lu";
-import type { RepoIssue, RepoIssueDetail } from "../../../shared/types";
-import { scrollbar } from "../lib/scrollbar";
+import type { RepoIssue } from "../../../shared/types";
 import CommentCard from "./CommentCard";
-import LabelBadges from "./LabelBadges";
 import Markdown from "./Markdown";
-import OpenedUpdatedLine from "./OpenedUpdatedLine";
 import { PanelError, PanelLoading, PanelSectionError } from "./PanelState";
+import ReadingPanel from "./ReadingPanel";
+import RepoIssueHero from "./RepoIssueHero";
+import RepoIssueSidebar from "./RepoIssueSidebar";
 import SectionHeading from "./SectionHeading";
-import UserAvatar from "./UserAvatar";
 
 interface Props {
   issue: RepoIssue;
 }
 
-// One badge with a handful of outcomes, so it lives here rather than in its own
-// file. The list only carries open issues, so it rarely says anything else —
-// but a preview left open while the issue closes elsewhere should tell the
-// truth. Only "completed" claims the issue was done: GitHub recorded no reason
-// at all before 2022, and a plain "Closed" is the honest reading of that.
-function IssueStateBadge({ detail }: { detail: RepoIssueDetail }) {
-  if (detail.state === "open") {
-    return (
-      <Badge colorPalette="green" variant="surface" size="lg">
-        <LuCircleDot size={12} /> Open
-      </Badge>
-    );
-  }
-  if (detail.stateReason === "completed") {
-    return (
-      <Badge colorPalette="purple" variant="surface" size="lg">
-        <LuCircleCheck size={12} /> Closed as completed
-      </Badge>
-    );
-  }
-  return (
-    <Badge colorPalette="gray" variant="surface" size="lg">
-      <LuCircleSlash size={12} />
-      {detail.stateReason === "not_planned"
-        ? "Closed as not planned"
-        : detail.stateReason === "duplicate"
-          ? "Closed as duplicate"
-          : "Closed"}
-    </Badge>
-  );
-}
-
 // The issue reading panel. Two queries where PullRequestOverview needs six —
 // an issue has no reviews, no inline threads and no commits, so its
-// conversation is a plain oldest-first comment list.
+// conversation is a plain oldest-first comment list — but the same layout, via
+// ReadingPanel: hero, reading column, rail.
 export default function RepoIssueOverview({ issue }: Props) {
   const detailQuery = useQuery({
     queryKey: ["repoIssue", issue.repo, issue.number],
@@ -89,51 +48,11 @@ export default function RepoIssueOverview({ issue }: Props) {
   const detail = detailQuery.data;
 
   return (
-    <Box h="full" overflowY="auto" css={scrollbar}>
-      <VStack gap="6" alignItems="stretch" maxW="3xl" mx="auto" px="8" py="8">
-        <VStack gap="3" alignItems="stretch">
-          <HStack gap="1.5">
-            <IssueStateBadge detail={detail} />
-          </HStack>
-          <Heading size="lg" lineHeight="1.3">
-            {detail.title}
-          </Heading>
-
-          <HStack
-            fontFamily="mono"
-            fontSize="sm"
-            color="fg.muted"
-            gap="2"
-            flexWrap="wrap"
-          >
-            <Text>#{detail.number}</Text>
-            <Text>·</Text>
-            <HStack gap="1.5">
-              <UserAvatar username={detail.author} />
-              <Text color="fg">{detail.author}</Text>
-            </HStack>
-            <Text>opened this issue</Text>
-          </HStack>
-        </VStack>
-
-        <LabelBadges labels={detail.labels} />
-
-        {detail.assignees.length > 0 && (
-          <Box>
-            <SectionHeading>Assignees</SectionHeading>
-            <HStack gap="4" flexWrap="wrap">
-              {detail.assignees.map((assignee) => (
-                <HStack key={assignee} gap="1.5" fontSize="sm">
-                  <UserAvatar username={assignee} />
-                  <Text>{assignee}</Text>
-                </HStack>
-              ))}
-            </HStack>
-          </Box>
-        )}
-
-        <Separator />
-
+    <ReadingPanel
+      hero={<RepoIssueHero detail={detail} comments={comments?.length} />}
+      rail={<RepoIssueSidebar detail={detail} />}
+    >
+      <VStack gap="6" alignItems="stretch">
         <Box>
           <SectionHeading>Description</SectionHeading>
           {detail.body?.trim() ? (
@@ -175,14 +94,7 @@ export default function RepoIssueOverview({ issue }: Props) {
             </Box>
           </>
         )}
-
-        <Separator />
-
-        <OpenedUpdatedLine
-          createdAt={detail.createdAt}
-          updatedAt={detail.updatedAt}
-        />
       </VStack>
-    </Box>
+    </ReadingPanel>
   );
 }
