@@ -28,6 +28,7 @@ import { usePanelWidth } from "../lib/usePanelWidth";
 import CommitList from "./CommitList";
 import DiffView from "./DiffView";
 import FileList from "./FileList";
+import ResizeHandle from "./ResizeHandle";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -392,14 +393,7 @@ export default function ChangesView({ pr }: Props) {
             </Checkbox.Root>
           </HStack>
         </Flex>
-        <Box
-          w="1"
-          flexShrink="0"
-          cursor="col-resize"
-          onPointerDown={startSidebarResize}
-          _hover={{ bg: "border.emphasized" }}
-          transition="background 0.15s"
-        />
+        <ResizeHandle onPointerDown={startSidebarResize} />
       </Flex>
 
       <Box flex="1" minH="0" minW="0">

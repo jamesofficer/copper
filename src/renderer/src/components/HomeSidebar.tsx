@@ -32,6 +32,7 @@ import {
 } from "../lib/hiddenReviewRequests";
 import { hotkeyHint, hotkeys } from "../lib/hotkeys";
 import { type RecentPullRequest, timeAgo } from "../lib/recentPrs";
+import { repoCountsQueryOptions } from "../lib/repoQueries";
 import { scrollbar } from "../lib/scrollbar";
 import { setSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { setSectionOpen, useCollapsedSections } from "../lib/sidebarSections";
@@ -90,10 +91,7 @@ export default function HomeSidebar({
   });
   const myPullRequests = myPullRequestsQuery.data;
 
-  const countsQuery = useQuery({
-    queryKey: ["repoCounts"],
-    queryFn: () => window.api.getRepoCounts(),
-  });
+  const countsQuery = useQuery(repoCountsQueryOptions());
 
   function isOpenPr(pr: PullRequest): boolean {
     return openPr?.repo === pr.repo && openPr?.number === pr.number;

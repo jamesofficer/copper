@@ -44,6 +44,7 @@ import CommitComposer from "./CommitComposer";
 import DiffView from "./DiffView";
 import DiscardChangesDialog from "./DiscardChangesDialog";
 import FileList, { type RowAction } from "./FileList";
+import ResizeHandle from "./ResizeHandle";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -289,14 +290,7 @@ export default function LocalChangesView({ path }: Props) {
             onClose={() => setDiscarding(null)}
           />
         </Flex>
-        <Box
-          w="1"
-          flexShrink="0"
-          cursor="col-resize"
-          onPointerDown={startSidebarResize}
-          _hover={{ bg: "border.emphasized" }}
-          transition="background 0.15s"
-        />
+        <ResizeHandle onPointerDown={startSidebarResize} />
       </Flex>
 
       <Box flex="1" minH="0" minW="0">

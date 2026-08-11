@@ -33,6 +33,7 @@ import AnalysisDetail from "./AnalysisDetail";
 import AnalysisNav, { type AnalysisSelection } from "./AnalysisNav";
 import ChatPanel from "./ChatPanel";
 import ReanalyzeButton from "./ReanalyzeButton";
+import ResizeHandle from "./ResizeHandle";
 
 interface Props {
   pr: PullRequest;
@@ -337,14 +338,7 @@ export default function ReviewPanel({ pr }: Props) {
           </Flex>
         ) : (
           <Flex flexShrink="0" style={{ width: chatWidth }}>
-            <Box
-              w="1"
-              flexShrink="0"
-              cursor="col-resize"
-              onPointerDown={startChatResize}
-              _hover={{ bg: "border.emphasized" }}
-              transition="background 0.15s"
-            />
+            <ResizeHandle onPointerDown={startChatResize} />
             <Box flex="1" minW="0" borderLeftWidth="1px">
               <ChatPanel
                 pr={pr}
