@@ -50,7 +50,7 @@ export const personalityOptions: Array<{
   },
 ];
 
-export const defaultPersonality: ReviewPersonality = "standard";
+export const defaultPersonality: ReviewPersonality = "ste";
 
 const STORAGE_KEY = "reviewPersonality";
 

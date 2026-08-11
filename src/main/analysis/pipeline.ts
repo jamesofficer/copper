@@ -303,7 +303,9 @@ export async function getExistingAnalysis(
 export async function analyzePullRequest(
   repo: string,
   prNumber: number,
-  personality: ReviewPersonality = "standard",
+  // Matches defaultPersonality in the renderer. Only reached by a caller that
+  // sends no personality at all; every UI path states one.
+  personality: ReviewPersonality = "ste",
   force = false,
 ): Promise<AnalysisResult> {
   const detail = await getPullRequest(repo, prNumber);
