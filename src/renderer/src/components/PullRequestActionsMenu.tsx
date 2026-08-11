@@ -100,7 +100,7 @@ export default function PullRequestActionsMenu({ pr, detail }: Props) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
     void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
     void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
-    void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
+    void queryClient.invalidateQueries({ queryKey: ["repoCounts"] });
   }
 
   function reportFailure(cause: unknown) {

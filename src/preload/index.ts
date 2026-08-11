@@ -28,8 +28,7 @@ const api: WindowApi = {
   listReviewRequestedPullRequests: () =>
     ipcRenderer.invoke("listReviewRequestedPullRequests"),
   listMyPullRequests: () => ipcRenderer.invoke("listMyPullRequests"),
-  getOpenPullRequestCounts: () =>
-    ipcRenderer.invoke("getOpenPullRequestCounts"),
+  getRepoCounts: () => ipcRenderer.invoke("getRepoCounts"),
   getBranchInfo: (repo) => ipcRenderer.invoke("getBranchInfo", repo),
   createPullRequest: (repo, pr) =>
     ipcRenderer.invoke("createPullRequest", repo, pr),

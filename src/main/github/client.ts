@@ -15,6 +15,7 @@ import type {
   ReactionContent,
   ReactionGroup,
   RepoBranchInfo,
+  RepoCounts,
   RepoIssue,
   RepoIssueDetail,
   RepoMergeSettings,
@@ -1702,9 +1703,7 @@ export async function setFileViewed(
 // Open-PR counts for every registered repo, keyed by slug — one aliased
 // GraphQL query instead of a REST call per repo. Counts are decorative
 // (sidebar badges), so no token or an inaccessible repo just means no entry.
-export async function getOpenPullRequestCounts(): Promise<
-  Record<string, number>
-> {
+export async function getRepoCounts(): Promise<Record<string, RepoCounts>> {
   const token = await getGitHubToken();
   if (!token) return {};
 
@@ -1714,15 +1713,26 @@ export async function getOpenPullRequestCounts(): Promise<
   }
   if (slugs.length === 0) return {};
 
+  // Both counts in one selection per repo: the issue count rides along on a
+  // request the sidebar already makes, so knowing it costs nothing.
   const parts = slugs.map((slug, index) => {
     const [owner, name] = slug.split("/");
     return `r${index}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(
       name,
-    )}) { pullRequests(states: OPEN) { totalCount } }`;
+    )}) {
+      pullRequests(states: OPEN) { totalCount }
+      issues(states: OPEN) { totalCount }
+    }`;
   });
 
   const response = await githubFetch<{
-    data?: Record<string, { pullRequests: { totalCount: number } } | null>;
+    data?: Record<
+      string,
+      {
+        pullRequests: { totalCount: number };
+        issues: { totalCount: number };
+      } | null
+    >;
     errors?: Array<{ message: string }>;
   }>(token, "/graphql", {
     method: "POST",
@@ -1730,10 +1740,16 @@ export async function getOpenPullRequestCounts(): Promise<
   });
 
   // Partial errors (one inaccessible repo) still return data for the rest.
-  const counts: Record<string, number> = {};
+  const counts: Record<string, RepoCounts> = {};
   slugs.forEach((slug, index) => {
-    const count = response.data?.[`r${index}`]?.pullRequests.totalCount;
-    if (count !== undefined) counts[slug] = count;
+    const repo = response.data?.[`r${index}`];
+    if (!repo) return;
+    counts[slug] = {
+      pullRequests: repo.pullRequests.totalCount,
+      // A repo with Issues switched off answers null for the connection, which
+      // is "none to show", not a failure that should cost the PR count too.
+      issues: repo.issues?.totalCount ?? 0,
+    };
   });
   return counts;
 }

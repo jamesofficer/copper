@@ -71,9 +71,19 @@ export interface PullRequestDetail {
 // has to be able to say when the list is only the newest slice.
 export const REPO_ISSUE_LIMIT = 50;
 
-// The same contract for open pull requests: listPullRequests returns the newest
-// slice, so the queue can say so instead of letting "no matches" read as "none".
+// listPullRequests returns at most this many open PRs, most recently updated
+// first. The queue deliberately shows no "only the newest 50" notice, unlike the
+// issue list: its tab badge comes from getRepoCounts — GitHub's own total — so
+// the number a reviewer reads is the repo's, not the loaded slice's.
 export const OPEN_PULL_REQUEST_LIMIT = 50;
+
+// What's open in a repo right now, both halves from one GraphQL request. These
+// are GitHub's own totals, not the length of a loaded list — the lists are
+// capped, so a badge built from one would under-report a busy repo.
+export interface RepoCounts {
+  pullRequests: number;
+  issues: number;
+}
 
 // A GitHub issue, not to be confused with a ReviewIssue — the app's own name
 // for a finding the analysis agent reported. Labels sit on the summary, unlike

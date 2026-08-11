@@ -34,8 +34,14 @@ export function clearRecentPullRequests(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
-export function timeAgo(iso: string): string {
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+// Empty for a date that doesn't parse. Entries revived from an older persisted
+// cache can be missing their dates, and every one of those used to fall through
+// to toLocaleDateString and render the words "Invalid Date" in the row.
+export function timeAgo(iso: string | undefined): string {
+  if (!iso) return "";
+  const time = new Date(iso).getTime();
+  if (Number.isNaN(time)) return "";
+  const seconds = Math.floor((Date.now() - time) / 1000);
   if (seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;

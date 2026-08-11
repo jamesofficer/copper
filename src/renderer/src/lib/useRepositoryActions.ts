@@ -30,7 +30,7 @@ export function useRepositoryActions(
   function invalidateRepoScoped() {
     void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
     void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
-    void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
+    void queryClient.invalidateQueries({ queryKey: ["repoCounts"] });
   }
 
   async function add() {

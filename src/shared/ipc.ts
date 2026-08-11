@@ -29,6 +29,7 @@ import type {
   PullRequestReview,
   ReactionContent,
   RepoBranchInfo,
+  RepoCounts,
   RepoIssue,
   RepoIssueDetail,
   RepoMergeSettings,
@@ -73,8 +74,9 @@ export interface IpcApi {
   listReviewRequestedPullRequests(): Promise<PullRequest[]>;
   // Open PRs across the registered repos authored by the logged-in user.
   listMyPullRequests(): Promise<PullRequest[]>;
-  // Open-PR counts per registered repo slug, for the sidebar's repo rows.
-  getOpenPullRequestCounts(): Promise<Record<string, number>>;
+  // Open pull-request and issue counts per registered repo slug, for the
+  // sidebar's repo rows and the queue's tab badges.
+  getRepoCounts(): Promise<Record<string, RepoCounts>>;
   // Branches + local checkout defaults for the new-PR dialog.
   getBranchInfo(repo: string): Promise<RepoBranchInfo>;
   createPullRequest(repo: string, pr: NewPullRequest): Promise<PullRequest>;
@@ -332,7 +334,7 @@ export const ipcChannels = [
   "listPullRequests",
   "listReviewRequestedPullRequests",
   "listMyPullRequests",
-  "getOpenPullRequestCounts",
+  "getRepoCounts",
   "getBranchInfo",
   "createPullRequest",
   "getPullRequest",

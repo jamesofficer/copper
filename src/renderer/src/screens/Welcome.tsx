@@ -149,10 +149,20 @@ export default function Welcome({
   });
   const changedCount = countQuery.data;
 
+  // GitHub's own open totals for every registered repo, in one request the
+  // sidebar already makes (observed here too, since the sidebar can be hidden).
+  // This is what puts a count on the Issues tab without opening it — and it's
+  // truer than the loaded lists, which are capped at 50.
+  const countsQuery = useQuery({
+    queryKey: ["repoCounts"],
+    queryFn: () => window.api.getRepoCounts(),
+  });
+  const repoCounts = active?.slug ? countsQuery.data?.[active.slug] : undefined;
+
   function openCreatedPullRequest(pr: PullRequest) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
     void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
-    void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
+    void queryClient.invalidateQueries({ queryKey: ["repoCounts"] });
     onSelect(pr);
   }
 
@@ -167,6 +177,10 @@ export default function Welcome({
         flex={listTab ? undefined : "1"}
         flexShrink="0"
         minW="0"
+        // The stored width can't crush the panel beside it: on a narrow window
+        // the queue gives way, leaving the preview the 45% the old fixed split
+        // gave it.
+        maxW={listTab ? "55%" : undefined}
         minH="0"
         style={listTab ? { width: queueWidth } : undefined}
       >
@@ -237,7 +251,7 @@ export default function Welcome({
                   onClick={() => {
                     void prsQuery.refetch();
                     void queryClient.invalidateQueries({
-                      queryKey: ["openPrCounts"],
+                      queryKey: ["repoCounts"],
                     });
                   }}
                 >
@@ -281,13 +295,15 @@ export default function Welcome({
           gap="4"
           whiteSpace="nowrap"
         >
+          {/* The loaded lists are the fallback, for a repo the counts query
+              couldn't reach (no token, no access). */}
           <Tabs.Trigger value="pull-requests" px="0" py="2.5">
             Open
-            <TabCount value={prs?.length} />
+            <TabCount value={repoCounts?.pullRequests ?? prs?.length} />
           </Tabs.Trigger>
           <Tabs.Trigger value="issues" px="0" py="2.5">
             Issues
-            <TabCount value={issues?.length} />
+            <TabCount value={repoCounts?.issues ?? issues?.length} />
           </Tabs.Trigger>
           <Tabs.Trigger value="local-changes" px="0" py="2.5">
             Changes
