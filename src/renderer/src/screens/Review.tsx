@@ -35,8 +35,15 @@ import ShowSidebarButton from "../components/ShowSidebarButton";
 import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
 
+// The review screen's three tabs. Exported because the callers that open a PR
+// choose which one it lands on — "Review changes" goes straight to the diff.
+export type ReviewTab = "overview" | "changes" | "review";
+
 interface Props {
   pr: PullRequest;
+  // Which tab this PR opens on. Defaults to the overview: most ways in are
+  // "show me this PR", and the overview is what that means.
+  initialTab?: ReviewTab;
   onBack(): void;
 }
 
@@ -70,7 +77,7 @@ function describeActivity(
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-export default function Review({ pr, onBack }: Props) {
+export default function Review({ pr, initialTab, onBack }: Props) {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   // With the sidebar hidden its header is gone too, so this bar takes over
@@ -172,8 +179,14 @@ export default function Review({ pr, onBack }: Props) {
         {detail && <PullRequestActionsMenu pr={pr} detail={detail} />}
       </HStack>
 
+      {/* Keyed by PR *and* entry tab, since `defaultValue` only applies on
+          mount: without the PR the tabs would keep whichever one the last PR
+          was left on ("Review changes" landing on the overview), and without
+          the tab a caller reopening the same PR on a different one would be
+          silently ignored. */}
       <Tabs.Root
-        defaultValue="overview"
+        key={`${pr.repo}#${pr.number}#${initialTab ?? "overview"}`}
+        defaultValue={initialTab ?? "overview"}
         display="flex"
         flexDirection="column"
         flex="1"

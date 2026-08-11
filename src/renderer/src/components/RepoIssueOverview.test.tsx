@@ -59,6 +59,29 @@ describe("RepoIssueOverview", () => {
     expect(listRepoIssueComments).toHaveBeenCalledTimes(2);
   });
 
+  it("waits for the comments before putting a count in the hero", async () => {
+    // A count that starts at zero and jumps reads as an issue nobody replied
+    // to — the one thing the line is there to tell you.
+    let resolveComments = (value: never[]) => {
+      void value;
+    };
+    stubApi({
+      getRepoIssue: () => Promise.resolve(detail),
+      listRepoIssueComments: () =>
+        new Promise((resolve) => {
+          resolveComments = resolve;
+        }),
+    });
+
+    renderWithProviders(<RepoIssueOverview issue={issue} />);
+
+    await screen.findByText(detail.title);
+    expect(screen.queryByText(/comments?$/i)).toBeNull();
+
+    resolveComments([]);
+    expect(await screen.findByText("0 comments")).toBeTruthy();
+  });
+
   it("reports a closed issue with no recorded reason as plain Closed", async () => {
     // GitHub only started recording a reason in 2022, so "not not_planned"
     // can't be read as "completed".

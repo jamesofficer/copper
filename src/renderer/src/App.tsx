@@ -13,17 +13,22 @@ import {
 } from "./lib/recentPrs";
 import { toggleSidebar, useSidebarCollapsed } from "./lib/sidebarCollapsed";
 import { useRepositoryActions } from "./lib/useRepositoryActions";
-import Review from "./screens/Review";
+import Review, { type ReviewTab } from "./screens/Review";
 import Welcome from "./screens/Welcome";
 
 export default function App() {
   const queryClient = useQueryClient();
-  const [selected, setSelected] = useState<PullRequest | null>(null);
+  // The open PR and the tab it was opened on — one piece of state, because a
+  // caller that opens a PR is also saying what the reviewer came to do.
+  const [selected, setSelected] = useState<{
+    pr: PullRequest;
+    tab: ReviewTab;
+  } | null>(null);
   // Lives here (not in Welcome) so it survives leaving the home screen for a
   // PR and coming back.
   const [activePath, setActivePath] = useState<string | null>(null);
   // Clicking a PR on the home screen previews its Overview in a right panel;
-  // the panel's "View PR" button opens the full review screen.
+  // the panel's "Review changes" button opens the full review screen.
   const [preview, setPreview] = useState<PullRequest | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [recent, setRecent] = useState(() => listRecentPullRequests());
@@ -44,7 +49,7 @@ export default function App() {
     repos.repositories?.[0] ??
     null;
 
-  function openPullRequest(pr: PullRequest) {
+  function openPullRequest(pr: PullRequest, tab: ReviewTab = "overview") {
     recordRecentPullRequest(pr);
     setRecent(listRecentPullRequests());
     // Remember which repo this PR belongs to so returning home lands on it,
@@ -57,7 +62,7 @@ export default function App() {
     // Kick off the repo warm-up. The Overview tab's query may be served from
     // a cache filled via peekPullRequest, which skips warm-up.
     void window.api.getPullRequest(pr.repo, pr.number).catch(() => {});
-    setSelected(pr);
+    setSelected({ pr, tab });
   }
 
   // Picking a repo means "show me this repo's open pull requests", so it leaves
@@ -94,14 +99,18 @@ export default function App() {
           onReorderRepos={repos.reorderRepositories}
           recent={recent}
           onClearRecent={clearRecent}
-          openPr={selected}
+          openPr={selected?.pr ?? null}
           onSelectPullRequest={openPullRequest}
           onOpenSettings={() => setSettingsOpen(true)}
         />
       )}
 
       {selected ? (
-        <Review pr={selected} onBack={() => setSelected(null)} />
+        <Review
+          pr={selected.pr}
+          initialTab={selected.tab}
+          onBack={() => setSelected(null)}
+        />
       ) : (
         <Welcome
           repositories={repos.repositories}

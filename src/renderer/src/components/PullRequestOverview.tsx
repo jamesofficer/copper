@@ -1,14 +1,5 @@
-import {
-  Badge,
-  Box,
-  Heading,
-  HStack,
-  Separator,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Separator, VStack } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
-import { LuGitCommitHorizontal } from "react-icons/lu";
 import type {
   PullRequest,
   PullRequestComment,
@@ -17,22 +8,17 @@ import type {
   ReviewComment,
 } from "../../../shared/types";
 import { listReviewThreads, type ReviewThread } from "../lib/reviewComments";
-import { scrollbar } from "../lib/scrollbar";
-import BaseBranchSelect from "./BaseBranchSelect";
 import CommentCard from "./CommentCard";
 import CommentComposer from "./CommentComposer";
 import CommitTimelineGroup from "./CommitTimelineGroup";
-import LabelBadges from "./LabelBadges";
-import OpenedUpdatedLine from "./OpenedUpdatedLine";
 import { PanelError, PanelLoading, PanelSectionError } from "./PanelState";
-import PrStateBadge from "./PrStateBadge";
 import PullRequestDescription from "./PullRequestDescription";
+import PullRequestHero from "./PullRequestHero";
+import PullRequestSidebar from "./PullRequestSidebar";
+import ReadingPanel from "./ReadingPanel";
 import ReviewCard from "./ReviewCard";
-import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
-import ReviewSummary from "./ReviewSummary";
 import ReviewThreadCard from "./ReviewThreadCard";
 import SectionHeading from "./SectionHeading";
-import UserAvatar from "./UserAvatar";
 
 interface Props {
   pr: PullRequest;
@@ -178,77 +164,17 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
   ).length;
 
   return (
-    <Box h="full" overflowY="auto" css={scrollbar}>
-      <VStack gap="6" alignItems="stretch" maxW="3xl" mx="auto" px="8" py="8">
-        <VStack gap="3" alignItems="stretch">
-          <HStack gap="1.5">
-            <PrStateBadge
-              state={detail.state}
-              draft={detail.draft}
-              merged={detail.merged}
-              size="lg"
-            />
-            {shouldShowReviewStatus(
-              detail.state,
-              detail.merged,
-              detail.reviewStatus,
-            ) && <ReviewStatusBadge status={detail.reviewStatus} size="lg" />}
-          </HStack>
-          <Heading size="lg" lineHeight="1.3">
-            {detail.title}
-          </Heading>
-
-          <HStack
-            fontFamily="mono"
-            fontSize="sm"
-            color="fg.muted"
-            gap="2"
-            flexWrap="wrap"
-          >
-            <Text>#{detail.number}</Text>
-            <Text>·</Text>
-            <HStack gap="1.5">
-              <UserAvatar username={detail.author} />
-              <Text color="fg">{detail.author}</Text>
-            </HStack>
-            <Text>wants to merge into</Text>
-            <BaseBranchSelect detail={detail} />
-            <Text>from</Text>
-            <Badge variant="outline">{detail.headRef}</Badge>
-          </HStack>
-        </VStack>
-
-        <LabelBadges labels={detail.labels} />
-
-        <HStack
-          fontFamily="mono"
-          fontSize="sm"
-          gap="5"
-          flexWrap="wrap"
-          color="fg.muted"
-        >
-          <HStack gap="1.5">
-            <LuGitCommitHorizontal />
-            <Text>
-              {detail.commits} commit{detail.commits === 1 ? "" : "s"}
-            </Text>
-          </HStack>
-          <Text>
-            {detail.changedFiles} file{detail.changedFiles === 1 ? "" : "s"}
-          </Text>
-          <HStack gap="2">
-            <Text color="green.fg">+{detail.additions}</Text>
-            <Text color="red.fg">−{detail.deletions}</Text>
-          </HStack>
-        </HStack>
-
-        <ReviewSummary
+    <ReadingPanel
+      hero={<PullRequestHero detail={detail} />}
+      rail={
+        <PullRequestSidebar
+          detail={detail}
           reviews={reviews}
-          requestedReviewers={detail.reviewers}
+          showProgress={showActions}
         />
-
-        <Separator />
-
+      }
+    >
+      <VStack gap="6" alignItems="stretch">
         <PullRequestDescription detail={detail} editable={showActions} />
 
         {!commentsQuery.isPending && (
@@ -301,14 +227,7 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
             </Box>
           </>
         )}
-
-        <Separator />
-
-        <OpenedUpdatedLine
-          createdAt={detail.createdAt}
-          updatedAt={detail.updatedAt}
-        />
       </VStack>
-    </Box>
+    </ReadingPanel>
   );
 }

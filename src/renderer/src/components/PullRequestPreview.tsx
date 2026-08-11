@@ -1,13 +1,15 @@
 import { Box, Button, Flex, HStack, IconButton, Text } from "@chakra-ui/react";
-import { LuArrowRight, LuX } from "react-icons/lu";
+import { LuExternalLink, LuX } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import { dragRegion, titleBarHeight } from "../lib/titleBar";
+import type { ReviewTab } from "../screens/Review";
 import PullRequestOverview from "./PullRequestOverview";
 
 interface Props {
   pr: PullRequest;
-  // Leave the preview and open the PR's full review screen.
-  onView(pr: PullRequest): void;
+  // Leave the preview and open the PR's full review screen, on the tab the
+  // button that called this one names.
+  onView(pr: PullRequest, tab: ReviewTab): void;
   onClose(): void;
 }
 
@@ -33,10 +35,18 @@ export default function PullRequestPreview({ pr, onView, onClose }: Props) {
           truncate
           flex="1"
         >
-          {pr.repo}#{pr.number}
+          {pr.repo}
         </Text>
-        <Button size="xs" variant="outline" onClick={() => onView(pr)}>
-          View PR <LuArrowRight />
+        <Button asChild size="xs" variant="outline">
+          <a href={pr.url} target="_blank" rel="noreferrer">
+            View on GitHub <LuExternalLink />
+          </a>
+        </Button>
+        {/* The panel's one primary action: this is the button that takes the
+            reviewer from skimming to reviewing, so it opens the diff rather
+            than a second copy of the overview they've just read. */}
+        <Button size="xs" onClick={() => onView(pr, "changes")}>
+          Review changes
         </Button>
         <IconButton
           aria-label="Close preview"

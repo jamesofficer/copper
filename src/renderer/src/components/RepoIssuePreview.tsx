@@ -30,11 +30,11 @@ export default function RepoIssuePreview({ issue, onClose }: Props) {
           truncate
           flex="1"
         >
-          {issue.repo}#{issue.number}
+          {issue.repo}
         </Text>
         <Button asChild size="xs" variant="outline">
           <a href={issue.url} target="_blank" rel="noreferrer">
-            <LuExternalLink /> Open in GitHub
+            View on GitHub <LuExternalLink />
           </a>
         </Button>
         <IconButton

@@ -218,7 +218,7 @@ export default function ReviewPanel({ pr }: Props) {
               </Text>{" "}
               reads the diff — summary, reading order, and the risks it spots.
             </Text>
-            <Text>
+            <Text textAlign="center">
               <Text as="span" fontWeight="medium" color="fg.muted">
                 Deep
               </Text>{" "}
