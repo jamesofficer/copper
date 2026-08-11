@@ -6,6 +6,10 @@ import {
   LuGitPullRequestDraft,
 } from "react-icons/lu";
 
+// Which of the four states a PR is in — the queue rows key their icon colour
+// off this.
+export type PrStateKind = "merged" | "closed" | "draft" | "open";
+
 export interface PrState {
   state: "open" | "closed";
   draft: boolean;

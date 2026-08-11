@@ -2,17 +2,12 @@ import { Box, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import type { PullRequest } from "../../../shared/types";
 import {
-  assigneeOptions,
-  authorOptions,
-  filterByPeople,
-  filterByText,
-  type ListSort,
-  sortListItems,
-  sortOptions,
+  applyQueueFilters,
+  defaultQueueFilters,
+  type QueueFilters,
   sortTimeField,
 } from "../lib/listFilters";
 import { scrollbar } from "../lib/scrollbar";
-import FilterSelect from "./FilterSelect";
 import PullRequestQueueRow from "./PullRequestQueueRow";
 import QueueFilterBar from "./QueueFilterBar";
 
@@ -32,56 +27,22 @@ export default function OpenPullRequestList({
   onSelect,
   onOpen,
 }: Props) {
-  const [text, setText] = useState("");
-  const [author, setAuthor] = useState("all");
-  const [assignee, setAssignee] = useState("all");
-  const [sort, setSort] = useState<ListSort>("newest");
-
-  const authorItems = useMemo(() => authorOptions(prs), [prs]);
-  const assigneeItems = useMemo(() => assigneeOptions(prs), [prs]);
+  const [filters, setFilters] = useState<QueueFilters>(defaultQueueFilters);
 
   const visible = useMemo(
-    () =>
-      sortListItems(
-        filterByText(filterByPeople(prs, author, assignee), text),
-        sort,
-      ),
-    [prs, author, assignee, text, sort],
+    () => applyQueueFilters(prs, filters),
+    [prs, filters],
   );
-  const timeField = sortTimeField(sort);
+  const timeField = sortTimeField(filters.sort);
 
   return (
     <>
       <QueueFilterBar
         placeholder="Filter pull requests"
-        value={text}
-        onChange={setText}
-        filtersActive={
-          author !== "all" || assignee !== "all" || sort !== "newest"
-        }
-      >
-        <FilterSelect
-          label="Author"
-          items={authorItems}
-          value={author}
-          width="full"
-          onChange={setAuthor}
-        />
-        <FilterSelect
-          label="Assignee"
-          items={assigneeItems}
-          value={assignee}
-          width="full"
-          onChange={setAssignee}
-        />
-        <FilterSelect
-          label="Sort"
-          items={sortOptions}
-          value={sort}
-          width="full"
-          onChange={(value) => setSort(value as ListSort)}
-        />
-      </QueueFilterBar>
+        filters={filters}
+        onChange={setFilters}
+        items={prs}
+      />
 
       <Box
         flex="1"

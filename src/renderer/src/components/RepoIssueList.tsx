@@ -2,17 +2,12 @@ import { Box, Text } from "@chakra-ui/react";
 import { useMemo, useRef, useState } from "react";
 import { REPO_ISSUE_LIMIT, type RepoIssue } from "../../../shared/types";
 import {
-  assigneeOptions,
-  authorOptions,
-  filterByPeople,
-  filterByText,
-  type ListSort,
-  sortListItems,
-  sortOptions,
+  applyQueueFilters,
+  defaultQueueFilters,
+  type QueueFilters,
   sortTimeField,
 } from "../lib/listFilters";
 import { scrollbar } from "../lib/scrollbar";
-import FilterSelect from "./FilterSelect";
 import ListPagination from "./ListPagination";
 import QueueFilterBar from "./QueueFilterBar";
 import RepoIssueQueueRow from "./RepoIssueQueueRow";
@@ -31,25 +26,14 @@ interface Props {
 export default function RepoIssueList({ issues, preview, onSelect }: Props) {
   const topRef = useRef<HTMLDivElement>(null);
 
-  const [text, setText] = useState("");
-  const [author, setAuthor] = useState("all");
-  const [assignee, setAssignee] = useState("all");
-  const [sort, setSort] = useState<ListSort>("newest");
+  const [filters, setFilters] = useState<QueueFilters>(defaultQueueFilters);
   const [requestedPage, setRequestedPage] = useState(1);
 
-  const authorItems = useMemo(() => authorOptions(issues), [issues]);
-  const assigneeItems = useMemo(() => assigneeOptions(issues), [issues]);
-
   const visible = useMemo(
-    () =>
-      sortListItems(
-        filterByText(filterByPeople(issues, author, assignee), text),
-        sort,
-      ),
-    [issues, author, assignee, text, sort],
+    () => applyQueueFilters(issues, filters),
+    [issues, filters],
   );
-
-  const timeField = sortTimeField(sort);
+  const timeField = sortTimeField(filters.sort);
 
   // Clamped rather than stored outright, so a refetch that returns fewer issues
   // can't leave the list on a page that no longer exists.
@@ -59,8 +43,8 @@ export default function RepoIssueList({ issues, preview, onSelect }: Props) {
 
   // Every filter change starts from the top: page 3 of the old filter says
   // nothing about where the new one's results are.
-  function changeFilter(apply: () => void) {
-    apply();
+  function changeFilters(next: QueueFilters) {
+    setFilters(next);
     setRequestedPage(1);
   }
 
@@ -77,34 +61,10 @@ export default function RepoIssueList({ issues, preview, onSelect }: Props) {
     <>
       <QueueFilterBar
         placeholder="Filter issues"
-        value={text}
-        onChange={(value) => changeFilter(() => setText(value))}
-        filtersActive={
-          author !== "all" || assignee !== "all" || sort !== "newest"
-        }
-      >
-        <FilterSelect
-          label="Author"
-          items={authorItems}
-          value={author}
-          width="full"
-          onChange={(value) => changeFilter(() => setAuthor(value))}
-        />
-        <FilterSelect
-          label="Assignee"
-          items={assigneeItems}
-          value={assignee}
-          width="full"
-          onChange={(value) => changeFilter(() => setAssignee(value))}
-        />
-        <FilterSelect
-          label="Sort"
-          items={sortOptions}
-          value={sort}
-          width="full"
-          onChange={(value) => changeFilter(() => setSort(value as ListSort))}
-        />
-      </QueueFilterBar>
+        filters={filters}
+        onChange={changeFilters}
+        items={issues}
+      />
 
       <Box
         flex="1"
@@ -143,7 +103,7 @@ export default function RepoIssueList({ issues, preview, onSelect }: Props) {
           ))
         )}
 
-        <Box px="4" py="3">
+        <Box px="4">
           <ListPagination
             count={visible.length}
             pageSize={PAGE_SIZE}

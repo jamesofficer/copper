@@ -26,8 +26,14 @@ export default function RepoIssueQueueRow({
       onClick={() => onSelect(issue)}
       title={issue.title}
       icon={
-        <Box color="green.fg" title="Open issue" aria-label="Open issue">
-          <LuCircleDot size={15} />
+        <Box
+          display="flex"
+          fontSize="15px"
+          color="green.fg"
+          title="Open issue"
+          aria-label="Open issue"
+        >
+          <LuCircleDot />
         </Box>
       }
       meta={

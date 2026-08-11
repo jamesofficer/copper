@@ -1,18 +1,15 @@
 import {
-  Alert,
   Badge,
   Box,
   Center,
   Flex,
   HStack,
   IconButton,
-  Spinner,
-  Stack,
   Tabs,
   Text,
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { LuGitBranch, LuRefreshCw } from "react-icons/lu";
 import type { PullRequest, RepoIssue, Repository } from "../../../shared/types";
 import LocalChangesView, {
@@ -20,16 +17,15 @@ import LocalChangesView, {
   localChangesQueryOptions,
 } from "../components/LocalChangesView";
 import NewPullRequestDialog from "../components/NewPullRequestDialog";
-import NoRepositoriesEmptyState from "../components/NoRepositoriesEmptyState";
 import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
 import QueueActionsMenu from "../components/QueueActionsMenu";
+import QueueListState from "../components/QueueListState";
 import RepoIssueList from "../components/RepoIssueList";
 import RepoIssuePreview from "../components/RepoIssuePreview";
 import SetupBanner from "../components/SetupBanner";
 import ShowSidebarButton from "../components/ShowSidebarButton";
 import WorktreeSelect from "../components/WorktreeSelect";
-import { scrollbar } from "../lib/scrollbar";
 import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
 import { usePanelWidth } from "../lib/usePanelWidth";
@@ -319,102 +315,48 @@ export default function Welcome({
 
         <Tabs.Content value="pull-requests" flex="1" minH="0" p="0">
           <Flex direction="column" h="full" minH="0">
-            {noRepositories ? (
-              <QueueMessage>
-                <NoRepositoriesEmptyState
-                  purpose="start reviewing its pull requests"
-                  onAddRepo={onAddRepo}
-                />
-              </QueueMessage>
-            ) : active && !active.slug ? (
-              <QueueMessage>
-                <Text fontSize="sm" color="fg.muted">
-                  This repository has no GitHub remote, so pull requests can’t
-                  be loaded.
-                </Text>
-              </QueueMessage>
-            ) : prsError ? (
-              <QueueMessage>
-                <Alert.Root status="error" rounded="lg">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Couldn’t load pull requests</Alert.Title>
-                    <Alert.Description>{prsError}</Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
-              </QueueMessage>
-            ) : !active?.slug ? null : prsQuery.isPending || !prs ? (
-              <QueueMessage>
-                <HStack color="fg.muted">
-                  <Spinner size="sm" />
-                  <Text fontSize="sm">Loading open pull requests…</Text>
-                </HStack>
-              </QueueMessage>
-            ) : prs.length === 0 ? (
-              <QueueMessage>
-                <Text fontSize="sm" color="fg.muted">
-                  No open pull requests. Nice and quiet.
-                </Text>
-              </QueueMessage>
-            ) : (
+            <QueueListState
+              noun="pull requests"
+              noRepositories={noRepositories}
+              addRepoPurpose="start reviewing its pull requests"
+              onAddRepo={onAddRepo}
+              repo={active}
+              error={prsError}
+              pending={prsQuery.isPending || !prs}
+              empty={prs?.length === 0}
+              emptyText="No open pull requests. Nice and quiet."
+            >
               <OpenPullRequestList
-                key={active.slug}
-                prs={prs}
+                key={active?.slug}
+                prs={prs ?? []}
                 preview={preview}
                 onSelect={onPreviewChange}
                 onOpen={onSelect}
               />
-            )}
+            </QueueListState>
           </Flex>
         </Tabs.Content>
 
         <Tabs.Content value="issues" flex="1" minH="0" p="0">
           <Flex direction="column" h="full" minH="0">
-            {noRepositories ? (
-              <QueueMessage>
-                <NoRepositoriesEmptyState
-                  purpose="see its issues"
-                  onAddRepo={onAddRepo}
-                />
-              </QueueMessage>
-            ) : active && !active.slug ? (
-              <QueueMessage>
-                <Text fontSize="sm" color="fg.muted">
-                  This repository has no GitHub remote, so issues can’t be
-                  loaded.
-                </Text>
-              </QueueMessage>
-            ) : issuesError ? (
-              <QueueMessage>
-                <Alert.Root status="error" rounded="lg">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Couldn’t load issues</Alert.Title>
-                    <Alert.Description>{issuesError}</Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
-              </QueueMessage>
-            ) : !active?.slug ? null : issuesQuery.isPending || !issues ? (
-              <QueueMessage>
-                <HStack color="fg.muted">
-                  <Spinner size="sm" />
-                  <Text fontSize="sm">Loading open issues…</Text>
-                </HStack>
-              </QueueMessage>
-            ) : issues.length === 0 ? (
-              <QueueMessage>
-                <Text fontSize="sm" color="fg.muted">
-                  No open issues. Nothing to fix.
-                </Text>
-              </QueueMessage>
-            ) : (
+            <QueueListState
+              noun="issues"
+              noRepositories={noRepositories}
+              addRepoPurpose="see its issues"
+              onAddRepo={onAddRepo}
+              repo={active}
+              error={issuesError}
+              pending={issuesQuery.isPending || !issues}
+              empty={issues?.length === 0}
+              emptyText="No open issues. Nothing to fix."
+            >
               <RepoIssueList
-                key={active.slug}
-                issues={issues}
+                key={active?.slug}
+                issues={issues ?? []}
                 preview={shownIssue}
                 onSelect={setPreviewIssue}
               />
-            )}
+            </QueueListState>
           </Flex>
         </Tabs.Content>
 
@@ -475,17 +417,6 @@ function TabCount({ value }: { value?: number }) {
     <Badge size="xs" variant="surface" colorPalette="gray">
       {value}
     </Badge>
-  );
-}
-
-// Anything the queue shows in place of rows — an empty state, an error, the
-// loading line. Scrolls, since a repo with no GitHub remote still gets a
-// paragraph and a button.
-function QueueMessage({ children }: { children: ReactNode }) {
-  return (
-    <Box flex="1" minH="0" overflowY="auto" px="4" py="4" css={scrollbar}>
-      <Stack gap="3">{children}</Stack>
-    </Box>
   );
 }
 

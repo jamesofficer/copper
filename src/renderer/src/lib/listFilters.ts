@@ -45,6 +45,48 @@ export function filterByPeople<T extends Listable>(
   });
 }
 
+// Everything the queue's filter bar controls, as one value. One object rather
+// than four useStates in each list: the bar can then decide for itself whether
+// a filter is set, and a list can reset the whole lot in one call.
+export interface QueueFilters {
+  text: string;
+  author: string;
+  assignee: string;
+  sort: ListSort;
+}
+
+export const defaultQueueFilters: QueueFilters = {
+  text: "",
+  author: "all",
+  assignee: "all",
+  sort: "newest",
+};
+
+// True while any dropdown is away from its default. The text box is exempt: it
+// shows what it's filtering by, so it needs no separate mark.
+export function queueFiltersActive(filters: QueueFilters): boolean {
+  return (
+    filters.author !== defaultQueueFilters.author ||
+    filters.assignee !== defaultQueueFilters.assignee ||
+    filters.sort !== defaultQueueFilters.sort
+  );
+}
+
+// The whole pipeline in the order that matters: narrow by people, then by text,
+// then sort what's left.
+export function applyQueueFilters<T extends Listable>(
+  items: T[],
+  filters: QueueFilters,
+): T[] {
+  return sortListItems(
+    filterByText(
+      filterByPeople(items, filters.author, filters.assignee),
+      filters.text,
+    ),
+    filters.sort,
+  );
+}
+
 // Which timestamp a row should show. A row carrying "updated 5m ago" in a list
 // ordered by when things were opened reads as a broken sort, so the time
 // follows the sort rather than always being one or the other.

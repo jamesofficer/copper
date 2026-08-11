@@ -1,14 +1,14 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
 import type { PullRequest } from "../../../shared/types";
 import CommentCountBadge from "./CommentCountBadge";
-import { prStateMeta } from "./PrStateBadge";
+import { type PrStateKind, prStateMeta } from "./PrStateBadge";
 import QueueRow from "./QueueRow";
 import RelativeTime from "./RelativeTime";
 
 // The rows carry no state badge, so the icon carries the state: grey draft,
 // green open, purple merged, red closed. Green rather than PrStateBadge's blue
 // for open — GitHub's colour, and a whole column of blue icons reads as links.
-const stateColor: Record<ReturnType<typeof prStateMeta>["kind"], string> = {
+const stateColor: Record<PrStateKind, string> = {
   draft: "fg.subtle",
   open: "green.fg",
   merged: "purple.fg",
@@ -44,10 +44,11 @@ export default function PullRequestQueueRow({
       title={pr.title}
       icon={
         <Box
+          display="flex"
+          fontSize="15px"
           color={stateColor[state.kind]}
           title={state.label}
           aria-label={state.label}
-          css={{ "& svg": { width: "15px", height: "15px" } }}
         >
           {state.icon}
         </Box>
