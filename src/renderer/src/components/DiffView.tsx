@@ -4,12 +4,21 @@ import {
   Center,
   Flex,
   HStack,
+  IconButton,
   Spinner,
   Text,
 } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { LuCheck, LuFileCode, LuFileDiff } from "react-icons/lu";
+import {
+  LuArrowRight,
+  LuCheck,
+  LuChevronLeft,
+  LuChevronRight,
+  LuFileCode,
+  LuFileDiff,
+  LuSquare,
+} from "react-icons/lu";
 import type { PullRequestFile } from "../../../shared/types";
 import { statusMeta } from "../lib/fileStatus";
 import { scrollbar } from "../lib/scrollbar";
@@ -19,6 +28,7 @@ import DiffLines, {
   type DiffCommenting,
   type DiffExpansion,
 } from "./DiffLines";
+import DiffViewModeSelect from "./DiffViewModeSelect";
 import FileView from "./FileView";
 
 interface Props {
@@ -26,7 +36,16 @@ interface Props {
   commenting?: DiffCommenting;
   // Undefined hides the Viewed button (commit-by-commit views).
   viewed?: boolean;
+  viewedUpdating?: boolean;
   onToggleViewed?(viewed: boolean): void;
+  hasPreviousFile?: boolean;
+  hasNextFile?: boolean;
+  onPreviousFile?(): void;
+  onNextFile?(): void;
+  reviewProgress?: { viewed: number; total: number };
+  onMarkViewedAndNext?(): void;
+  markViewedLabel?: string;
+  markViewedDisabled?: boolean;
   // Where to read the full file from — enables expand-hidden-lines,
   // whole-file syntax highlighting, and the full-file view.
   fileContext?: { repo: string; sha: string };
@@ -36,7 +55,16 @@ export default function DiffView({
   file,
   commenting,
   viewed,
+  viewedUpdating,
   onToggleViewed,
+  hasPreviousFile,
+  hasNextFile,
+  onPreviousFile,
+  onNextFile,
+  reviewProgress,
+  onMarkViewedAndNext,
+  markViewedLabel,
+  markViewedDisabled,
   fileContext,
 }: Props) {
   const meta = statusMeta[file.status];
@@ -85,7 +113,7 @@ export default function DiffView({
   );
 
   return (
-    <Flex direction="column" h="full" minH="0">
+    <Flex direction="column" h="full" minH="0" position="relative">
       <HStack
         px="4"
         py="2"
@@ -104,7 +132,14 @@ export default function DiffView({
         >
           {meta.label}
         </Text>
-        <Text as="span" fontFamily="mono" fontSize="xs" wordBreak="break-all">
+        <Text
+          as="span"
+          fontFamily="mono"
+          fontSize="xs"
+          truncate
+          minW="0"
+          flex="1"
+        >
           {file.path}
         </Text>
         {file.previousPath && (
@@ -128,15 +163,43 @@ export default function DiffView({
         </HStack>
 
         <HStack gap="2" flexShrink="0" ml="auto">
+          {onPreviousFile && onNextFile && (
+            <HStack gap="0" borderWidth="1px" rounded="md">
+              <IconButton
+                aria-label="Previous file"
+                title="Previous file"
+                size="xs"
+                variant="ghost"
+                color="fg.muted"
+                disabled={!hasPreviousFile}
+                onClick={onPreviousFile}
+              >
+                <LuChevronLeft />
+              </IconButton>
+              <IconButton
+                aria-label="Next file"
+                title="Next file"
+                size="xs"
+                variant="ghost"
+                color="fg.muted"
+                disabled={!hasNextFile}
+                onClick={onNextFile}
+              >
+                <LuChevronRight />
+              </IconButton>
+            </HStack>
+          )}
           {viewed !== undefined && onToggleViewed && (
             <Button
-              size="2xs"
+              size="xs"
+              h="34px"
               variant="outline"
               colorPalette={viewed ? "green" : undefined}
               color={viewed ? undefined : "fg.muted"}
+              disabled={viewedUpdating}
               onClick={() => onToggleViewed(!viewed)}
             >
-              {viewed && <LuCheck />} Viewed
+              {viewed ? <LuCheck /> : <LuSquare />} Viewed
             </Button>
           )}
 
@@ -151,6 +214,7 @@ export default function DiffView({
               {showFullFile ? "View diff" : "View file"}
             </Button>
           )}
+          <DiffViewModeSelect />
         </HStack>
       </HStack>
 
@@ -196,6 +260,32 @@ export default function DiffView({
               : "No text diff available — this file is binary or too large to show."}
           </Text>
         </Center>
+      )}
+      {reviewProgress && onMarkViewedAndNext && (
+        <HStack
+          position="absolute"
+          right="6"
+          bottom="6"
+          gap="2"
+          rounded="md"
+          borderWidth="1px"
+          bg="bg.panel"
+          boxShadow="md"
+          px="2"
+          py="1.5"
+        >
+          <Text fontSize="xs" color="fg.muted" whiteSpace="nowrap">
+            {reviewProgress.viewed} / {reviewProgress.total} viewed
+          </Text>
+          <Button
+            size="xs"
+            colorPalette="orange"
+            disabled={markViewedDisabled}
+            onClick={onMarkViewedAndNext}
+          >
+            {markViewedLabel ?? "Mark viewed & next"} <LuArrowRight />
+          </Button>
+        </HStack>
       )}
     </Flex>
   );
