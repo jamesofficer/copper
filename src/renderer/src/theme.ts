@@ -15,6 +15,11 @@ const accentRules = Object.fromEntries(
   ]),
 );
 
+// What the app falls back to before the bundled font is parsed, and for any
+// glyph it doesn't carry.
+const uiFallback =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
 const config = defineConfig({
   globalCss: {
     html: {
@@ -48,6 +53,13 @@ const config = defineConfig({
     },
     tokens: {
       fonts: {
+        // Outfit, bundled as a variable font (@fontsource-variable/outfit) —
+        // shipped with the app rather than fetched from Google, since the
+        // renderer's CSP allows no outside connections and a desktop app
+        // shouldn't wait on a font CDN to paint. The system stack stays behind
+        // it for the glyphs Outfit's Latin subsets don't cover.
+        heading: { value: `'Outfit Variable', ${uiFallback}` },
+        body: { value: `'Outfit Variable', ${uiFallback}` },
         mono: {
           value: "'SF Mono', ui-monospace, Menlo, Consolas, monospace",
         },
