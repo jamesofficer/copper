@@ -29,6 +29,11 @@ export const personalityOptions: Array<{
     description: "Short sentences and everyday words, first-week friendly.",
   },
   {
+    value: "ste",
+    label: "Simplified Technical English",
+    description: "ASD-STE100: approved words, short sentences, active voice.",
+  },
+  {
     value: "grug",
     label: "Grug",
     description: "grug see complexity. grug worry.",

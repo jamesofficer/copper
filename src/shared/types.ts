@@ -194,6 +194,7 @@ export const reviewPersonalities = [
   "technical",
   "non_technical",
   "simplified",
+  "ste",
   "grug",
   "mentor",
   "concise",
