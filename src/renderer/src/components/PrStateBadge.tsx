@@ -6,32 +6,54 @@ import {
   LuGitPullRequestDraft,
 } from "react-icons/lu";
 
-interface Props {
+export interface PrState {
   state: "open" | "closed";
   draft: boolean;
   merged: boolean;
+}
+
+interface Props extends PrState {
   size?: "xs" | "sm" | "md" | "lg";
 }
 
-function meta({ state, draft, merged }: Omit<Props, "size">) {
+// The four states a PR can be in, as one table. Exported because the queue rows
+// carry the same state as a tinted icon rather than a badge, and two components
+// deciding "is this merged or just closed" separately is how they drift apart.
+export function prStateMeta({ state, draft, merged }: PrState) {
   if (merged) {
-    return { label: "Merged", palette: "purple", icon: <LuGitMerge /> };
+    return {
+      kind: "merged" as const,
+      label: "Merged",
+      palette: "purple",
+      icon: <LuGitMerge />,
+    };
   }
   if (state === "closed") {
     return {
+      kind: "closed" as const,
       label: "Closed",
       palette: "red",
       icon: <LuGitPullRequestClosed />,
     };
   }
   if (draft) {
-    return { label: "Draft", palette: "gray", icon: <LuGitPullRequestDraft /> };
+    return {
+      kind: "draft" as const,
+      label: "Draft",
+      palette: "gray",
+      icon: <LuGitPullRequestDraft />,
+    };
   }
-  return { label: "Open", palette: "blue", icon: <LuGitPullRequest /> };
+  return {
+    kind: "open" as const,
+    label: "Open",
+    palette: "blue",
+    icon: <LuGitPullRequest />,
+  };
 }
 
 export default function PrStateBadge({ size, ...stateProps }: Props) {
-  const state = meta(stateProps);
+  const state = prStateMeta(stateProps);
   return (
     <Badge colorPalette={state.palette} variant="surface" size={size}>
       {state.icon}

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { LuCircleCheck, LuCircleDashed, LuCircleX } from "react-icons/lu";
 import type { ReviewStatus } from "../../../shared/types";
 
-export const reviewStatusMeta: Record<
+const meta: Record<
   ReviewStatus,
   { label: string; palette: string; icon: ReactNode }
 > = {
@@ -43,7 +43,7 @@ interface Props {
 export default function ReviewStatusBadge({ status, size }: Props) {
   // PR lists cached before this field existed don't carry it.
   if (!status) return null;
-  const state = reviewStatusMeta[status];
+  const state = meta[status];
   return (
     <Badge colorPalette={state.palette} variant="surface" size={size}>
       {state.icon}

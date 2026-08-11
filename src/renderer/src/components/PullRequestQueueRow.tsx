@@ -1,19 +1,18 @@
 import { Box, HStack, Text } from "@chakra-ui/react";
-import { LuGitPullRequest, LuGitPullRequestDraft } from "react-icons/lu";
-import type { PullRequest, ReviewStatus } from "../../../shared/types";
+import type { PullRequest } from "../../../shared/types";
 import CommentCountBadge from "./CommentCountBadge";
+import { prStateMeta } from "./PrStateBadge";
 import QueueRow from "./QueueRow";
 import RelativeTime from "./RelativeTime";
-import { reviewStatusMeta } from "./ReviewStatusBadge";
 
-// The rows carry no state badges, so the icon carries the review verdict
-// instead. Awaiting review is deliberately neutral rather than the badge's
-// orange: it's the resting state of most open PRs, and colouring it would
-// leave a column of warnings with nothing to warn about.
-const statusColor: Record<ReviewStatus, string> = {
-  approved: "green.fg",
-  changes_requested: "red.fg",
-  awaiting_review: "fg.muted",
+// The rows carry no state badge, so the icon carries the state: grey draft,
+// green open, purple merged, red closed. Green rather than PrStateBadge's blue
+// for open — GitHub's colour, and a whole column of blue icons reads as links.
+const stateColor: Record<ReturnType<typeof prStateMeta>["kind"], string> = {
+  draft: "fg.subtle",
+  open: "green.fg",
+  merged: "purple.fg",
+  closed: "red.fg",
 };
 
 interface Props {
@@ -33,10 +32,9 @@ export default function PullRequestQueueRow({
   onSelect,
   onOpen,
 }: Props) {
-  const status = pr.reviewStatus
-    ? reviewStatusMeta[pr.reviewStatus]
-    : undefined;
-  const label = pr.draft ? "Draft" : (status?.label ?? "Pull request");
+  // The summary carries no state or merged flag because every list feeding these
+  // rows asks GitHub for open PRs only — so the icon is a draft or it's open.
+  const state = prStateMeta({ state: "open", draft: pr.draft, merged: false });
 
   return (
     <QueueRow
@@ -46,19 +44,12 @@ export default function PullRequestQueueRow({
       title={pr.title}
       icon={
         <Box
-          color={
-            pr.draft
-              ? "fg.subtle"
-              : (statusColor[pr.reviewStatus] ?? "fg.muted")
-          }
-          title={label}
-          aria-label={label}
+          color={stateColor[state.kind]}
+          title={state.label}
+          aria-label={state.label}
+          css={{ "& svg": { width: "15px", height: "15px" } }}
         >
-          {pr.draft ? (
-            <LuGitPullRequestDraft size={15} />
-          ) : (
-            <LuGitPullRequest size={15} />
-          )}
+          {state.icon}
         </Box>
       }
       trailing={
