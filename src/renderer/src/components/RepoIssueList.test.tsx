@@ -66,6 +66,8 @@ describe("RepoIssueList", () => {
     await user.click(screen.getByLabelText("Page 2"));
     expect(screen.getByText("Issue number 26")).toBeTruthy();
 
+    // The dropdowns live behind the queue's filter button.
+    await user.click(screen.getByLabelText("Show filters"));
     await user.click(pick("Newest", "button"));
     await user.click(pick("Oldest", '[role="option"]'));
 

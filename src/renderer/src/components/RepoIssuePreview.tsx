@@ -1,6 +1,7 @@
 import { Box, Button, Flex, HStack, IconButton, Text } from "@chakra-ui/react";
 import { LuExternalLink, LuX } from "react-icons/lu";
 import type { RepoIssue } from "../../../shared/types";
+import { dragRegion, titleBarHeight } from "../lib/titleBar";
 import RepoIssueOverview from "./RepoIssueOverview";
 
 interface Props {
@@ -13,15 +14,15 @@ interface Props {
 // "View issue" button.
 export default function RepoIssuePreview({ issue, onClose }: Props) {
   return (
-    <Flex
-      direction="column"
-      w="45%"
-      minW="md"
-      flexShrink="0"
-      minH="0"
-      borderLeftWidth="1px"
-    >
-      <HStack gap="3" px="4" py="2" borderBottomWidth="1px" flexShrink="0">
+    <Flex direction="column" flex="1" minW="0" minH="0">
+      <HStack
+        gap="3"
+        px="4"
+        h={titleBarHeight}
+        borderBottomWidth="1px"
+        flexShrink="0"
+        css={dragRegion}
+      >
         <Text
           fontFamily="mono"
           fontSize="sm"

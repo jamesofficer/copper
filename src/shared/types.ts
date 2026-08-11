@@ -20,6 +20,9 @@ export interface PullRequest {
   additions: number;
   deletions: number;
   changedFiles: number;
+  // Optional because lists persisted before this field existed don't carry it —
+  // the queue row leaves the segment out rather than claiming zero commits.
+  commits?: number;
   // Conversation + inline review comments combined.
   comments: number;
   assignees: string[];
@@ -67,6 +70,10 @@ export interface PullRequestDetail {
 // private detail: the renderer filters and sorts the list it was given, so it
 // has to be able to say when the list is only the newest slice.
 export const REPO_ISSUE_LIMIT = 50;
+
+// The same contract for open pull requests: listPullRequests returns the newest
+// slice, so the queue can say so instead of letting "no matches" read as "none".
+export const OPEN_PULL_REQUEST_LIMIT = 50;
 
 // A GitHub issue, not to be confused with a ReviewIssue — the app's own name
 // for a finding the analysis agent reported. Labels sit on the summary, unlike

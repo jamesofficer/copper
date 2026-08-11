@@ -1,5 +1,7 @@
 import {
   Alert,
+  Badge,
+  Box,
   Center,
   Flex,
   HStack,
@@ -10,14 +12,8 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import {
-  LuCircleDot,
-  LuFileDiff,
-  LuGitBranch,
-  LuGitPullRequest,
-  LuRefreshCw,
-} from "react-icons/lu";
+import { type ReactNode, useState } from "react";
+import { LuGitBranch, LuRefreshCw } from "react-icons/lu";
 import type { PullRequest, RepoIssue, Repository } from "../../../shared/types";
 import LocalChangesView, {
   localChangeCountQueryOptions,
@@ -27,6 +23,7 @@ import NewPullRequestDialog from "../components/NewPullRequestDialog";
 import NoRepositoriesEmptyState from "../components/NoRepositoriesEmptyState";
 import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
+import QueueActionsMenu from "../components/QueueActionsMenu";
 import RepoIssueList from "../components/RepoIssueList";
 import RepoIssuePreview from "../components/RepoIssuePreview";
 import SetupBanner from "../components/SetupBanner";
@@ -35,6 +32,7 @@ import WorktreeSelect from "../components/WorktreeSelect";
 import { scrollbar } from "../lib/scrollbar";
 import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
+import { usePanelWidth } from "../lib/usePanelWidth";
 
 interface Props {
   repositories: Repository[] | undefined;
@@ -63,6 +61,16 @@ export default function Welcome({
   // holding the window's traffic lights clear.
   const collapsed = useSidebarCollapsed();
 
+  // The queue is a list read top to bottom, so it stays narrow and hands the
+  // rest of the window to whatever is being read beside it.
+  const { width: queueWidth, startResize } = usePanelWidth({
+    storageKey: "reviewQueueWidth",
+    min: 380,
+    max: 700,
+    fallback: 480,
+    handle: "right",
+  });
+
   const prsQuery = useQuery({
     queryKey: ["pullRequests", active?.slug],
     queryFn: () => window.api.listPullRequests(active?.slug ?? ""),
@@ -75,13 +83,17 @@ export default function Welcome({
       : "Couldn't load pull requests."
     : null;
 
+  const pullRequestsTab = tab === "pull-requests";
   const localChangesTab = tab === "local-changes";
   const issuesTab = tab === "issues";
+  // Only the two list tabs share the window with a panel beside them; Current
+  // changes is a file list and a diff, and needs the whole width.
+  const listTab = pullRequestsTab || issuesTab;
   const noRepositories =
     !reposPending && (!repositories || repositories.length === 0);
 
   // Only fetched while the tab is showing, so a user who never opens Issues
-  // never spends the request. That's also why the trigger carries no count.
+  // never spends the request.
   const issuesQuery = useQuery({
     queryKey: ["repoIssues", active?.slug],
     queryFn: () => window.api.listRepoIssues(active?.slug ?? ""),
@@ -146,53 +158,81 @@ export default function Welcome({
 
   return (
     <>
-      <Flex direction="column" flex="1" minW="0">
-        <Tabs.Root
-          value={tab}
-          onValueChange={(details) => setTab(details.value)}
-          display="flex"
-          flexDirection="column"
-          flex="1"
-          minH="0"
+      <Tabs.Root
+        value={tab}
+        onValueChange={(details) => setTab(details.value)}
+        display="flex"
+        flexDirection="column"
+        // Fixed width beside a panel; the whole remaining window otherwise.
+        flex={listTab ? undefined : "1"}
+        flexShrink="0"
+        minW="0"
+        minH="0"
+        style={listTab ? { width: queueWidth } : undefined}
+      >
+        <HStack
+          flexShrink="0"
+          h={titleBarHeight}
+          pl={collapsed ? trafficLightSpace : "4"}
+          pr="3"
+          gap="2"
+          borderBottomWidth="1px"
+          css={dragRegion}
         >
-          <HStack
-            flexShrink="0"
-            h={titleBarHeight}
-            pl={collapsed ? trafficLightSpace : "4"}
-            pr="4"
-            gap="2"
-            borderBottomWidth="1px"
-            color="fg.muted"
-            css={dragRegion}
-          >
-            <ShowSidebarButton />
-            {/* A third tab plus the preview panel is enough to wrap the
-                labels onto two lines, which fights the title bar's height. */}
-            <Tabs.List
-              h="full"
-              border="none"
-              alignItems="stretch"
-              flexShrink="0"
-              whiteSpace="nowrap"
-            >
-              <Tabs.Trigger value="pull-requests" h="full">
-                <LuGitPullRequest /> Pull requests
-              </Tabs.Trigger>
-              <Tabs.Trigger value="issues" h="full">
-                <LuCircleDot /> Issues
-              </Tabs.Trigger>
-              <Tabs.Trigger value="local-changes" h="full">
-                <LuFileDiff /> Current changes
-                {changedCount !== undefined ? ` (${changedCount})` : ""}
-              </Tabs.Trigger>
-            </Tabs.List>
-            {active?.slug && tab === "pull-requests" && (
-              <HStack ml="auto" gap="2">
+          <ShowSidebarButton />
+          <Text fontSize="sm" fontWeight="semibold" truncate>
+            Review queue
+          </Text>
+          <HStack ml="auto" gap="1" flexShrink="0">
+            {active && localChangesTab && (
+              <>
+                {worktrees && worktrees.length > 1 ? (
+                  <WorktreeSelect
+                    worktrees={worktrees}
+                    value={worktreePath}
+                    onChange={setSelectedWorktree}
+                  />
+                ) : (
+                  changesQuery.data?.branch && (
+                    <HStack
+                      gap="1"
+                      fontFamily="mono"
+                      fontSize="xs"
+                      color="fg.muted"
+                      minW="0"
+                    >
+                      <LuGitBranch size={12} />
+                      <Text as="span" truncate>
+                        {changesQuery.data.branch}
+                      </Text>
+                    </HStack>
+                  )
+                )}
+                <IconButton
+                  aria-label="Refresh"
+                  title="Refresh"
+                  variant="ghost"
+                  size="xs"
+                  color="fg.muted"
+                  loading={changesQuery.isFetching}
+                  onClick={() => {
+                    void worktreesQuery.refetch();
+                    void countQuery.refetch();
+                    void changesQuery.refetch();
+                  }}
+                >
+                  <LuRefreshCw />
+                </IconButton>
+              </>
+            )}
+            {active?.slug && pullRequestsTab && (
+              <>
                 <IconButton
                   aria-label="Refresh pull requests"
                   title="Refresh"
-                  variant="outline"
+                  variant="ghost"
                   size="xs"
+                  color="fg.muted"
                   loading={prsQuery.isFetching}
                   onClick={() => {
                     void prsQuery.refetch();
@@ -206,211 +246,239 @@ export default function Welcome({
                 <NewPullRequestDialog
                   key={active.slug}
                   repo={active.slug}
+                  compact
                   onCreated={openCreatedPullRequest}
                 />
-              </HStack>
+              </>
             )}
             {active?.slug && issuesTab && (
-              <HStack ml="auto" gap="2">
-                <IconButton
-                  aria-label="Refresh issues"
-                  title="Refresh"
-                  variant="outline"
-                  size="xs"
-                  loading={issuesQuery.isFetching}
-                  onClick={() => void issuesQuery.refetch()}
-                >
-                  <LuRefreshCw />
-                </IconButton>
-              </HStack>
+              <IconButton
+                aria-label="Refresh issues"
+                title="Refresh"
+                variant="ghost"
+                size="xs"
+                color="fg.muted"
+                loading={issuesQuery.isFetching}
+                onClick={() => void issuesQuery.refetch()}
+              >
+                <LuRefreshCw />
+              </IconButton>
             )}
-            {active && localChangesTab && (
-              <HStack ml="auto" gap="2">
-                {worktrees && worktrees.length > 1 ? (
-                  <WorktreeSelect
-                    worktrees={worktrees}
-                    value={worktreePath}
-                    onChange={setSelectedWorktree}
-                  />
-                ) : (
-                  changesQuery.data?.branch && (
-                    <HStack gap="1" fontFamily="mono" fontSize="xs" minW="0">
-                      <LuGitBranch size={12} />
-                      <Text as="span" truncate>
-                        {changesQuery.data.branch}
-                      </Text>
-                    </HStack>
-                  )
-                )}
-                <IconButton
-                  aria-label="Refresh"
-                  title="Refresh"
-                  variant="outline"
-                  size="xs"
-                  loading={changesQuery.isFetching}
-                  onClick={() => {
-                    void worktreesQuery.refetch();
-                    void countQuery.refetch();
-                    void changesQuery.refetch();
-                  }}
-                >
-                  <LuRefreshCw />
-                </IconButton>
-              </HStack>
-            )}
+            <QueueActionsMenu
+              repoSlug={active?.slug ?? undefined}
+              onAddRepo={onAddRepo}
+              onOpenSettings={onOpenSettings}
+            />
           </HStack>
+        </HStack>
 
-          <Tabs.Content value="pull-requests" flex="1" minH="0" p="0">
-            <Stack
-              h="full"
-              minH="0"
-              overflowY="auto"
-              gap="3"
-              px="4"
-              py="4"
-              css={scrollbar}
-            >
-              <SetupBanner onOpenSettings={onOpenSettings} />
+        {/* No icons on the triggers: the column is narrow, and the counts are
+            the part that says where the work is. */}
+        <Tabs.List
+          flexShrink="0"
+          px="4"
+          border="none"
+          gap="4"
+          whiteSpace="nowrap"
+        >
+          <Tabs.Trigger value="pull-requests" px="0" py="2.5">
+            Open
+            <TabCount value={prs?.length} />
+          </Tabs.Trigger>
+          <Tabs.Trigger value="issues" px="0" py="2.5">
+            Issues
+            <TabCount value={issues?.length} />
+          </Tabs.Trigger>
+          <Tabs.Trigger value="local-changes" px="0" py="2.5">
+            Changes
+            <TabCount value={changedCount} />
+          </Tabs.Trigger>
+        </Tabs.List>
 
-              {noRepositories ? (
+        {/* Collapses to nothing on the usual path: the banner renders null once
+            both credentials are set, and :empty takes the padding with it. */}
+        <Box px="4" pt="2" flexShrink="0" _empty={{ display: "none" }}>
+          <SetupBanner onOpenSettings={onOpenSettings} />
+        </Box>
+
+        <Tabs.Content value="pull-requests" flex="1" minH="0" p="0">
+          <Flex direction="column" h="full" minH="0">
+            {noRepositories ? (
+              <QueueMessage>
                 <NoRepositoriesEmptyState
                   purpose="start reviewing its pull requests"
                   onAddRepo={onAddRepo}
                 />
-              ) : (
-                <>
-                  {active && !active.slug && (
-                    <Text fontSize="sm" color="fg.muted">
-                      This repository has no GitHub remote, so pull requests
-                      can’t be loaded.
-                    </Text>
-                  )}
+              </QueueMessage>
+            ) : active && !active.slug ? (
+              <QueueMessage>
+                <Text fontSize="sm" color="fg.muted">
+                  This repository has no GitHub remote, so pull requests can’t
+                  be loaded.
+                </Text>
+              </QueueMessage>
+            ) : prsError ? (
+              <QueueMessage>
+                <Alert.Root status="error" rounded="lg">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Couldn’t load pull requests</Alert.Title>
+                    <Alert.Description>{prsError}</Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              </QueueMessage>
+            ) : !active?.slug ? null : prsQuery.isPending || !prs ? (
+              <QueueMessage>
+                <HStack color="fg.muted">
+                  <Spinner size="sm" />
+                  <Text fontSize="sm">Loading open pull requests…</Text>
+                </HStack>
+              </QueueMessage>
+            ) : prs.length === 0 ? (
+              <QueueMessage>
+                <Text fontSize="sm" color="fg.muted">
+                  No open pull requests. Nice and quiet.
+                </Text>
+              </QueueMessage>
+            ) : (
+              <OpenPullRequestList
+                key={active.slug}
+                prs={prs}
+                preview={preview}
+                onSelect={onPreviewChange}
+                onOpen={onSelect}
+              />
+            )}
+          </Flex>
+        </Tabs.Content>
 
-                  {prsError && (
-                    <Alert.Root status="error" rounded="lg" maxW="2xl">
-                      <Alert.Indicator />
-                      <Alert.Content>
-                        <Alert.Title>Couldn’t load pull requests</Alert.Title>
-                        <Alert.Description>{prsError}</Alert.Description>
-                      </Alert.Content>
-                    </Alert.Root>
-                  )}
-
-                  {active?.slug &&
-                    !prsError &&
-                    (prsQuery.isPending || !prs ? (
-                      <HStack color="fg.muted" py="4">
-                        <Spinner size="sm" />
-                        <Text fontSize="sm">Loading open pull requests…</Text>
-                      </HStack>
-                    ) : prs.length === 0 ? (
-                      <Text fontSize="sm" color="fg.muted" py="4">
-                        No open pull requests. Nice and quiet.
-                      </Text>
-                    ) : (
-                      <OpenPullRequestList
-                        key={active.slug}
-                        prs={prs}
-                        preview={preview}
-                        onSelect={onPreviewChange}
-                        onOpen={onSelect}
-                      />
-                    ))}
-                </>
-              )}
-            </Stack>
-          </Tabs.Content>
-
-          <Tabs.Content value="issues" flex="1" minH="0" p="0">
-            <Stack
-              h="full"
-              minH="0"
-              overflowY="auto"
-              gap="3"
-              px="4"
-              py="4"
-              css={scrollbar}
-            >
-              <SetupBanner onOpenSettings={onOpenSettings} />
-
-              {noRepositories ? (
+        <Tabs.Content value="issues" flex="1" minH="0" p="0">
+          <Flex direction="column" h="full" minH="0">
+            {noRepositories ? (
+              <QueueMessage>
                 <NoRepositoriesEmptyState
                   purpose="see its issues"
                   onAddRepo={onAddRepo}
                 />
-              ) : (
-                <>
-                  {active && !active.slug && (
-                    <Text fontSize="sm" color="fg.muted">
-                      This repository has no GitHub remote, so issues can’t be
-                      loaded.
-                    </Text>
-                  )}
-
-                  {issuesError && (
-                    <Alert.Root status="error" rounded="lg" maxW="2xl">
-                      <Alert.Indicator />
-                      <Alert.Content>
-                        <Alert.Title>Couldn’t load issues</Alert.Title>
-                        <Alert.Description>{issuesError}</Alert.Description>
-                      </Alert.Content>
-                    </Alert.Root>
-                  )}
-
-                  {active?.slug &&
-                    !issuesError &&
-                    (issuesQuery.isPending || !issues ? (
-                      <HStack color="fg.muted" py="4">
-                        <Spinner size="sm" />
-                        <Text fontSize="sm">Loading open issues…</Text>
-                      </HStack>
-                    ) : issues.length === 0 ? (
-                      <Text fontSize="sm" color="fg.muted" py="4">
-                        No open issues. Nothing to fix.
-                      </Text>
-                    ) : (
-                      <RepoIssueList
-                        key={active.slug}
-                        issues={issues}
-                        preview={shownIssue}
-                        onSelect={setPreviewIssue}
-                      />
-                    ))}
-                </>
-              )}
-            </Stack>
-          </Tabs.Content>
-
-          <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
-            {active ? (
-              localChangesTab ? (
-                <LocalChangesView key={worktreePath} path={worktreePath} />
-              ) : null
-            ) : (
-              <Center h="full" p="4">
-                <Text color="fg.muted" fontSize="sm">
-                  Select a repository to see its uncommitted changes.
+              </QueueMessage>
+            ) : active && !active.slug ? (
+              <QueueMessage>
+                <Text fontSize="sm" color="fg.muted">
+                  This repository has no GitHub remote, so issues can’t be
+                  loaded.
                 </Text>
-              </Center>
+              </QueueMessage>
+            ) : issuesError ? (
+              <QueueMessage>
+                <Alert.Root status="error" rounded="lg">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Couldn’t load issues</Alert.Title>
+                    <Alert.Description>{issuesError}</Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              </QueueMessage>
+            ) : !active?.slug ? null : issuesQuery.isPending || !issues ? (
+              <QueueMessage>
+                <HStack color="fg.muted">
+                  <Spinner size="sm" />
+                  <Text fontSize="sm">Loading open issues…</Text>
+                </HStack>
+              </QueueMessage>
+            ) : issues.length === 0 ? (
+              <QueueMessage>
+                <Text fontSize="sm" color="fg.muted">
+                  No open issues. Nothing to fix.
+                </Text>
+              </QueueMessage>
+            ) : (
+              <RepoIssueList
+                key={active.slug}
+                issues={issues}
+                preview={shownIssue}
+                onSelect={setPreviewIssue}
+              />
             )}
-          </Tabs.Content>
-        </Tabs.Root>
-      </Flex>
+          </Flex>
+        </Tabs.Content>
 
-      {tab === "pull-requests" && preview && (
-        <PullRequestPreview
-          pr={preview}
-          onView={onSelect}
-          onClose={() => onPreviewChange(null)}
+        <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
+          {active ? (
+            localChangesTab ? (
+              <LocalChangesView key={worktreePath} path={worktreePath} />
+            ) : null
+          ) : (
+            <Center h="full" p="4">
+              <Text color="fg.muted" fontSize="sm">
+                Select a repository to see its uncommitted changes.
+              </Text>
+            </Center>
+          )}
+        </Tabs.Content>
+      </Tabs.Root>
+
+      {listTab && (
+        <Box
+          w="1"
+          flexShrink="0"
+          cursor="col-resize"
+          borderLeftWidth="1px"
+          onPointerDown={startResize}
+          _hover={{ bg: "border.emphasized" }}
+          transition="background 0.15s"
         />
       )}
 
-      {issuesTab && shownIssue && (
-        <RepoIssuePreview
-          issue={shownIssue}
-          onClose={() => setPreviewIssue(null)}
-        />
-      )}
+      {pullRequestsTab &&
+        (preview ? (
+          <PullRequestPreview
+            pr={preview}
+            onView={onSelect}
+            onClose={() => onPreviewChange(null)}
+          />
+        ) : (
+          <QueuePlaceholder text="Pick a pull request to read it here." />
+        ))}
+
+      {issuesTab &&
+        (shownIssue ? (
+          <RepoIssuePreview
+            issue={shownIssue}
+            onClose={() => setPreviewIssue(null)}
+          />
+        ) : (
+          <QueuePlaceholder text="Pick an issue to read it here." />
+        ))}
     </>
+  );
+}
+
+function TabCount({ value }: { value?: number }) {
+  if (value === undefined) return null;
+  return (
+    <Badge size="xs" variant="surface" colorPalette="gray">
+      {value}
+    </Badge>
+  );
+}
+
+// Anything the queue shows in place of rows — an empty state, an error, the
+// loading line. Scrolls, since a repo with no GitHub remote still gets a
+// paragraph and a button.
+function QueueMessage({ children }: { children: ReactNode }) {
+  return (
+    <Box flex="1" minH="0" overflowY="auto" px="4" py="4" css={scrollbar}>
+      <Stack gap="3">{children}</Stack>
+    </Box>
+  );
+}
+
+function QueuePlaceholder({ text }: { text: string }) {
+  return (
+    <Center flex="1" minW="0" p="6">
+      <Text fontSize="sm" color="fg.muted">
+        {text}
+      </Text>
+    </Center>
   );
 }

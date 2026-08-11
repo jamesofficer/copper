@@ -4,6 +4,7 @@ import {
   assigneeOptions,
   authorOptions,
   filterByPeople,
+  filterByText,
   sortListItems,
 } from "./listFilters";
 
@@ -129,6 +130,34 @@ describe("sortListItems", () => {
     expect(sortListItems(undated, "newest").map((i) => i.number)).toEqual([
       7, 1,
     ]);
+  });
+});
+
+describe("filterByText", () => {
+  const items = [
+    pr({ number: 12, title: "feat: send preview emails", author: "ada" }),
+    pr({ number: 128, title: "fix: soften audience numbers", author: "grace" }),
+  ];
+
+  it("returns everything for an empty query", () => {
+    expect(filterByText(items, "   ")).toEqual(items);
+  });
+
+  it("matches the title regardless of case", () => {
+    expect(filterByText(items, "PREVIEW").map((i) => i.number)).toEqual([12]);
+  });
+
+  it("matches the author", () => {
+    expect(filterByText(items, "grace").map((i) => i.number)).toEqual([128]);
+  });
+
+  it("matches the number with or without a leading #", () => {
+    expect(filterByText(items, "#128").map((i) => i.number)).toEqual([128]);
+    expect(filterByText(items, "12").map((i) => i.number)).toEqual([12, 128]);
+  });
+
+  it("drops everything that matches nothing", () => {
+    expect(filterByText(items, "nothing here")).toEqual([]);
   });
 });
 

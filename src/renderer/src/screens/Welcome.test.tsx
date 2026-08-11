@@ -66,7 +66,7 @@ describe("Welcome current changes queries", () => {
     await waitFor(() => expect(getLocalChangeCount).toHaveBeenCalled());
     expect(getLocalChanges).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("tab", { name: /current changes/i }));
+    fireEvent.click(screen.getByRole("tab", { name: /changes/i }));
 
     await waitFor(() =>
       expect(getLocalChanges).toHaveBeenCalledWith(repository.path),

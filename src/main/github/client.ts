@@ -24,7 +24,7 @@ import type {
   ReviewStatus,
   ReviewVerdict,
 } from "../../shared/types";
-import { REPO_ISSUE_LIMIT } from "../../shared/types";
+import { OPEN_PULL_REQUEST_LIMIT, REPO_ISSUE_LIMIT } from "../../shared/types";
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
@@ -198,6 +198,7 @@ function toPullRequest(
     additions: pull.additions,
     deletions: pull.deletions,
     changedFiles: pull.changed_files,
+    commits: pull.commits,
     comments: pull.comments + pull.review_comments,
     assignees: (pull.assignees ?? []).map((assignee) => assignee.login),
     createdAt: pull.created_at,
@@ -257,6 +258,7 @@ const PR_FIELDS = `
   additions
   deletions
   changedFiles
+  commits { totalCount }
   createdAt
   updatedAt
   author { __typename login }
@@ -277,6 +279,7 @@ interface GraphQlPullRequest {
   additions: number;
   deletions: number;
   changedFiles: number;
+  commits: { totalCount: number };
   createdAt: string;
   updatedAt: string;
   author: { __typename: string; login: string } | null;
@@ -336,6 +339,7 @@ function fromGraphQlPullRequest(pull: GraphQlPullRequest): PullRequest {
     additions: pull.additions,
     deletions: pull.deletions,
     changedFiles: pull.changedFiles,
+    commits: pull.commits.totalCount,
     comments: pull.comments.totalCount + inlineComments,
     assignees: (pull.assignees.nodes ?? []).flatMap((assignee) =>
       assignee ? [assignee.login] : [],
@@ -375,7 +379,7 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
           pullRequests(
             states: OPEN
             orderBy: { field: UPDATED_AT, direction: DESC }
-            first: 50
+            first: ${OPEN_PULL_REQUEST_LIMIT}
           ) {
             nodes { ${PR_FIELDS} }
           }
