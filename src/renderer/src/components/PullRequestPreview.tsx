@@ -1,5 +1,5 @@
 import { Box, Button, Flex, HStack, IconButton, Text } from "@chakra-ui/react";
-import { LuArrowRight, LuX } from "react-icons/lu";
+import { LuExternalLink, LuX } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import { dragRegion, titleBarHeight } from "../lib/titleBar";
 import PullRequestOverview from "./PullRequestOverview";
@@ -33,10 +33,17 @@ export default function PullRequestPreview({ pr, onView, onClose }: Props) {
           truncate
           flex="1"
         >
-          {pr.repo}#{pr.number}
+          {pr.repo}
         </Text>
-        <Button size="xs" variant="outline" onClick={() => onView(pr)}>
-          View PR <LuArrowRight />
+        <Button asChild size="xs" variant="outline">
+          <a href={pr.url} target="_blank" rel="noreferrer">
+            View on GitHub <LuExternalLink />
+          </a>
+        </Button>
+        {/* The panel's one primary action: this is the button that takes the
+            reviewer from skimming to reviewing. */}
+        <Button size="xs" onClick={() => onView(pr)}>
+          Review changes
         </Button>
         <IconButton
           aria-label="Close preview"
