@@ -1,16 +1,15 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { Box, Text } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import type { PullRequest } from "../../../shared/types";
 import {
-  assigneeOptions,
-  authorOptions,
-  filterByPeople,
-  type ListSort,
-  sortListItems,
-  sortOptions,
+  applyQueueFilters,
+  defaultQueueFilters,
+  type QueueFilters,
+  sortTimeField,
 } from "../lib/listFilters";
-import FilterSelect from "./FilterSelect";
-import PullRequestCard from "./PullRequestCard";
+import { scrollbar } from "../lib/scrollbar";
+import PullRequestQueueRow from "./PullRequestQueueRow";
+import QueueFilterBar from "./QueueFilterBar";
 
 interface Props {
   prs: PullRequest[];
@@ -19,7 +18,7 @@ interface Props {
   onOpen(pr: PullRequest): void;
 }
 
-// The selected repo's open PRs with GitHub-style filters. Filtering is
+// The selected repo's open PRs as the review queue's rows. Filtering is
 // client-side — the full open list is already loaded. Mounted with
 // key={repo slug} so filters reset when switching repos.
 export default function OpenPullRequestList({
@@ -28,60 +27,49 @@ export default function OpenPullRequestList({
   onSelect,
   onOpen,
 }: Props) {
-  const [author, setAuthor] = useState("all");
-  const [assignee, setAssignee] = useState("all");
-  const [sort, setSort] = useState<ListSort>("newest");
-
-  const authorItems = useMemo(() => authorOptions(prs), [prs]);
-  const assigneeItems = useMemo(() => assigneeOptions(prs), [prs]);
+  const [filters, setFilters] = useState<QueueFilters>(defaultQueueFilters);
 
   const visible = useMemo(
-    () => sortListItems(filterByPeople(prs, author, assignee), sort),
-    [prs, author, assignee, sort],
+    () => applyQueueFilters(prs, filters),
+    [prs, filters],
   );
+  const timeField = sortTimeField(filters.sort);
 
   return (
     <>
-      <HStack gap="2" maxW="2xl" flexWrap="wrap">
-        <FilterSelect
-          label="Author"
-          items={authorItems}
-          value={author}
-          onChange={setAuthor}
-        />
-        <FilterSelect
-          label="Assignee"
-          items={assigneeItems}
-          value={assignee}
-          onChange={setAssignee}
-        />
-        <FilterSelect
-          label="Sort"
-          items={sortOptions}
-          value={sort}
-          width="180px"
-          onChange={(value) => setSort(value as ListSort)}
-        />
-      </HStack>
+      <QueueFilterBar
+        placeholder="Filter pull requests"
+        filters={filters}
+        onChange={setFilters}
+        items={prs}
+      />
 
-      {visible.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted" py="4">
-          No pull requests match these filters.
-        </Text>
-      ) : (
-        visible.map((pr) => (
-          <PullRequestCard
-            key={`${pr.repo}#${pr.number}`}
-            pr={pr}
-            onSelect={onSelect}
-            onOpen={onOpen}
-            selected={
-              preview?.repo === pr.repo && preview?.number === pr.number
-            }
-            maxW="2xl"
-          />
-        ))
-      )}
+      <Box
+        flex="1"
+        minH="0"
+        overflowY="auto"
+        borderTopWidth="1px"
+        css={scrollbar}
+      >
+        {visible.length === 0 ? (
+          <Text fontSize="sm" color="fg.muted" px="4" py="4">
+            No pull requests match these filters.
+          </Text>
+        ) : (
+          visible.map((pr) => (
+            <PullRequestQueueRow
+              key={`${pr.repo}#${pr.number}`}
+              pr={pr}
+              time={pr[timeField]}
+              onSelect={onSelect}
+              onOpen={onOpen}
+              selected={
+                preview?.repo === pr.repo && preview?.number === pr.number
+              }
+            />
+          ))
+        )}
+      </Box>
     </>
   );
 }

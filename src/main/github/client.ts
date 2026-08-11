@@ -15,6 +15,7 @@ import type {
   ReactionContent,
   ReactionGroup,
   RepoBranchInfo,
+  RepoCounts,
   RepoIssue,
   RepoIssueDetail,
   RepoMergeSettings,
@@ -24,7 +25,7 @@ import type {
   ReviewStatus,
   ReviewVerdict,
 } from "../../shared/types";
-import { REPO_ISSUE_LIMIT } from "../../shared/types";
+import { OPEN_PULL_REQUEST_LIMIT, REPO_ISSUE_LIMIT } from "../../shared/types";
 import { getLocalCheckoutBranch, listRepositories } from "../repo/local";
 import { clearDraftComments, listDraftComments } from "../store/drafts";
 import { getGitHubToken } from "./auth";
@@ -198,6 +199,7 @@ function toPullRequest(
     additions: pull.additions,
     deletions: pull.deletions,
     changedFiles: pull.changed_files,
+    commits: pull.commits,
     comments: pull.comments + pull.review_comments,
     assignees: (pull.assignees ?? []).map((assignee) => assignee.login),
     createdAt: pull.created_at,
@@ -257,6 +259,7 @@ const PR_FIELDS = `
   additions
   deletions
   changedFiles
+  commits { totalCount }
   createdAt
   updatedAt
   author { __typename login }
@@ -277,6 +280,7 @@ interface GraphQlPullRequest {
   additions: number;
   deletions: number;
   changedFiles: number;
+  commits: { totalCount: number };
   createdAt: string;
   updatedAt: string;
   author: { __typename: string; login: string } | null;
@@ -336,6 +340,7 @@ function fromGraphQlPullRequest(pull: GraphQlPullRequest): PullRequest {
     additions: pull.additions,
     deletions: pull.deletions,
     changedFiles: pull.changedFiles,
+    commits: pull.commits.totalCount,
     comments: pull.comments.totalCount + inlineComments,
     assignees: (pull.assignees.nodes ?? []).flatMap((assignee) =>
       assignee ? [assignee.login] : [],
@@ -375,7 +380,7 @@ export async function listReviewRequests(repo: string): Promise<PullRequest[]> {
           pullRequests(
             states: OPEN
             orderBy: { field: UPDATED_AT, direction: DESC }
-            first: 50
+            first: ${OPEN_PULL_REQUEST_LIMIT}
           ) {
             nodes { ${PR_FIELDS} }
           }
@@ -1698,9 +1703,7 @@ export async function setFileViewed(
 // Open-PR counts for every registered repo, keyed by slug — one aliased
 // GraphQL query instead of a REST call per repo. Counts are decorative
 // (sidebar badges), so no token or an inaccessible repo just means no entry.
-export async function getOpenPullRequestCounts(): Promise<
-  Record<string, number>
-> {
+export async function getRepoCounts(): Promise<Record<string, RepoCounts>> {
   const token = await getGitHubToken();
   if (!token) return {};
 
@@ -1710,15 +1713,26 @@ export async function getOpenPullRequestCounts(): Promise<
   }
   if (slugs.length === 0) return {};
 
+  // Both counts in one selection per repo: the issue count rides along on a
+  // request the sidebar already makes, so knowing it costs nothing.
   const parts = slugs.map((slug, index) => {
     const [owner, name] = slug.split("/");
     return `r${index}: repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(
       name,
-    )}) { pullRequests(states: OPEN) { totalCount } }`;
+    )}) {
+      pullRequests(states: OPEN) { totalCount }
+      issues(states: OPEN) { totalCount }
+    }`;
   });
 
   const response = await githubFetch<{
-    data?: Record<string, { pullRequests: { totalCount: number } } | null>;
+    data?: Record<
+      string,
+      {
+        pullRequests: { totalCount: number };
+        issues: { totalCount: number };
+      } | null
+    >;
     errors?: Array<{ message: string }>;
   }>(token, "/graphql", {
     method: "POST",
@@ -1726,10 +1740,16 @@ export async function getOpenPullRequestCounts(): Promise<
   });
 
   // Partial errors (one inaccessible repo) still return data for the rest.
-  const counts: Record<string, number> = {};
+  const counts: Record<string, RepoCounts> = {};
   slugs.forEach((slug, index) => {
-    const count = response.data?.[`r${index}`]?.pullRequests.totalCount;
-    if (count !== undefined) counts[slug] = count;
+    const repo = response.data?.[`r${index}`];
+    if (!repo) return;
+    counts[slug] = {
+      pullRequests: repo.pullRequests.totalCount,
+      // A repo with Issues switched off answers null for the connection, which
+      // is "none to show", not a failure that should cost the PR count too.
+      issues: repo.issues?.totalCount ?? 0,
+    };
   });
   return counts;
 }

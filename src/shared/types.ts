@@ -20,6 +20,9 @@ export interface PullRequest {
   additions: number;
   deletions: number;
   changedFiles: number;
+  // Optional because lists persisted before this field existed don't carry it —
+  // the queue row leaves the segment out rather than claiming zero commits.
+  commits?: number;
   // Conversation + inline review comments combined.
   comments: number;
   assignees: string[];
@@ -67,6 +70,20 @@ export interface PullRequestDetail {
 // private detail: the renderer filters and sorts the list it was given, so it
 // has to be able to say when the list is only the newest slice.
 export const REPO_ISSUE_LIMIT = 50;
+
+// listPullRequests returns at most this many open PRs, most recently updated
+// first. The queue deliberately shows no "only the newest 50" notice, unlike the
+// issue list: its tab badge comes from getRepoCounts — GitHub's own total — so
+// the number a reviewer reads is the repo's, not the loaded slice's.
+export const OPEN_PULL_REQUEST_LIMIT = 50;
+
+// What's open in a repo right now, both halves from one GraphQL request. These
+// are GitHub's own totals, not the length of a loaded list — the lists are
+// capped, so a badge built from one would under-report a busy repo.
+export interface RepoCounts {
+  pullRequests: number;
+  issues: number;
+}
 
 // A GitHub issue, not to be confused with a ReviewIssue — the app's own name
 // for a finding the analysis agent reported. Labels sit on the summary, unlike
@@ -177,6 +194,7 @@ export const reviewPersonalities = [
   "technical",
   "non_technical",
   "simplified",
+  "ste",
   "grug",
   "mentor",
   "concise",

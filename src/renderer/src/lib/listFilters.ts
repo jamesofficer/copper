@@ -3,6 +3,7 @@
 // serves both — a second copy would only drift.
 export interface Listable {
   number: number;
+  title: string;
   author: string;
   assignees?: string[];
   comments: number;
@@ -42,6 +43,75 @@ export function filterByPeople<T extends Listable>(
       ? assignees.length === 0
       : assignees.includes(assignee);
   });
+}
+
+// Everything the queue's filter bar controls, as one value. One object rather
+// than four useStates in each list: the bar can then decide for itself whether
+// a filter is set, and a list can reset the whole lot in one call.
+export interface QueueFilters {
+  text: string;
+  author: string;
+  assignee: string;
+  sort: ListSort;
+}
+
+export const defaultQueueFilters: QueueFilters = {
+  text: "",
+  author: "all",
+  assignee: "all",
+  sort: "newest",
+};
+
+// True while any dropdown is away from its default. The text box is exempt: it
+// shows what it's filtering by, so it needs no separate mark.
+export function queueFiltersActive(filters: QueueFilters): boolean {
+  return (
+    filters.author !== defaultQueueFilters.author ||
+    filters.assignee !== defaultQueueFilters.assignee ||
+    filters.sort !== defaultQueueFilters.sort
+  );
+}
+
+// The whole pipeline in the order that matters: narrow by people, then by text,
+// then sort what's left.
+export function applyQueueFilters<T extends Listable>(
+  items: T[],
+  filters: QueueFilters,
+): T[] {
+  return sortListItems(
+    filterByText(
+      filterByPeople(items, filters.author, filters.assignee),
+      filters.text,
+    ),
+    filters.sort,
+  );
+}
+
+// Which timestamp a row should show. A row carrying "updated 5m ago" in a list
+// ordered by when things were opened reads as a broken sort, so the time
+// follows the sort rather than always being one or the other.
+export function sortTimeField(sort: ListSort): "createdAt" | "updatedAt" {
+  return sort === "recently_updated" || sort === "least_recently_updated"
+    ? "updatedAt"
+    : "createdAt";
+}
+
+// The queue's filter box. Matches the three things a reviewer types when
+// looking for a known item: words from its title, its author, or its number
+// (with or without the "#" GitHub prints in front of it).
+export function filterByText<T extends Listable>(
+  items: T[],
+  query: string,
+): T[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return items;
+  const digits = needle.startsWith("#") ? needle.slice(1) : needle;
+  return items.filter(
+    (item) =>
+      item.title.toLowerCase().includes(needle) ||
+      item.author.toLowerCase().includes(needle) ||
+      (digits.length > 0 && String(item.number).includes(digits)),
+  );
 }
 
 // Numbers break ties: they follow creation order, which keeps the sorts

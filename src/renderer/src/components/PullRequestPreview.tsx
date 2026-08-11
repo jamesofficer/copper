@@ -1,6 +1,7 @@
 import { Box, Button, Flex, HStack, IconButton, Text } from "@chakra-ui/react";
 import { LuArrowRight, LuX } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
+import { dragRegion, titleBarHeight } from "../lib/titleBar";
 import PullRequestOverview from "./PullRequestOverview";
 
 interface Props {
@@ -14,15 +15,17 @@ interface Props {
 // without leaving the PR lists.
 export default function PullRequestPreview({ pr, onView, onClose }: Props) {
   return (
-    <Flex
-      direction="column"
-      w="45%"
-      minW="md"
-      flexShrink="0"
-      minH="0"
-      borderLeftWidth="1px"
-    >
-      <HStack gap="3" px="4" py="2" borderBottomWidth="1px" flexShrink="0">
+    <Flex direction="column" flex="1" minW="0" minH="0">
+      {/* Same height as the queue's header, so the two line up across the top
+          of the window. */}
+      <HStack
+        gap="3"
+        px="4"
+        h={titleBarHeight}
+        borderBottomWidth="1px"
+        flexShrink="0"
+        css={dragRegion}
+      >
         <Text
           fontFamily="mono"
           fontSize="sm"

@@ -25,16 +25,21 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useState } from "react";
-import { LuFolderGit2, LuTrash2 } from "react-icons/lu";
-import type { Repository } from "../../../shared/types";
+import {
+  LuCircleDot,
+  LuFolderGit2,
+  LuGitPullRequest,
+  LuTrash2,
+} from "react-icons/lu";
+import type { RepoCounts, Repository } from "../../../shared/types";
 import { sidebarHover, sidebarSelected } from "../lib/sidebarStyles";
 import UserAvatar from "./UserAvatar";
 
 interface Props {
   repositories: Repository[];
   activePath: string | null;
-  // Open-PR count per slug — shown at the row's right edge when known.
-  openPrCounts: Record<string, number> | undefined;
+  // What's open per slug — shown at the row's right edge when known.
+  counts: Record<string, RepoCounts> | undefined;
   onSelectRepo(path: string): void;
   onRemoveRepo(path: string): void;
   onReorder(repositories: Repository[]): void;
@@ -46,7 +51,7 @@ interface Props {
 export default function RepositoryList({
   repositories,
   activePath,
-  openPrCounts,
+  counts,
   onSelectRepo,
   onRemoveRepo,
   onReorder,
@@ -92,7 +97,7 @@ export default function RepositoryList({
             key={repo.path}
             repo={repo}
             selected={repo.path === activePath}
-            count={repo.slug ? openPrCounts?.[repo.slug] : undefined}
+            counts={repo.slug ? counts?.[repo.slug] : undefined}
             onSelect={onSelectRepo}
             onRemove={onRemoveRepo}
           />
@@ -111,7 +116,7 @@ export default function RepositoryList({
             <RowContent
               repo={dragged}
               selected={dragged.path === activePath}
-              count={dragged.slug ? openPrCounts?.[dragged.slug] : undefined}
+              counts={dragged.slug ? counts?.[dragged.slug] : undefined}
             />
           </HStack>
         )}
@@ -123,7 +128,7 @@ export default function RepositoryList({
 interface RowProps {
   repo: Repository;
   selected: boolean;
-  count: number | undefined;
+  counts: RepoCounts | undefined;
   onSelect(path: string): void;
   onRemove(path: string): void;
 }
@@ -131,7 +136,7 @@ interface RowProps {
 function RepositoryRow({
   repo,
   selected,
-  count,
+  counts,
   onSelect,
   onRemove,
 }: RowProps) {
@@ -164,7 +169,7 @@ function RepositoryRow({
       <RowContent
         repo={repo}
         selected={selected}
-        count={count}
+        counts={counts}
         onSelect={onSelect}
         onRemove={onRemove}
       />
@@ -182,7 +187,7 @@ const revealed = ".group:hover &, .group:has(:focus-visible) &";
 interface RowContentProps {
   repo: Repository;
   selected: boolean;
-  count: number | undefined;
+  counts: RepoCounts | undefined;
   // Absent on the DragOverlay copy — it's purely visual.
   onSelect?(path: string): void;
   onRemove?(path: string): void;
@@ -191,7 +196,7 @@ interface RowContentProps {
 function RowContent({
   repo,
   selected,
-  count,
+  counts,
   onSelect,
   onRemove,
 }: RowContentProps) {
@@ -224,19 +229,38 @@ function RowContent({
           {repo.slug?.split("/")[1] ?? repo.name}
         </Text>
       </HStack>
-      {/* One fixed slot at the row's edge: the open-PR count, replaced by
-          the remove button while the row is hovered. */}
+      {/* One fixed slot at the row's edge: what's open in the repo, replaced by
+          the remove button while the row is hovered. Each count is an icon plus
+          a number rather than two bare numbers, which would read as one. */}
       <Center position="relative" minW="5" h="5" mr="2" flexShrink="0">
-        {count !== undefined && count > 0 && (
-          <Badge
-            size="xs"
-            variant="surface"
-            fontFamily="mono"
-            css={onRemove ? { [revealed]: { opacity: 0 } } : undefined}
-          >
-            {count}
-          </Badge>
-        )}
+        <HStack
+          gap="1"
+          css={onRemove ? { [revealed]: { opacity: 0 } } : undefined}
+        >
+          {counts?.pullRequests ? (
+            <Badge
+              size="xs"
+              variant="surface"
+              fontFamily="mono"
+              title={`${counts.pullRequests} open pull requests`}
+            >
+              <LuGitPullRequest size={9} />
+              {counts.pullRequests}
+            </Badge>
+          ) : null}
+          {counts?.issues ? (
+            <Badge
+              size="xs"
+              variant="surface"
+              colorPalette="gray"
+              fontFamily="mono"
+              title={`${counts.issues} open issues`}
+            >
+              <LuCircleDot size={9} />
+              {counts.issues}
+            </Badge>
+          ) : null}
+        </HStack>
         {onRemove && (
           <IconButton
             aria-label="Remove repository"

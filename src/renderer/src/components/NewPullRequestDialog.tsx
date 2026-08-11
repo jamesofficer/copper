@@ -8,6 +8,7 @@ import {
   Dialog,
   Field,
   HStack,
+  IconButton,
   Input,
   Portal,
   Spinner,
@@ -27,9 +28,15 @@ import { toaster } from "./ui/toaster";
 interface Props {
   repo: string;
   onCreated(pr: PullRequest): void;
+  // Icon-only trigger, for the review queue's header.
+  compact?: boolean;
 }
 
-export default function NewPullRequestDialog({ repo, onCreated }: Props) {
+export default function NewPullRequestDialog({
+  repo,
+  onCreated,
+  compact,
+}: Props) {
   const [open, setOpen] = useState(false);
   // null = untouched; these fall back to suggestions computed from the
   // branch info once it loads, so late-arriving data still prefills.
@@ -154,9 +161,23 @@ export default function NewPullRequestDialog({ repo, onCreated }: Props) {
       scrollBehavior="inside"
     >
       <Dialog.Trigger asChild>
-        <Button size="xs" variant="outline">
-          <LuGitPullRequestCreate /> New pull request
-        </Button>
+        {/* The queue header is too narrow for a labelled button, so it asks
+            for the icon alone. */}
+        {compact ? (
+          <IconButton
+            aria-label="New pull request"
+            title="New pull request"
+            size="xs"
+            variant="ghost"
+            color="fg.muted"
+          >
+            <LuGitPullRequestCreate />
+          </IconButton>
+        ) : (
+          <Button size="xs" variant="outline">
+            <LuGitPullRequestCreate /> New pull request
+          </Button>
+        )}
       </Dialog.Trigger>
       <Portal>
         <Dialog.Backdrop />

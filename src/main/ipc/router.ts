@@ -21,8 +21,8 @@ import {
   createPullRequest,
   deleteReviewComment,
   getBranchInfo,
-  getOpenPullRequestCounts,
   getPullRequest,
+  getRepoCounts,
   getRepoIssue,
   getRepoMergeSettings,
   getReviewDecision,
@@ -81,7 +81,7 @@ const handlers: IpcApi = {
   listPullRequests: (repo) => listReviewRequests(repo),
   listReviewRequestedPullRequests: () => listReviewRequestedPullRequests(),
   listMyPullRequests: () => listMyPullRequests(),
-  getOpenPullRequestCounts: () => getOpenPullRequestCounts(),
+  getRepoCounts: () => getRepoCounts(),
   getBranchInfo: (repo) => getBranchInfo(repo),
   createPullRequest: (repo, pr) => createPullRequest(repo, pr),
   getPullRequest: async (repo, prNumber) => {

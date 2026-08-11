@@ -90,9 +90,9 @@ export default function HomeSidebar({
   });
   const myPullRequests = myPullRequestsQuery.data;
 
-  const openPrCountsQuery = useQuery({
-    queryKey: ["openPrCounts"],
-    queryFn: () => window.api.getOpenPullRequestCounts(),
+  const countsQuery = useQuery({
+    queryKey: ["repoCounts"],
+    queryFn: () => window.api.getRepoCounts(),
   });
 
   function isOpenPr(pr: PullRequest): boolean {
@@ -192,7 +192,7 @@ export default function HomeSidebar({
             <RepositoryList
               repositories={repositories}
               activePath={activePath}
-              openPrCounts={openPrCountsQuery.data}
+              counts={countsQuery.data}
               onSelectRepo={onSelectRepo}
               onRemoveRepo={onRemoveRepo}
               onReorder={onReorderRepos}

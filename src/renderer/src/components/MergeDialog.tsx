@@ -116,7 +116,7 @@ export default function MergeDialog({ detail, open, onOpenChange }: Props) {
       void queryClient.invalidateQueries({ queryKey: ["pullRequests"] });
       void queryClient.invalidateQueries({ queryKey: ["myPullRequests"] });
       void queryClient.invalidateQueries({ queryKey: ["reviewRequests"] });
-      void queryClient.invalidateQueries({ queryKey: ["openPrCounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["repoCounts"] });
     },
     onError: (cause) => {
       toaster.create({

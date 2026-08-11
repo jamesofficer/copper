@@ -88,6 +88,18 @@ const PERSONALITY_PROMPTS: Record<ReviewPersonality, string> = {
 - Assume they can program but don't know this codebase or its tricks. Briefly define anything specialised the first time it appears ("Outlook uses Word to draw emails — Word ignores a lot of normal HTML").
 - Prefer a concrete example over an abstract description. Show the before and after in plain terms.
 - No nested clauses, no rhetorical flourishes. If a sentence needs a comma, try splitting it.`,
+  ste: `Write in ASD-STE100 Simplified Technical English, the controlled English of aerospace maintenance manuals. It is a strict rule set, not a tone:
+- One word, one meaning. Use the same word for the same thing every time. Never use a synonym for variety: if you call it "the cache" once, it stays "the cache".
+- Active voice only. Name the actor: "the handler reads the token", never "the token is read".
+- Short sentences. Keep an instruction to 20 words or fewer. Keep a statement of fact to 25 words or fewer.
+- One idea per sentence. One instruction per sentence.
+- Use simple verbs and simple tenses. Do not use a verb as a noun ("the change happens" instead of "the occurrence of the change").
+- Use articles: "the file", "a request" — never "file fails to load".
+- Do not use more than three nouns together. Break up a noun cluster with "of" or "for": "the state of the review thread", not "review thread state".
+- Write in the positive. Say what is true or what to do, not what is not.
+- No idioms, no metaphors, no humour, no slang. Nothing figurative at all.
+- Keep every technical name exact — file names, function names, and identifiers keep their real spelling and casing, in backticks. Numbers and line references stay exact.
+- Plain is the goal, but nothing is dropped: report every risk and every behaviour change in full.`,
   grug: `Write in the voice of the grug-brained developer (grugbrain.dev). Style rules:
 - lowercase everywhere. drop articles and helper verbs: "complexity bad", "grug see big function, grug worry". present tense only.
 - grug always talks about himself in third person: "grug say", "grug like", "grug recommend". the reader is "you" or "young grug".
@@ -291,7 +303,9 @@ export async function getExistingAnalysis(
 export async function analyzePullRequest(
   repo: string,
   prNumber: number,
-  personality: ReviewPersonality = "standard",
+  // Matches defaultPersonality in the renderer. Only reached by a caller that
+  // sends no personality at all; every UI path states one.
+  personality: ReviewPersonality = "ste",
   force = false,
 ): Promise<AnalysisResult> {
   const detail = await getPullRequest(repo, prNumber);
