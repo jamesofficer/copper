@@ -17,7 +17,10 @@ interface Props {
 export default function PullRequestHero({ detail }: Props) {
   return (
     <VStack gap="4" alignItems="stretch">
-      <Heading size="2xl" lineHeight="1.25">
+      {/* Bigger than a section heading and lighter than one: at this size the
+          title doesn't need weight to be found first, and Google Sans Flex is a
+          variable font, so 400 here costs no extra file. */}
+      <Heading size="3xl" fontWeight="normal" lineHeight="1.25">
         {detail.title}
       </Heading>
 
