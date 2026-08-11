@@ -18,13 +18,14 @@ import {
 } from "../lib/repoQueries";
 import { usePanelWidth } from "../lib/usePanelWidth";
 import { useWorktreeSelection } from "../lib/useWorktreeSelection";
+import type { ReviewTab } from "./Review";
 
 interface Props {
   repositories: Repository[] | undefined;
   reposPending: boolean;
   activeRepo: Repository | null;
   onAddRepo(): void;
-  onSelect(pr: PullRequest): void;
+  onSelect(pr: PullRequest, tab?: ReviewTab): void;
   preview: PullRequest | null;
   onPreviewChange(pr: PullRequest | null): void;
   onOpenSettings(): void;
