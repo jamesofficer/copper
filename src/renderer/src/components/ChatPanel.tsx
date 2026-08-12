@@ -65,8 +65,8 @@ export default function ChatPanel({
     : (askRequest?.context ?? scope ?? null);
 
   useEffect(() => {
-    if (attachedContext) inputRef.current?.focus();
-  }, [attachedContext]);
+    if (askRequest && !askRequest.question) inputRef.current?.focus();
+  }, [askRequest]);
 
   const historyQuery = useQuery({
     queryKey: ["chatHistory", pr.repo, pr.number],

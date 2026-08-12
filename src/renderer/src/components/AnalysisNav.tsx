@@ -115,11 +115,11 @@ function NavItem({
               content: '""',
               position: "absolute",
               left: "0",
-              top: "2",
-              bottom: "2",
+              top: "0",
+              bottom: "0",
               w: "0.5",
               bg: "orange.solid",
-              roundedRight: "full",
+              roundedLeft: "md",
             }
           : undefined
       }

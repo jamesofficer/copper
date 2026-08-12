@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useHotkey } from "@tanstack/react-hotkeys";
 import {
   useIsMutating,
   useMutation,
@@ -25,6 +26,7 @@ import {
 import type { PullRequest } from "../../../shared/types";
 import { startAnalysis, useAnalysisJob } from "../lib/analysisJobs";
 import type { AskContext, AskRequest } from "../lib/askContext";
+import { hotkeys } from "../lib/hotkeys";
 import { cleanIpcError } from "../lib/ipcError";
 import { buildIssues } from "../lib/issues";
 import { scrollbar } from "../lib/scrollbar";
@@ -168,6 +170,41 @@ export default function ReviewPanel({ pr }: Props) {
           anchors: issue.risk.anchors,
         };
   }, [issues, selection]);
+  const openIssueIndex =
+    selection.kind === "issue"
+      ? issues.open.findIndex((issue) => issue.id === selection.id)
+      : -1;
+  const canCycleIssues = openIssueIndex !== -1 && issues.open.length > 1;
+
+  function cycleIssue(offset: -1 | 1) {
+    if (!canCycleIssues) return;
+    const nextIndex =
+      (openIssueIndex + offset + issues.open.length) % issues.open.length;
+    setSelection({ kind: "issue", id: issues.open[nextIndex].id });
+  }
+
+  function cycleIssueFromHotkey(event: KeyboardEvent, offset: -1 | 1) {
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    cycleIssue(offset);
+  }
+
+  useHotkey(hotkeys.previousIssue, (event) => cycleIssueFromHotkey(event, -1), {
+    enabled: canCycleIssues,
+    meta: { name: "Previous issue" },
+  });
+  useHotkey(hotkeys.nextIssue, (event) => cycleIssueFromHotkey(event, 1), {
+    enabled: canCycleIssues,
+    meta: { name: "Next issue" },
+  });
 
   // A new analysis replaces the old items; start with the most severe open
   // issue so the review begins with the action that needs attention.
