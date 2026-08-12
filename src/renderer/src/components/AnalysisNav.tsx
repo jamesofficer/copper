@@ -103,6 +103,7 @@ function NavItem({
       textAlign="left"
       w="full"
       rounded="md"
+      overflow="hidden"
       px="2"
       py="1.5"
       cursor="pointer"
