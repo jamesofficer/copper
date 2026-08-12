@@ -103,11 +103,27 @@ function NavItem({
       textAlign="left"
       w="full"
       rounded="md"
+      overflow="hidden"
       px="2"
       py="1.5"
       cursor="pointer"
+      position="relative"
       bg={selected ? "bg.emphasized" : "transparent"}
       _hover={{ bg: selected ? "bg.emphasized" : "bg.subtle" }}
+      _before={
+        selected
+          ? {
+              content: '""',
+              position: "absolute",
+              left: "0",
+              top: "0",
+              bottom: "0",
+              w: "0.5",
+              bg: "colorPalette.solid",
+              roundedLeft: "md",
+            }
+          : undefined
+      }
     >
       {children}
     </Box>
@@ -134,8 +150,40 @@ export default function AnalysisNav({
   selection,
   onSelect,
 }: Props) {
+  const highCount = issues.open.filter(
+    (issue) => issue.severity === "high",
+  ).length;
+  const mediumCount = issues.open.filter(
+    (issue) => issue.severity === "medium",
+  ).length;
+  const lowCount = issues.open.filter(
+    (issue) => issue.severity === "low",
+  ).length;
+  const issueTotal = issues.open.length + issues.resolved.length;
+
   return (
-    <VStack alignItems="stretch" gap="5" px="3" py="4">
+    <VStack alignItems="stretch" gap="6" px="3" py="4">
+      <VStack alignItems="stretch" gap="2" px="1">
+        <Text fontSize="sm" fontWeight="semibold">
+          Review summary
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          {issueTotal} issues · {issues.resolved.length} resolved
+        </Text>
+        {issueTotal > 0 && (
+          <HStack gap="0" h="1.5" rounded="full" overflow="hidden">
+            {highCount > 0 && <Box flex={highCount} h="full" bg="red.solid" />}
+            {mediumCount > 0 && (
+              <Box flex={mediumCount} h="full" bg="orange.solid" />
+            )}
+            {lowCount > 0 && <Box flex={lowCount} h="full" bg="blue.solid" />}
+            {issues.resolved.length > 0 && (
+              <Box flex={issues.resolved.length} h="full" bg="green.solid" />
+            )}
+          </HStack>
+        )}
+      </VStack>
+
       <VStack alignItems="stretch" gap="1">
         <NavItem
           selected={sameSelection(selection, { kind: "summary" })}

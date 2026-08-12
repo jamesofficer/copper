@@ -9,13 +9,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useHotkey } from "@tanstack/react-hotkeys";
 import {
   useIsMutating,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LuPanelRightOpen,
   LuSparkles,
@@ -25,6 +26,7 @@ import {
 import type { PullRequest } from "../../../shared/types";
 import { startAnalysis, useAnalysisJob } from "../lib/analysisJobs";
 import type { AskContext, AskRequest } from "../lib/askContext";
+import { hotkeys } from "../lib/hotkeys";
 import { cleanIpcError } from "../lib/ipcError";
 import { buildIssues } from "../lib/issues";
 import { scrollbar } from "../lib/scrollbar";
@@ -56,6 +58,7 @@ export default function ReviewPanel({ pr }: Props) {
     () => localStorage.getItem(CHAT_COLLAPSED_KEY) === "true",
   );
   const [askRequest, setAskRequest] = useState<AskRequest | null>(null);
+  const selectedAnalysisRef = useRef<string | undefined>(undefined);
   const queryClient = useQueryClient();
 
   function collapseChat(collapsed: boolean) {
@@ -147,12 +150,74 @@ export default function ReviewPanel({ pr }: Props) {
         : { open: [], resolved: [] },
     [analysis, findings, checking],
   );
+  const chatScope = useMemo(() => {
+    if (selection.kind !== "issue") return null;
+    const issue = [...issues.open, ...issues.resolved].find(
+      (entry) => entry.id === selection.id,
+    );
+    if (!issue) return null;
+    return issue.kind === "finding"
+      ? {
+          label: "issue" as const,
+          title: issue.title,
+          text: issue.finding.body,
+          anchors: [{ path: issue.finding.path, line: issue.finding.line }],
+        }
+      : {
+          label: "issue" as const,
+          title: issue.title,
+          text: issue.risk.text,
+          anchors: issue.risk.anchors,
+        };
+  }, [issues, selection]);
+  const openIssueIndex =
+    selection.kind === "issue"
+      ? issues.open.findIndex((issue) => issue.id === selection.id)
+      : -1;
+  const canCycleIssues = openIssueIndex !== -1 && issues.open.length > 1;
 
-  // A new analysis replaces the old items; start reading from the summary.
+  function cycleIssue(offset: -1 | 1) {
+    if (!canCycleIssues) return;
+    const nextIndex =
+      (openIssueIndex + offset + issues.open.length) % issues.open.length;
+    setSelection({ kind: "issue", id: issues.open[nextIndex].id });
+  }
+
+  function cycleIssueFromHotkey(event: KeyboardEvent, offset: -1 | 1) {
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    ) {
+      return;
+    }
+    event.preventDefault();
+    cycleIssue(offset);
+  }
+
+  useHotkey(hotkeys.previousIssue, (event) => cycleIssueFromHotkey(event, -1), {
+    enabled: canCycleIssues,
+    meta: { name: "Previous issue" },
+  });
+  useHotkey(hotkeys.nextIssue, (event) => cycleIssueFromHotkey(event, 1), {
+    enabled: canCycleIssues,
+    meta: { name: "Next issue" },
+  });
+
+  // A new analysis replaces the old items; start with the most severe open
+  // issue so the review begins with the action that needs attention.
   const analyzedAt = analysis?.analyzedAt;
   useEffect(() => {
-    if (analyzedAt) setSelection({ kind: "summary" });
-  }, [analyzedAt]);
+    if (analyzedAt && selectedAnalysisRef.current !== analyzedAt) {
+      selectedAnalysisRef.current = analyzedAt;
+      const firstIssue = issues.open[0];
+      setSelection(
+        firstIssue ? { kind: "issue", id: firstIssue.id } : { kind: "summary" },
+      );
+    }
+  }, [analyzedAt, issues.open]);
 
   if (analysisQuery.isPending) {
     return (
@@ -248,6 +313,7 @@ export default function ReviewPanel({ pr }: Props) {
           py="2"
           borderBottomWidth="1px"
           bg="bg.subtle"
+          _light={{ bg: "gray.100" }}
           flexShrink="0"
         >
           <Box color="orange.fg" flexShrink="0">
@@ -266,7 +332,7 @@ export default function ReviewPanel({ pr }: Props) {
 
       <Flex flex="1" minH="0">
         <Box
-          w="300px"
+          w="320px"
           flexShrink="0"
           borderRightWidth="1px"
           overflowY="auto"
@@ -345,6 +411,7 @@ export default function ReviewPanel({ pr }: Props) {
                 onCollapse={() => collapseChat(true)}
                 askRequest={askRequest}
                 onClearAskRequest={() => setAskRequest(null)}
+                scope={chatScope}
               />
             </Box>
           </Flex>

@@ -84,7 +84,6 @@ export default function ChangesView({ pr }: Props) {
     if (!queryFilteredFiles || !hideTestFiles) return 0;
     return queryFilteredFiles.filter((file) => isTestFile(file.path)).length;
   }, [queryFilteredFiles, hideTestFiles]);
-  const filtering = Boolean(query) || hideTestFiles;
   const visibleFiles = useMemo(() => {
     if (!queryFilteredFiles || !hideTestFiles) return queryFilteredFiles;
     return queryFilteredFiles.filter((file) => !isTestFile(file.path));
@@ -93,12 +92,6 @@ export default function ChangesView({ pr }: Props) {
     visibleFiles?.find((file) => file.path === selectedPath) ??
     visibleFiles?.[0] ??
     null;
-
-  const fileCount = files
-    ? filtering
-      ? `${visibleFiles?.length ?? 0}/${files.length}`
-      : `${files.length}`
-    : null;
 
   // Same key as the Overview tab's query — needed for the full head SHA
   // (the summary prop's headSha is truncated for display).
@@ -165,6 +158,29 @@ export default function ChangesView({ pr }: Props) {
       });
     },
   });
+
+  const viewedCount =
+    files?.filter((file) => viewedPaths.has(file.path)).length ?? 0;
+  const selectedFileIndex = selectedFile
+    ? (visibleFiles?.findIndex((file) => file.path === selectedFile.path) ?? -1)
+    : -1;
+  const hasPreviousFile = selectedFileIndex > 0;
+  const hasNextFile =
+    selectedFileIndex !== -1 &&
+    selectedFileIndex < (visibleFiles?.length ?? 0) - 1;
+
+  function selectRelativeFile(offset: -1 | 1) {
+    const nextFile = visibleFiles?.[selectedFileIndex + offset];
+    if (nextFile) setSelectedPath(nextFile.path);
+  }
+
+  function markViewedAndContinue() {
+    if (!selectedFile) return;
+    if (!viewedPaths.has(selectedFile.path)) {
+      setViewed.mutate({ path: selectedFile.path, viewed: true });
+    }
+    if (hasNextFile) selectRelativeFile(1);
+  }
 
   // Locally drafted review comments — shown on the diff like threads, and
   // submitted together by the Submit review dialog.
@@ -268,25 +284,41 @@ export default function ChangesView({ pr }: Props) {
           borderRightWidth="1px"
         >
           <HStack px="4" py="3" flexShrink="0">
-            <Heading
-              size="xs"
-              color="fg.muted"
-              textTransform="uppercase"
-              letterSpacing="wider"
-            >
-              Files{fileCount ? ` (${fileCount})` : ""}
-            </Heading>
+            <Heading size="sm">Files</Heading>
             {selectedCommit === null && files && files.length > 0 && (
-              <Text ml="auto" fontFamily="mono" fontSize="2xs" color="fg.muted">
-                {files.filter((file) => viewedPaths.has(file.path)).length}/
-                {files.length} viewed
+              <Text ml="auto" fontSize="xs" color="fg.muted">
+                {viewedCount} of {files.length} viewed
               </Text>
             )}
           </HStack>
-          <Box px="3" pb="2" flexShrink="0">
-            <InputGroup startElement={<LuSearch size={12} />}>
+          {selectedCommit === null && files && files.length > 0 && (
+            <Box
+              role="progressbar"
+              aria-label="Files viewed"
+              aria-valuemin={0}
+              aria-valuemax={files.length}
+              aria-valuenow={viewedCount}
+              h="1.5"
+              mx="4"
+              mb="3"
+              bg="bg.muted"
+              flexShrink="0"
+              rounded="full"
+              overflow="hidden"
+            >
+              <Box
+                h="full"
+                bg="green.solid"
+                rounded="full"
+                transition="width 0.2s"
+                w={`${(viewedCount / files.length) * 100}%`}
+              />
+            </Box>
+          )}
+          <Box px="3" pb="3" flexShrink="0">
+            <InputGroup startElement={<LuSearch size={14} />}>
               <Input
-                size="xs"
+                size="sm"
                 placeholder="Filter files"
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
@@ -315,6 +347,7 @@ export default function ChangesView({ pr }: Props) {
                 files={visibleFiles}
                 selectedPath={selectedFile?.path ?? null}
                 onSelect={setSelectedPath}
+                selectedIndicator
                 viewedPaths={selectedCommit === null ? viewedPaths : undefined}
                 commentCounts={commentCounts}
                 explanationCounts={explanationCounts}
@@ -336,12 +369,14 @@ export default function ChangesView({ pr }: Props) {
             />
           )}
           <HStack px="3" py="2" flexShrink="0" borderTopWidth="1px">
-            {hiddenTestFileCount > 0 && (
-              <Text fontSize="xs" color="fg.muted">
-                {hiddenTestFileCount} file
-                {hiddenTestFileCount === 1 ? "" : "s"} hidden
-              </Text>
-            )}
+            <Text fontSize="xs" color="fg.muted">
+              {visibleFiles?.length ?? 0} file
+              {(visibleFiles?.length ?? 0) === 1 ? "" : "s"} shown
+              {hiddenTestFileCount > 0 &&
+                ` · ${hiddenTestFileCount} test ${
+                  hiddenTestFileCount === 1 ? "file" : "files"
+                } hidden`}
+            </Text>
             <Checkbox.Root
               ml="auto"
               size="sm"
@@ -373,6 +408,32 @@ export default function ChangesView({ pr }: Props) {
                 ? viewedPaths.has(selectedFile.path)
                 : undefined
             }
+            hasPreviousFile={hasPreviousFile}
+            hasNextFile={hasNextFile}
+            onPreviousFile={() => selectRelativeFile(-1)}
+            onNextFile={() => selectRelativeFile(1)}
+            reviewProgress={
+              selectedCommit === null && files
+                ? { viewed: viewedCount, total: files.length }
+                : undefined
+            }
+            onMarkViewedAndNext={
+              selectedCommit === null ? markViewedAndContinue : undefined
+            }
+            markViewedLabel={
+              viewedPaths.has(selectedFile.path)
+                ? hasNextFile
+                  ? "Next file"
+                  : "Viewed"
+                : hasNextFile
+                  ? "Mark viewed & next"
+                  : "Mark viewed"
+            }
+            markViewedDisabled={
+              setViewed.isPending ||
+              (viewedPaths.has(selectedFile.path) && !hasNextFile)
+            }
+            viewedUpdating={setViewed.isPending}
             onToggleViewed={
               selectedCommit === null
                 ? (viewed) =>

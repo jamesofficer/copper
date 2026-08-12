@@ -86,8 +86,8 @@ interface Props {
 const SPLIT_MIN_WIDTH = 960;
 
 const rowStyles: Record<LineKind, { bg: string; sign: string }> = {
-  add: { bg: "green.subtle", sign: "+" },
-  del: { bg: "red.subtle", sign: "-" },
+  add: { bg: "green.subtle/75", sign: "+" },
+  del: { bg: "red.subtle/75", sign: "-" },
   context: { bg: "transparent", sign: " " },
   hunk: { bg: "bg.muted", sign: "" },
   meta: { bg: "transparent", sign: "" },
