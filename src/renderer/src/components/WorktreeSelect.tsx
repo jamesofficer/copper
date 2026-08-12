@@ -44,15 +44,23 @@ export default function WorktreeSelect({ worktrees, value, onChange }: Props) {
         if (event.value[0]) onChange(event.value[0]);
       }}
       size="xs"
-      w="56"
+      w="full"
     >
       <Select.HiddenSelect />
       <Select.Control>
         <Select.Trigger cursor="pointer" title="Switch worktree">
-          <HStack gap="1.5" minW="0" color="fg.muted">
+          {/* pe clears the chevron, which is positioned over the trigger's own
+              padding. maxW undoes the recipe's 80% cap on the value text —
+              without it a branch name ellipses with a third of the box empty. */}
+          <HStack gap="1.5" flex="1" minW="0" pe="5" color="fg.muted">
             <LuGitBranch size={12} />
-            <Text as="span" fontFamily="mono" fontSize="xs" truncate>
-              <Select.ValueText placeholder="Select worktree" />
+            <Text as="span" fontFamily="mono" fontSize="xs" flex="1" minW="0">
+              <Select.ValueText
+                placeholder="Select worktree"
+                display="block"
+                maxW="full"
+                truncate
+              />
             </Text>
           </HStack>
         </Select.Trigger>

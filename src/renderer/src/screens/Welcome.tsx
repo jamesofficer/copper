@@ -2,11 +2,13 @@ import { Box, Center, Flex, Tabs, Text } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { PullRequest, RepoIssue, Repository } from "../../../shared/types";
-import LocalChangesView from "../components/LocalChangesView";
+import LocalChangesColumn from "../components/LocalChangesColumn";
+import LocalChangesPane from "../components/LocalChangesPane";
 import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
 import QueueHeader, { type QueueTab } from "../components/QueueHeader";
 import QueueListState from "../components/QueueListState";
+import QueueTabs from "../components/QueueTabs";
 import RepoIssueList from "../components/RepoIssueList";
 import RepoIssuePreview from "../components/RepoIssuePreview";
 import ResizeHandle from "../components/ResizeHandle";
@@ -16,6 +18,10 @@ import {
   pullRequestsQueryOptions,
   repoIssuesQueryOptions,
 } from "../lib/repoQueries";
+import {
+  localChangesFileListPanel,
+  useLocalChanges,
+} from "../lib/useLocalChanges";
 import { usePanelWidth } from "../lib/usePanelWidth";
 import { useWorktreeSelection } from "../lib/useWorktreeSelection";
 import type { ReviewTab } from "./Review";
@@ -56,12 +62,18 @@ export default function Welcome({
     fallback: 480,
     handle: "right",
   });
-
   const pullRequestsTab = tab === "pull-requests";
   const issuesTab = tab === "issues";
   const localChangesTab = tab === "local-changes";
-  // Only the two list tabs share the window with a panel beside them; Current
-  // changes is a file list and a diff, and needs the whole width.
+
+  // The Changes tab has a column of its own: narrower, and resized separately
+  // from the queue's lists.
+  const { width: fileListWidth, startResize: startFileListResize } =
+    usePanelWidth({ ...localChangesFileListPanel, handle: "right" });
+  const localChanges = useLocalChanges(worktree, localChangesTab);
+
+  // Only the two list tabs share the window with a preview panel beside them;
+  // the Changes tab splits into its own column and a diff.
   const listTab = pullRequestsTab || issuesTab;
   const noRepositories =
     !reposPending && (!repositories || repositories.length === 0);
@@ -109,6 +121,10 @@ export default function Welcome({
         <Box px="4" pt="2" flexShrink="0" _empty={{ display: "none" }}>
           <SetupBanner onOpenSettings={onOpenSettings} />
         </Box>
+
+        {listTab && (
+          <QueueTabs repo={active} tab={tab} checkoutPath={worktree.path} />
+        )}
 
         <Tabs.Content value="pull-requests" flex="1" minH="0" p="0">
           <Flex direction="column" h="full" minH="0">
@@ -165,15 +181,38 @@ export default function Welcome({
           </Flex>
         </Tabs.Content>
 
+        {/* The Changes tab splits below the top bar, not below the tab bar:
+            the tabs cap the file-list column, so the diff beside them runs the
+            full height of the window. */}
         <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
           {!active ? (
-            <Center h="full" p="4">
-              <Text color="fg.muted" fontSize="sm">
-                Select a repository to see its uncommitted changes.
-              </Text>
-            </Center>
+            <Flex direction="column" h="full" minH="0">
+              <QueueTabs repo={active} tab={tab} checkoutPath={worktree.path} />
+              <Center flex="1" p="4">
+                <Text color="fg.muted" fontSize="sm">
+                  Select a repository to see its uncommitted changes.
+                </Text>
+              </Center>
+            </Flex>
           ) : localChangesTab ? (
-            <LocalChangesView key={worktree.path} path={worktree.path} />
+            <Flex h="full" minH="0">
+              <Flex
+                direction="column"
+                minH="0"
+                minW="0"
+                flexShrink="0"
+                style={{ width: fileListWidth }}
+              >
+                <QueueTabs
+                  repo={active}
+                  tab={tab}
+                  checkoutPath={worktree.path}
+                />
+                <LocalChangesColumn state={localChanges} />
+              </Flex>
+              <ResizeHandle onPointerDown={startFileListResize} border />
+              <LocalChangesPane state={localChanges} />
+            </Flex>
           ) : null}
         </Tabs.Content>
       </Tabs.Root>

@@ -16,12 +16,15 @@ interface Props {
   // The checkout to commit in — the registered repo path, or a worktree.
   path: string;
   stagedCount: number;
+  // Set while a past commit is being read: the box stays in place, greyed out,
+  // rather than unmounting and shifting the panels above it.
+  disabled?: boolean;
 }
 
 // Commits the index of one checkout. Staging is the only way changes reach a
 // commit here — there is no "commit all", deliberately: the file list above
 // is the record of what is about to be committed.
-export default function CommitComposer({ path, stagedCount }: Props) {
+export default function CommitComposer({ path, stagedCount, disabled }: Props) {
   const [message, setMessage] = useState("");
   const queryClient = useQueryClient();
   const writeMutationKey = localChangesWriteMutationKey(path);
@@ -51,7 +54,8 @@ export default function CommitComposer({ path, stagedCount }: Props) {
     },
   });
 
-  const ready = stagedCount > 0 && message.trim() !== "" && !writesPending;
+  const ready =
+    !disabled && stagedCount > 0 && message.trim() !== "" && !writesPending;
 
   return (
     <Stack gap="2" px="3" py="3" borderTopWidth="1px" flexShrink="0">
@@ -59,8 +63,13 @@ export default function CommitComposer({ path, stagedCount }: Props) {
         size="xs"
         rows={3}
         resize="none"
+        disabled={disabled}
         placeholder={
-          stagedCount > 0 ? "Commit message" : "Stage a file to commit"
+          disabled
+            ? "Reading a past commit"
+            : stagedCount > 0
+              ? "Commit message"
+              : "Stage a file to commit"
         }
         value={message}
         onChange={(event) => setMessage(event.target.value)}
@@ -80,7 +89,7 @@ export default function CommitComposer({ path, stagedCount }: Props) {
         <Box asChild>
           <LuGitCommitHorizontal />
         </Box>
-        {stagedCount > 0
+        {!disabled && stagedCount > 0
           ? `Commit ${stagedCount} file${stagedCount === 1 ? "" : "s"}`
           : "Commit"}
       </Button>

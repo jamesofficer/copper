@@ -47,3 +47,30 @@ export function worktreesQueryOptions(repoPath: string | undefined) {
     refetchOnWindowFocus: true,
   } as const;
 }
+
+// The commits on a checkout's current branch. New commits land while the app
+// runs, so this is never trusted from cache — like the local change queries it
+// refetches on mount and focus and is never persisted.
+export function localCommitsQueryOptions(repoPath: string | undefined) {
+  return {
+    queryKey: ["localCommits", repoPath],
+    queryFn: () => window.api.listLocalCommits(repoPath ?? ""),
+    enabled: Boolean(repoPath),
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+  } as const;
+}
+
+// One commit's changed files. A commit is immutable, so its diff never goes
+// stale — only its size keeps it out of the persisted cache.
+export function localCommitFilesQueryOptions(
+  repoPath: string,
+  sha: string | undefined,
+) {
+  return {
+    queryKey: ["localCommitFiles", repoPath, sha],
+    queryFn: () => window.api.getLocalCommitFiles(repoPath, sha ?? ""),
+    enabled: Boolean(sha),
+    staleTime: Number.POSITIVE_INFINITY,
+  } as const;
+}

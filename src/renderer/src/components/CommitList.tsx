@@ -6,6 +6,13 @@ interface Props {
   commits: PullRequestCommit[];
   selectedSha: string | null;
   onSelect(sha: string | null): void;
+  // The row that clears the selection, for a list where "everything at once"
+  // is a real answer. Null on the Commits tab, where a commit is the only
+  // thing there is to show.
+  allLabel?: string | null;
+  // The API's oldest-first order needs reversing; git log is already newest
+  // first.
+  newestFirst?: boolean;
 }
 
 interface RowProps {
@@ -34,16 +41,27 @@ function CommitRow({ selected, onClick, title, children }: RowProps) {
   );
 }
 
-export default function CommitList({ commits, selectedSha, onSelect }: Props) {
+export default function CommitList({
+  commits,
+  selectedSha,
+  onSelect,
+  allLabel = "All changes",
+  newestFirst = false,
+}: Props) {
+  const ordered = newestFirst ? commits : [...commits].reverse();
   return (
     <Stack gap="0.5">
-      <CommitRow selected={selectedSha === null} onClick={() => onSelect(null)}>
-        <Text fontSize="xs" fontWeight="medium">
-          All changes
-        </Text>
-      </CommitRow>
-      {/* The API returns oldest first; show newest at the top. */}
-      {[...commits].reverse().map((commit) => (
+      {allLabel !== null && (
+        <CommitRow
+          selected={selectedSha === null}
+          onClick={() => onSelect(null)}
+        >
+          <Text fontSize="xs" fontWeight="medium">
+            {allLabel}
+          </Text>
+        </CommitRow>
+      )}
+      {ordered.map((commit) => (
         <CommitRow
           key={commit.sha}
           selected={commit.sha === selectedSha}

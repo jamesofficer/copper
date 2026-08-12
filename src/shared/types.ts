@@ -361,6 +361,24 @@ export interface LocalChanges {
   untracked: string[];
 }
 
+// One commit in a local checkout. Shares the PullRequestCommit fields so the
+// commit list renders both, and adds the message past the subject line.
+export interface LocalCommit extends PullRequestCommit {
+  // "" when the commit message is a subject line and nothing else.
+  body: string;
+}
+
+// The commits on a checkout's current branch, newest first.
+export interface LocalCommitList {
+  // Current branch of the checkout; null on a detached HEAD.
+  branch: string | null;
+  // The ref the branch was compared against ("origin/main"), so the UI can say
+  // what the list means. Null when the checkout is level with its trunk and
+  // upstream, and the list is plain recent history.
+  base: string | null;
+  commits: LocalCommit[];
+}
+
 // The commit a Current-changes commit produced, for the confirmation toast.
 export interface CommitResult {
   sha: string;

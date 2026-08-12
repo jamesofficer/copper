@@ -35,6 +35,10 @@ async function git(repoPath: string, args: string[]): Promise<string> {
   return stdout;
 }
 
+// The same runner serves the Commits tab (repo/commits.ts): one place decides
+// the literal-pathspec and buffer settings every local git call needs.
+export { git as runGit };
+
 // git C-quotes a path containing quotes, backslashes, or control characters
 // (core.quotepath=off only stops the escaping of non-ASCII).
 function unquotePath(raw: string): string {

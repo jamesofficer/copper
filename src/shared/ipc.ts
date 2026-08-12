@@ -16,6 +16,7 @@ import type {
   LlmStatus,
   LlmTask,
   LocalChanges,
+  LocalCommitList,
   MergeMethod,
   NewPullRequest,
   NewReviewComment,
@@ -56,6 +57,15 @@ export interface IpcApi {
   // for the home screen's Current changes tab. Read from local git only — no
   // GitHub token needed.
   getLocalChanges(repoPath: string): Promise<LocalChanges>;
+  // The commits on the checkout's current branch, newest first, for the home
+  // screen's Commits tab. Local git only — no GitHub token needed.
+  listLocalCommits(repoPath: string): Promise<LocalCommitList>;
+  // One local commit's changed files, shaped like a PR's so the diff UI renders
+  // them unchanged.
+  getLocalCommitFiles(
+    repoPath: string,
+    sha: string,
+  ): Promise<PullRequestFile[]>;
   // The repo's checkouts — the main worktree plus any linked git worktrees —
   // so Current changes can switch between them. [] when listing fails.
   listWorktrees(repoPath: string): Promise<Worktree[]>;
@@ -326,6 +336,8 @@ export const ipcChannels = [
   "removeRepository",
   "reorderRepositories",
   "getLocalChanges",
+  "listLocalCommits",
+  "getLocalCommitFiles",
   "listWorktrees",
   "stageFiles",
   "unstageFiles",
