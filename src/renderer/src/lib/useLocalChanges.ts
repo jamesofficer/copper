@@ -110,8 +110,9 @@ export interface LocalChangesState {
   // Uncommitted paths, and the loaded (unfiltered) count of a commit's files.
   changedPaths: number;
   commitFileTotal: number;
-  // What the Files heading counts — either mode.
-  fileCount: string | null;
+  // The heading count over a commit's flat file list ("3" or "3/12" while
+  // filtering); null until its files load.
+  commitFileCount: string | null;
 
   stagedCount: number;
   selectFile(area: LocalChangeArea, path: string): void;
@@ -148,6 +149,21 @@ export function useLocalChanges(
   const [filter, setFilter] = useState("");
   const [discarding, setDiscarding] = useState<string[] | null>(null);
 
+  // Everything here describes one checkout, so switching repo or worktree
+  // starts again. The view used to be remounted by a key for this; the state
+  // lives above the view now, so the reset has to be its own. Adjusting state
+  // during render (rather than in an effect) means the stale filter is never
+  // painted against the new checkout's files.
+  const [lastPath, setLastPath] = useState(path);
+  if (lastPath !== path) {
+    setLastPath(path);
+    setSelection(null);
+    setSelectedCommit(null);
+    setCommitFilePath(null);
+    setFilter("");
+    setDiscarding(null);
+  }
+
   const queryClient = useQueryClient();
   const writeMutationKey = localChangesWriteMutationKey(path);
   const writesPending = useIsMutating({ mutationKey: writeMutationKey }) > 0;
@@ -175,7 +191,11 @@ export function useLocalChanges(
   });
 
   const [debouncedFilter] = useDebounce(filter, 150);
-  const query = debouncedFilter.trim().toLowerCase();
+  // An empty box filters nothing at once, debounce or no debounce: after a
+  // checkout switch clears the filter, waiting out the delay would hide the
+  // new checkout's files behind the old one's text.
+  const query =
+    filter.trim() === "" ? "" : debouncedFilter.trim().toLowerCase();
   const staged = useMemo(() => {
     if (!changes) return [];
     return query
@@ -234,14 +254,9 @@ export function useLocalChanges(
   const untracked = useMemo(() => new Set(changes?.untracked ?? []), [changes]);
 
   const changedPaths = changes ? changedPathCount(changes) : 0;
-  const shownPaths = new Set([...staged, ...unstaged].map((file) => file.path))
-    .size;
   const commitFileTotal = commitFilesQuery.data?.length ?? 0;
-  const changeCount = !changes
-    ? null
-    : query
-      ? `${shownPaths}/${changedPaths}`
-      : `${changedPaths}`;
+  // Only a commit's flat list needs a count of its own: the uncommitted view
+  // carries one per group heading.
   const commitFileCount = !commitFilesQuery.data
     ? null
     : query
@@ -276,7 +291,7 @@ export function useLocalChanges(
     commitFiles,
     changedPaths,
     commitFileTotal,
-    fileCount: commit ? commitFileCount : changeCount,
+    commitFileCount,
 
     stagedCount: changes?.staged.length ?? 0,
     selectFile: (area, filePath) => setSelection({ area, path: filePath }),

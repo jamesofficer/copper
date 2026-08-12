@@ -7,6 +7,22 @@ interface Props {
   state: LocalChangesState;
 }
 
+// A filter that hides every file leaves this pane empty too, and saying the
+// commit changed nothing would be a lie the column beside it contradicts.
+function placeholder(state: LocalChangesState): string {
+  if (state.commit) {
+    if (state.commitFilesPending) return "Reading the commit…";
+    if (state.commitFileTotal === 0) return "This commit changed no files.";
+    return "No files match your filter.";
+  }
+  if (state.changesPending) return "Reading local changes…";
+  if (state.changedPaths === 0) {
+    return "The working tree is clean — nothing to review.";
+  }
+  if (state.filtering) return "No files match your filter.";
+  return "Select a file to view its diff.";
+}
+
 // The diff beside the Changes tab's file column. It starts under the queue's
 // top bar rather than under the tab bar, because the tab bar caps the column
 // and not the window.
@@ -25,15 +41,7 @@ export default function LocalChangesPane({ state }: Props) {
         ) : (
           <Center h="full" p="4">
             <Text color="fg.muted" fontSize="sm">
-              {commit
-                ? state.commitFilesPending
-                  ? "Reading the commit…"
-                  : "This commit changed no files."
-                : state.changesPending
-                  ? "Reading local changes…"
-                  : state.changedPaths === 0
-                    ? "The working tree is clean — nothing to review."
-                    : "Select a file to view its diff."}
+              {placeholder(state)}
             </Text>
           </Center>
         )}

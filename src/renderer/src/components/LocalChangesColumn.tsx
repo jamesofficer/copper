@@ -53,7 +53,7 @@ export default function LocalChangesColumn({ state }: Props) {
     commitFiles,
     commitFileTotal,
     changedPaths,
-    fileCount,
+    commitFileCount,
     staged,
     unstaged,
     writesPending,
@@ -124,7 +124,7 @@ export default function LocalChangesColumn({ state }: Props) {
             <>
               <HStack px="1" pb="1">
                 <SectionHeading>
-                  Files{fileCount ? ` (${fileCount})` : ""}
+                  Files{commitFileCount ? ` (${commitFileCount})` : ""}
                 </SectionHeading>
               </HStack>
               <FileList

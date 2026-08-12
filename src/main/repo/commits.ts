@@ -123,9 +123,9 @@ function parseLog(output: string): LocalCommit[] {
   return commits;
 }
 
-// The commits on the checkout's current branch, newest first, for the home
-// screen's Commits tab. Local git only — no token, no network, and it works on
-// a repo with no GitHub slug.
+// The commits on the checkout's current branch, newest first, for the commit
+// list on the home screen's Changes tab. Local git only — no token, no
+// network, and it works on a repo with no GitHub slug.
 export async function listLocalCommits(
   repoPath: string,
 ): Promise<LocalCommitList> {

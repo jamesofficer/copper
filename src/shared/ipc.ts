@@ -57,8 +57,8 @@ export interface IpcApi {
   // for the home screen's Current changes tab. Read from local git only — no
   // GitHub token needed.
   getLocalChanges(repoPath: string): Promise<LocalChanges>;
-  // The commits on the checkout's current branch, newest first, for the home
-  // screen's Commits tab. Local git only — no GitHub token needed.
+  // The commits on the checkout's current branch, newest first, for the commit
+  // list on the home screen's Changes tab. Local git only — no token needed.
   listLocalCommits(repoPath: string): Promise<LocalCommitList>;
   // One local commit's changed files, shaped like a PR's so the diff UI renders
   // them unchanged.

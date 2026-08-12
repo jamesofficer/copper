@@ -184,8 +184,11 @@ export default function Welcome({
         {/* The Changes tab splits below the top bar, not below the tab bar:
             the tabs cap the file-list column, so the diff beside them runs the
             full height of the window. */}
+        {/* Gated on the tab being open, not just rendered inside its panel:
+            an inactive Tabs.Content is still mounted, so a second copy of the
+            tab bar would sit in the tree with the same trigger ids. */}
         <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
-          {!active ? (
+          {!localChangesTab ? null : !active ? (
             <Flex direction="column" h="full" minH="0">
               <QueueTabs repo={active} tab={tab} checkoutPath={worktree.path} />
               <Center flex="1" p="4">
