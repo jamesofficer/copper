@@ -35,7 +35,7 @@ async function git(repoPath: string, args: string[]): Promise<string> {
   return stdout;
 }
 
-// The same runner serves the Commits tab (repo/commits.ts): one place decides
+// The same runner serves the commit list (repo/commits.ts): one place decides
 // the literal-pathspec and buffer settings every local git call needs.
 export { git as runGit };
 
