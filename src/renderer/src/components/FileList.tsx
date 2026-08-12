@@ -18,6 +18,9 @@ interface Props {
   commentCounts?: Map<string, number>;
   // Local AI explanations per file path; undefined hides the chips.
   explanationCounts?: Map<string, number>;
+  // Adds the Changes view's narrow selected-file marker without changing the
+  // Current changes list, which uses selection only to choose a diff.
+  selectedIndicator?: boolean;
   // Per-row buttons revealed on hover, in place of the diff counts —
   // stage/discard in the Current changes view. Undefined leaves the rows
   // action-free, as the PR views want them.
@@ -52,13 +55,14 @@ export default function FileList({
   viewedPaths,
   commentCounts,
   explanationCounts,
+  selectedIndicator,
   rowActions,
   nameColor,
 }: Props) {
   const display = useFilePathDisplay();
 
   return (
-    <Stack gap="0.5">
+    <Stack gap="1">
       {files.map((file) => {
         const meta = statusMeta[file.status];
         const selected = file.path === selectedPath;
@@ -80,14 +84,29 @@ export default function FileList({
               minW="0"
               onClick={() => onSelect(file.path)}
               textAlign="left"
-              rounded="md"
-              px="2"
-              py="1.5"
+              rounded="lg"
+              overflow="hidden"
+              position="relative"
+              px="3"
+              py="2"
               bg={selected ? "bg.emphasized" : "transparent"}
               _hover={{ bg: selected ? "bg.emphasized" : "bg.subtle" }}
               opacity={viewed ? 0.55 : undefined}
+              _before={
+                selected && selectedIndicator
+                  ? {
+                      content: '""',
+                      position: "absolute",
+                      insetBlock: "0",
+                      insetInlineStart: "0",
+                      w: "0.5",
+                      bg: "colorPalette.solid",
+                      roundedLeft: "lg",
+                    }
+                  : undefined
+              }
             >
-              <HStack gap="2" minW="0">
+              <HStack gap="3" minW="0">
                 <Text
                   as="span"
                   fontFamily="mono"
@@ -120,6 +139,7 @@ export default function FileList({
                       display="block"
                       fontSize="2xs"
                       color="fg.muted"
+                      mt="0.5"
                       truncate
                     >
                       {dir.slice(0, -1)}

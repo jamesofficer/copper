@@ -13,6 +13,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   LuBadgeCheck,
   LuCheck,
+  LuChevronLeft,
+  LuChevronRight,
   LuCopy,
   LuMessageSquarePlus,
   LuShieldCheck,
@@ -65,6 +67,12 @@ interface Props {
   anchorCommits: IssueAnchorCommits;
   files: PullRequestFile[] | undefined;
   fileByPath: FileMap;
+  issuePosition?: {
+    current: number;
+    total: number;
+    onPrevious(): void;
+    onNext(): void;
+  };
   onAskAbout(context: AskContext, question?: string): void;
 }
 
@@ -75,6 +83,7 @@ function VerdictBadge({ issue }: { issue: ReviewIssue }) {
     <Badge
       colorPalette={meta.palette}
       variant={meta.solid ? "surface" : "outline"}
+      size="lg"
     >
       {verdict === "verified" && <LuBadgeCheck />}
       {verdict === "non_issue" && <LuShieldCheck />}
@@ -92,6 +101,7 @@ export default function IssuePane({
   anchorCommits,
   files,
   fileByPath,
+  issuePosition,
   onAskAbout,
 }: Props) {
   const queryClient = useQueryClient();
@@ -164,61 +174,63 @@ export default function IssuePane({
           anchors: [{ path: issue.finding.path, line: issue.finding.line }],
         }
       : issue.risk;
-
   return (
-    <VStack alignItems="stretch" gap="4">
-      <VStack alignItems="stretch" gap="4" maxW="3xl">
-        <VStack alignItems="stretch" gap="2">
-          <HStack gap="2">
-            <RiskSeverityBadge severity={issue.severity} />
+    <VStack alignItems="stretch" gap="6">
+      <VStack alignItems="stretch" gap="5" maxW="4xl">
+        <VStack alignItems="stretch" gap="3">
+          <HStack gap="2.5">
+            <RiskSeverityBadge severity={issue.severity} size="lg" />
             {finding && (
               <Badge
                 colorPalette={categoryMeta[finding.category].palette}
                 variant="surface"
+                size="lg"
               >
                 {categoryMeta[finding.category].label}
               </Badge>
             )}
             <VerdictBadge issue={issue} />
-            <HStack gap="1" ml="auto" minW="0">
-              {finding && (
-                <Text
-                  fontSize="xs"
-                  fontFamily="mono"
-                  color="fg.subtle"
-                  truncate
-                  title={`${finding.path}:${finding.line}`}
+            {issuePosition && (
+              <HStack gap="1" ml="auto">
+                <IconButton
+                  aria-label="Previous issue"
+                  title="Previous issue"
+                  size="sm"
+                  variant="ghost"
+                  color="fg.muted"
+                  disabled={issuePosition.current === 1}
+                  onClick={issuePosition.onPrevious}
                 >
-                  {finding.path}:{finding.line}
+                  <LuChevronLeft />
+                </IconButton>
+                <Text
+                  minW="24"
+                  textAlign="center"
+                  fontSize="sm"
+                  fontWeight="medium"
+                  color="fg.muted"
+                >
+                  Issue {issuePosition.current} of {issuePosition.total}
                 </Text>
-              )}
-              <IconButton
-                aria-label="Copy issue as markdown"
-                title={
-                  copyOmitsCode
-                    ? "Copy as markdown — the findings run is behind the branch, so the code isn’t quoted"
-                    : "Copy as markdown — to paste into an agent or a message"
-                }
-                size="2xs"
-                variant="ghost"
-                color="fg.muted"
-                flexShrink="0"
-                onClick={() =>
-                  void clipboard.copy(
-                    issueToMarkdown(issue, {
-                      repo,
-                      prNumber,
-                      fileByPath,
-                      ...anchorCommits,
-                    }),
-                  )
-                }
-              >
-                {clipboard.copied ? <LuCheck /> : <LuCopy />}
-              </IconButton>
-            </HStack>
+                <IconButton
+                  aria-label="Next issue"
+                  title="Next issue"
+                  size="sm"
+                  variant="ghost"
+                  color="fg.muted"
+                  disabled={issuePosition.current === issuePosition.total}
+                  onClick={issuePosition.onNext}
+                >
+                  <LuChevronRight />
+                </IconButton>
+              </HStack>
+            )}
           </HStack>
-          <Heading size="md">{issue.title}</Heading>
+          <HStack gap="4" alignItems="center">
+            <Heading size="2xl" letterSpacing="tight" flex="1" minW="0">
+              {issue.title}
+            </Heading>
+          </HStack>
         </VStack>
 
         {resolution && (
@@ -281,14 +293,57 @@ export default function IssuePane({
           </HStack>
         )}
 
+        {!resolution && !cleared && (
+          <Box
+            borderWidth="1px"
+            borderColor={`${issue.severity === "high" ? "red" : "orange"}.emphasized`}
+            bg={`${issue.severity === "high" ? "red" : "orange"}.subtle`}
+            rounded="md"
+            px="3"
+            py="2.5"
+          >
+            <Text fontSize="sm" color="fg.muted">
+              {issue.kind === "finding"
+                ? "This finding needs review before it becomes a comment on the pull request."
+                : "This is a candidate issue from the diff review. Run a deeper check to verify it."}
+            </Text>
+          </Box>
+        )}
+
         <Markdown fontSize="md">
           {issue.kind === "finding" ? issue.finding.body : issue.risk.text}
         </Markdown>
 
-        {issue.kind === "risk" && <AnchorChips claim={issue.risk} />}
+        <HStack justifyContent="space-between" gap="3" alignItems="center">
+          {issue.kind === "risk" ? <AnchorChips claim={issue.risk} /> : <Box />}
+          <Button
+            size="xs"
+            variant="outline"
+            color="fg.muted"
+            flexShrink="0"
+            title={
+              copyOmitsCode
+                ? "Copy issue details — the findings run is behind the branch, so the code isn’t quoted"
+                : "Copy issue details — to paste into an agent or a message"
+            }
+            onClick={() =>
+              void clipboard.copy(
+                issueToMarkdown(issue, {
+                  repo,
+                  prNumber,
+                  fileByPath,
+                  ...anchorCommits,
+                }),
+              )
+            }
+          >
+            {clipboard.copied ? <LuCheck /> : <LuCopy />}
+            Copy issue details
+          </Button>
+        </HStack>
 
         {finding && (
-          <Box borderLeftWidth="2px" borderColor="border.emphasized" pl="3">
+          <Box borderWidth="1px" rounded="md" p="3" bg="bg.subtle">
             <Text
               fontSize="2xs"
               fontWeight="semibold"

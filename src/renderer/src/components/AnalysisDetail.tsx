@@ -188,6 +188,9 @@ export default function AnalysisDetail({
         (entry) => entry.id === selection.id,
       );
       if (issue) {
+        const issueIndex = issues.open.findIndex(
+          (entry) => entry.id === issue.id,
+        );
         return (
           <IssuePane
             issue={issue}
@@ -198,6 +201,24 @@ export default function AnalysisDetail({
             anchorCommits={anchorCommits}
             files={files}
             fileByPath={fileByPath}
+            issuePosition={
+              issueIndex === -1
+                ? undefined
+                : {
+                    current: issueIndex + 1,
+                    total: issues.open.length,
+                    onPrevious: () => {
+                      const previous = issues.open[issueIndex - 1];
+                      if (previous) {
+                        onSelect({ kind: "issue", id: previous.id });
+                      }
+                    },
+                    onNext: () => {
+                      const next = issues.open[issueIndex + 1];
+                      if (next) onSelect({ kind: "issue", id: next.id });
+                    },
+                  }
+            }
             onAskAbout={onAskAbout}
           />
         );
@@ -245,7 +266,7 @@ export default function AnalysisDetail({
 
   return (
     // Extra bottom padding so scrollable content can overscroll past the end.
-    <Box px="8" pt="6" pb="80">
+    <Box maxW="6xl" mx="auto" px="8" pt="7" pb="80">
       {resolve()}
     </Box>
   );

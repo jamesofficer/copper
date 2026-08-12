@@ -85,7 +85,6 @@ export default function ChangesView({ pr }: Props) {
     if (!queryFilteredFiles || !hideTestFiles) return 0;
     return queryFilteredFiles.filter((file) => isTestFile(file.path)).length;
   }, [queryFilteredFiles, hideTestFiles]);
-  const filtering = Boolean(query) || hideTestFiles;
   const visibleFiles = useMemo(() => {
     if (!queryFilteredFiles || !hideTestFiles) return queryFilteredFiles;
     return queryFilteredFiles.filter((file) => !isTestFile(file.path));
@@ -94,12 +93,6 @@ export default function ChangesView({ pr }: Props) {
     visibleFiles?.find((file) => file.path === selectedPath) ??
     visibleFiles?.[0] ??
     null;
-
-  const fileCount = files
-    ? filtering
-      ? `${visibleFiles?.length ?? 0}/${files.length}`
-      : `${files.length}`
-    : null;
 
   // Same key as the Overview tab's query — needed for the full head SHA
   // (the summary prop's headSha is truncated for display).
@@ -166,6 +159,29 @@ export default function ChangesView({ pr }: Props) {
       });
     },
   });
+
+  const viewedCount =
+    files?.filter((file) => viewedPaths.has(file.path)).length ?? 0;
+  const selectedFileIndex = selectedFile
+    ? (visibleFiles?.findIndex((file) => file.path === selectedFile.path) ?? -1)
+    : -1;
+  const hasPreviousFile = selectedFileIndex > 0;
+  const hasNextFile =
+    selectedFileIndex !== -1 &&
+    selectedFileIndex < (visibleFiles?.length ?? 0) - 1;
+
+  function selectRelativeFile(offset: -1 | 1) {
+    const nextFile = visibleFiles?.[selectedFileIndex + offset];
+    if (nextFile) setSelectedPath(nextFile.path);
+  }
+
+  function markViewedAndContinue() {
+    if (!selectedFile) return;
+    if (!viewedPaths.has(selectedFile.path)) {
+      setViewed.mutate({ path: selectedFile.path, viewed: true });
+    }
+    if (hasNextFile) selectRelativeFile(1);
+  }
 
   // Locally drafted review comments — shown on the diff like threads, and
   // submitted together by the Submit review dialog.
@@ -262,8 +278,83 @@ export default function ChangesView({ pr }: Props) {
     <Flex h="full" minH="0">
       <Flex flexShrink="0" minH="0" style={{ width: sidebarWidth }}>
         <Flex direction="column" flex="1" minW="0" borderRightWidth="1px">
+          <HStack px="4" py="3" flexShrink="0">
+            <Heading size="sm">Files</Heading>
+            {selectedCommit === null && files && files.length > 0 && (
+              <Text ml="auto" fontSize="xs" color="fg.muted">
+                {viewedCount} of {files.length} viewed
+              </Text>
+            )}
+          </HStack>
+          {selectedCommit === null && files && files.length > 0 && (
+            <Box
+              role="progressbar"
+              aria-label="Files viewed"
+              aria-valuemin={0}
+              aria-valuemax={files.length}
+              aria-valuenow={viewedCount}
+              h="1.5"
+              mx="4"
+              mb="3"
+              bg="bg.muted"
+              flexShrink="0"
+              rounded="full"
+              overflow="hidden"
+            >
+              <Box
+                h="full"
+                bg="green.solid"
+                rounded="full"
+                transition="width 0.2s"
+                w={`${(viewedCount / files.length) * 100}%`}
+              />
+            </Box>
+          )}
+          <Box px="3" pb="3" flexShrink="0">
+            <InputGroup startElement={<LuSearch size={14} />}>
+              <Input
+                size="sm"
+                placeholder="Filter files"
+                value={filter}
+                onChange={(event) => setFilter(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setFilter("");
+                }}
+              />
+            </InputGroup>
+          </Box>
+          <Box flex="1" overflowY="auto" px="3" pb="3" css={scrollbar}>
+            {filesQuery.isPending ? (
+              <HStack color="fg.muted" px="1">
+                <Spinner size="sm" />
+                <Text fontSize="sm">Loading changed files…</Text>
+              </HStack>
+            ) : filesQuery.isError ? (
+              <Text fontSize="sm" color="fg.error" px="1">
+                {filesQuery.error instanceof Error
+                  ? filesQuery.error.message
+                  : "Couldn't load changed files."}
+              </Text>
+            ) : visibleFiles && visibleFiles.length > 0 ? (
+              <FileList
+                files={visibleFiles}
+                selectedPath={selectedFile?.path ?? null}
+                onSelect={setSelectedPath}
+                selectedIndicator
+                viewedPaths={selectedCommit === null ? viewedPaths : undefined}
+                commentCounts={commentCounts}
+                explanationCounts={explanationCounts}
+              />
+            ) : (
+              <Text fontSize="sm" color="fg.muted" px="1">
+                {files && files.length > 0
+                  ? "No files match your filter."
+                  : "No changed files."}
+              </Text>
+            )}
+          </Box>
           {commits && commits.length > 1 && (
-            <Collapsible.Root flexShrink="0">
+            <Collapsible.Root flexShrink="0" borderTopWidth="1px">
               <Collapsible.Trigger w="full" cursor="pointer">
                 <HStack gap="1.5" px="4" py="3" color="fg.muted">
                   <Heading
@@ -305,77 +396,15 @@ export default function ChangesView({ pr }: Props) {
               </Collapsible.Content>
             </Collapsible.Root>
           )}
-
-          <HStack
-            px="4"
-            py="3"
-            flexShrink="0"
-            borderTopWidth={commits && commits.length > 1 ? "1px" : "0"}
-          >
-            <Heading
-              size="xs"
-              color="fg.muted"
-              textTransform="uppercase"
-              letterSpacing="wider"
-            >
-              Files{fileCount ? ` (${fileCount})` : ""}
-            </Heading>
-            {selectedCommit === null && files && files.length > 0 && (
-              <Text ml="auto" fontFamily="mono" fontSize="2xs" color="fg.muted">
-                {files.filter((file) => viewedPaths.has(file.path)).length}/
-                {files.length} viewed
-              </Text>
-            )}
-          </HStack>
-          <Box px="3" pb="2" flexShrink="0">
-            <InputGroup startElement={<LuSearch size={12} />}>
-              <Input
-                size="xs"
-                placeholder="Filter files"
-                value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") setFilter("");
-                }}
-              />
-            </InputGroup>
-          </Box>
-          <Box flex="1" overflowY="auto" px="3" pb="3" css={scrollbar}>
-            {filesQuery.isPending ? (
-              <HStack color="fg.muted" px="1">
-                <Spinner size="sm" />
-                <Text fontSize="sm">Loading changed files…</Text>
-              </HStack>
-            ) : filesQuery.isError ? (
-              <Text fontSize="sm" color="fg.error" px="1">
-                {filesQuery.error instanceof Error
-                  ? filesQuery.error.message
-                  : "Couldn't load changed files."}
-              </Text>
-            ) : visibleFiles && visibleFiles.length > 0 ? (
-              <FileList
-                files={visibleFiles}
-                selectedPath={selectedFile?.path ?? null}
-                onSelect={setSelectedPath}
-                viewedPaths={selectedCommit === null ? viewedPaths : undefined}
-                commentCounts={commentCounts}
-                explanationCounts={explanationCounts}
-              />
-            ) : (
-              <Text fontSize="sm" color="fg.muted" px="1">
-                {files && files.length > 0
-                  ? "No files match your filter."
-                  : "No changed files."}
-              </Text>
-            )}
-          </Box>
           <HStack px="3" py="2" flexShrink="0" borderTopWidth="1px">
-            {hiddenTestFileCount > 0 && (
-              <Text fontSize="xs" color="fg.muted">
-                {hiddenTestFileCount} file
-                {hiddenTestFileCount === 1 ? "" : "s"} hidden
-              </Text>
-            )}
+            <Text fontSize="xs" color="fg.muted">
+              {visibleFiles?.length ?? 0} file
+              {(visibleFiles?.length ?? 0) === 1 ? "" : "s"} shown
+              {hiddenTestFileCount > 0 &&
+                ` · ${hiddenTestFileCount} test ${
+                  hiddenTestFileCount === 1 ? "file" : "files"
+                } hidden`}
+            </Text>
             <Checkbox.Root
               ml="auto"
               size="sm"
@@ -407,6 +436,32 @@ export default function ChangesView({ pr }: Props) {
                 ? viewedPaths.has(selectedFile.path)
                 : undefined
             }
+            hasPreviousFile={hasPreviousFile}
+            hasNextFile={hasNextFile}
+            onPreviousFile={() => selectRelativeFile(-1)}
+            onNextFile={() => selectRelativeFile(1)}
+            reviewProgress={
+              selectedCommit === null && files
+                ? { viewed: viewedCount, total: files.length }
+                : undefined
+            }
+            onMarkViewedAndNext={
+              selectedCommit === null ? markViewedAndContinue : undefined
+            }
+            markViewedLabel={
+              viewedPaths.has(selectedFile.path)
+                ? hasNextFile
+                  ? "Next file"
+                  : "Viewed"
+                : hasNextFile
+                  ? "Mark viewed & next"
+                  : "Mark viewed"
+            }
+            markViewedDisabled={
+              setViewed.isPending ||
+              (viewedPaths.has(selectedFile.path) && !hasNextFile)
+            }
+            viewedUpdating={setViewed.isPending}
             onToggleViewed={
               selectedCommit === null
                 ? (viewed) =>

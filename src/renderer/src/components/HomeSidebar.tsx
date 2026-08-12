@@ -107,9 +107,9 @@ export default function HomeSidebar({
     hidden.has(reviewRequestKey(pr)),
   );
 
-  // The sidebar sits recessed against the main column: a translucent black
-  // darkens whatever the current mode's page background is, so one rule covers
-  // both modes and it stays clear of the rows' hover colour.
+  // The sidebar sits recessed against the main column: a translucent overlay
+  // darkens in light mode and lightens in dark mode, so one rule covers both
+  // modes and it stays clear of the rows' hover colour.
   return (
     <Flex
       direction="column"
@@ -118,7 +118,7 @@ export default function HomeSidebar({
       minH="0"
       borderRightWidth="1px"
       bg="black/8"
-      _dark={{ bg: "black/40" }}
+      _dark={{ bg: "white/3" }}
     >
       {/* The window's traffic lights are drawn over this corner, so the app's
           own buttons sit at the far end of the bar. Its height matches the main

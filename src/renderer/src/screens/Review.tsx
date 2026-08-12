@@ -78,6 +78,13 @@ function describeActivity(
 }
 
 export default function Review({ pr, initialTab, onBack }: Props) {
+  const tabKey = `${pr.repo}#${pr.number}#${initialTab ?? "overview"}`;
+  const [tabState, setTabState] = useState({
+    key: tabKey,
+    value: initialTab ?? "overview",
+  });
+  const activeTab =
+    tabState.key === tabKey ? tabState.value : (initialTab ?? "overview");
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
   // With the sidebar hidden its header is gone too, so this bar takes over
@@ -102,6 +109,10 @@ export default function Review({ pr, initialTab, onBack }: Props) {
     enabled: Boolean(detail),
   });
   const newActivity = describeActivity(detail, activityQuery.data);
+
+  function selectTab(tab: ReviewTab) {
+    setTabState({ key: tabKey, value: tab });
+  }
 
   // Refetch everything this PR shows — detail, diffs, comments, reviews. Match
   // by predicate so any query scoped to this repo + PR number is busted.
@@ -187,6 +198,7 @@ export default function Review({ pr, initialTab, onBack }: Props) {
       <Tabs.Root
         key={`${pr.repo}#${pr.number}#${initialTab ?? "overview"}`}
         defaultValue={initialTab ?? "overview"}
+        onValueChange={(event) => selectTab(event.value as ReviewTab)}
         display="flex"
         flexDirection="column"
         flex="1"
@@ -202,9 +214,11 @@ export default function Review({ pr, initialTab, onBack }: Props) {
           <Tabs.Trigger value="review">
             <LuSparkles /> Review
           </Tabs.Trigger>
-          <Box ml="auto">
-            <DiffViewModeSelect />
-          </Box>
+          {activeTab !== "changes" && (
+            <Box ml="auto">
+              <DiffViewModeSelect />
+            </Box>
+          )}
         </Tabs.List>
 
         <Tabs.Content value="overview" flex="1" minH="0" p="0">

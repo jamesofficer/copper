@@ -4,6 +4,8 @@ import { formatForDisplay } from "@tanstack/react-hotkeys";
 // to Command on macOS and Control everywhere else, so one string covers both.
 export const hotkeys = {
   toggleSidebar: "Mod+B",
+  previousIssue: "ArrowLeft",
+  nextIssue: "ArrowRight",
 } as const;
 
 // How a shortcut reads in a button's tooltip — "⌘ B" on macOS, "Ctrl+B" on
