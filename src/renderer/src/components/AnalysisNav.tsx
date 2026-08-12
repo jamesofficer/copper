@@ -119,7 +119,7 @@ function NavItem({
               top: "0",
               bottom: "0",
               w: "0.5",
-              bg: "orange.solid",
+              bg: "colorPalette.solid",
               roundedLeft: "md",
             }
           : undefined

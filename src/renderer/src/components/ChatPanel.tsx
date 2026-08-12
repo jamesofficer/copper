@@ -54,6 +54,9 @@ export default function ChatPanel({
   const [local, setLocal] = useState<UiMessage[] | null>(null);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
+  const [clearedScopeTitle, setClearedScopeTitle] = useState<string | null>(
+    null,
+  );
   const streamingIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -62,7 +65,8 @@ export default function ChatPanel({
 
   const attachedContext = askRequest?.question
     ? null
-    : (askRequest?.context ?? scope ?? null);
+    : (askRequest?.context ??
+      (clearedScopeTitle === scope?.title ? null : scope));
 
   useEffect(() => {
     if (askRequest && !askRequest.question) inputRef.current?.focus();
@@ -124,6 +128,11 @@ export default function ChatPanel({
     setQuestion("");
     onClearAskRequest();
     void send(context ? buildQuestionWithContext(context, trimmed) : trimmed);
+  }
+
+  function clearAttachedContext() {
+    setClearedScopeTitle(scope?.title ?? null);
+    onClearAskRequest();
   }
 
   async function send(fullQuestion: string) {
@@ -241,7 +250,7 @@ export default function ChatPanel({
                     }
                   >
                     <HStack gap="2">
-                      <Box color="orange.fg">
+                      <Box color="colorPalette.fg">
                         <LuSparkles size={13} />
                       </Box>
                       <Text>{prompt}</Text>
@@ -298,7 +307,7 @@ export default function ChatPanel({
               variant="ghost"
               color="fg.muted"
               ml="auto"
-              onClick={onClearAskRequest}
+              onClick={clearAttachedContext}
             >
               <LuX />
             </IconButton>
@@ -314,7 +323,7 @@ export default function ChatPanel({
               ask();
             }
             if (event.key === "Escape" && attachedContext) {
-              onClearAskRequest();
+              clearAttachedContext();
             }
           }}
           placeholder={

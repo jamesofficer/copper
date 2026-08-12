@@ -45,7 +45,6 @@ import {
   AskAboutButton,
   DiffCards,
   type FileMap,
-  fileName,
   LoadingDiffs,
   SectionHeading,
 } from "./AnalysisShared";
@@ -175,11 +174,6 @@ export default function IssuePane({
           anchors: [{ path: issue.finding.path, line: issue.finding.line }],
         }
       : issue.risk;
-  const anchor =
-    issue.kind === "finding"
-      ? { path: issue.finding.path, line: issue.finding.line }
-      : issue.risk.anchors[0];
-
   return (
     <VStack alignItems="stretch" gap="6">
       <VStack alignItems="stretch" gap="5" maxW="4xl">
@@ -236,19 +230,6 @@ export default function IssuePane({
             <Heading size="2xl" letterSpacing="tight" flex="1" minW="0">
               {issue.title}
             </Heading>
-            <HStack gap="1" flexShrink="0">
-              {anchor && (
-                <Badge
-                  size="sm"
-                  variant="outline"
-                  fontFamily="mono"
-                  fontWeight="medium"
-                  title={`${anchor.path}:${anchor.line}`}
-                >
-                  {fileName(anchor.path)}:{anchor.line}
-                </Badge>
-              )}
-            </HStack>
           </HStack>
         </VStack>
 
@@ -312,20 +293,22 @@ export default function IssuePane({
           </HStack>
         )}
 
-        <Box
-          borderWidth="1px"
-          borderColor={`${issue.severity === "high" ? "red" : "orange"}.emphasized`}
-          bg={`${issue.severity === "high" ? "red" : "orange"}.subtle`}
-          rounded="md"
-          px="3"
-          py="2.5"
-        >
-          <Text fontSize="sm" color="fg.muted">
-            {issue.kind === "finding"
-              ? "This finding needs review before it becomes a comment on the pull request."
-              : "This is a candidate issue from the diff review. Run a deeper check to verify it."}
-          </Text>
-        </Box>
+        {!resolution && !cleared && (
+          <Box
+            borderWidth="1px"
+            borderColor={`${issue.severity === "high" ? "red" : "orange"}.emphasized`}
+            bg={`${issue.severity === "high" ? "red" : "orange"}.subtle`}
+            rounded="md"
+            px="3"
+            py="2.5"
+          >
+            <Text fontSize="sm" color="fg.muted">
+              {issue.kind === "finding"
+                ? "This finding needs review before it becomes a comment on the pull request."
+                : "This is a candidate issue from the diff review. Run a deeper check to verify it."}
+            </Text>
+          </Box>
+        )}
 
         <Markdown fontSize="md">
           {issue.kind === "finding" ? issue.finding.body : issue.risk.text}

@@ -100,7 +100,7 @@ export default function FileList({
                       insetBlock: "0",
                       insetInlineStart: "0",
                       w: "0.5",
-                      bg: "orange.solid",
+                      bg: "colorPalette.solid",
                       roundedLeft: "lg",
                     }
                   : undefined

@@ -279,7 +279,6 @@ export default function DiffView({
           </Text>
           <Button
             size="xs"
-            colorPalette="orange"
             disabled={markViewedDisabled}
             onClick={onMarkViewedAndNext}
           >

@@ -207,16 +207,16 @@ export default function AnalysisDetail({
                 : {
                     current: issueIndex + 1,
                     total: issues.open.length,
-                    onPrevious: () =>
-                      onSelect({
-                        kind: "issue",
-                        id: issues.open[issueIndex - 1].id,
-                      }),
-                    onNext: () =>
-                      onSelect({
-                        kind: "issue",
-                        id: issues.open[issueIndex + 1].id,
-                      }),
+                    onPrevious: () => {
+                      const previous = issues.open[issueIndex - 1];
+                      if (previous) {
+                        onSelect({ kind: "issue", id: previous.id });
+                      }
+                    },
+                    onNext: () => {
+                      const next = issues.open[issueIndex + 1];
+                      if (next) onSelect({ kind: "issue", id: next.id });
+                    },
                   }
             }
             onAskAbout={onAskAbout}
