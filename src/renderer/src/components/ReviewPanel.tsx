@@ -313,6 +313,7 @@ export default function ReviewPanel({ pr }: Props) {
           py="2"
           borderBottomWidth="1px"
           bg="bg.subtle"
+          _light={{ bg: "gray.100" }}
           flexShrink="0"
         >
           <Box color="orange.fg" flexShrink="0">
