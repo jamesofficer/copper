@@ -85,6 +85,7 @@ export default function FileList({
               onClick={() => onSelect(file.path)}
               textAlign="left"
               rounded="lg"
+              overflow="hidden"
               position="relative"
               px="3"
               py="2"
@@ -96,12 +97,11 @@ export default function FileList({
                   ? {
                       content: '""',
                       position: "absolute",
-                      left: "0",
-                      top: "2",
-                      bottom: "2",
-                      w: "1",
+                      insetBlock: "0",
+                      insetInlineStart: "0",
+                      w: "0.5",
                       bg: "orange.solid",
-                      roundedRight: "full",
+                      roundedLeft: "lg",
                     }
                   : undefined
               }
