@@ -6,6 +6,12 @@ interface Props {
   commits: PullRequestCommit[];
   selectedSha: string | null;
   onSelect(sha: string | null): void;
+  // The row that clears the selection: "All changes" on a PR, "Uncommitted
+  // changes" on the local list.
+  allLabel: string;
+  // The API's oldest-first order needs reversing; git log is already newest
+  // first.
+  newestFirst?: boolean;
 }
 
 interface RowProps {
@@ -34,16 +40,22 @@ function CommitRow({ selected, onClick, title, children }: RowProps) {
   );
 }
 
-export default function CommitList({ commits, selectedSha, onSelect }: Props) {
+export default function CommitList({
+  commits,
+  selectedSha,
+  onSelect,
+  allLabel,
+  newestFirst = false,
+}: Props) {
+  const ordered = newestFirst ? commits : [...commits].reverse();
   return (
     <Stack gap="0.5">
       <CommitRow selected={selectedSha === null} onClick={() => onSelect(null)}>
         <Text fontSize="xs" fontWeight="medium">
-          All changes
+          {allLabel}
         </Text>
       </CommitRow>
-      {/* The API returns oldest first; show newest at the top. */}
-      {[...commits].reverse().map((commit) => (
+      {ordered.map((commit) => (
         <CommitRow
           key={commit.sha}
           selected={commit.sha === selectedSha}

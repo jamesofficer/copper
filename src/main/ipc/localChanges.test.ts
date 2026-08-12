@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import type { CommitResult, LocalChanges } from "../../shared/types";
+import type {
+  CommitResult,
+  LocalChanges,
+  LocalCommitList,
+} from "../../shared/types";
 import { createLocalChangesHandlers } from "./localChanges";
 
 function dependencies() {
@@ -21,6 +25,12 @@ function dependencies() {
       unstaged: [],
       untracked: [],
     } satisfies LocalChanges),
+    listLocalCommits: vi.fn().mockResolvedValue({
+      branch: "main",
+      base: "origin/main",
+      commits: [],
+    } satisfies LocalCommitList),
+    getLocalCommitFiles: vi.fn().mockResolvedValue([]),
     stageFiles: vi.fn().mockResolvedValue(undefined),
     unstageFiles: vi.fn().mockResolvedValue(undefined),
     discardChanges: vi.fn().mockResolvedValue(undefined),

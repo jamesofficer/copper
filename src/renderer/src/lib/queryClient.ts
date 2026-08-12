@@ -38,6 +38,8 @@ const doNotPersist = [
   "fileAtCommit",
   "localChangeCount",
   "localChanges",
+  "localCommits",
+  "localCommitFiles",
   "worktrees",
 ];
 

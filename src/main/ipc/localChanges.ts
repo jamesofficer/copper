@@ -7,12 +7,15 @@ import {
   stageFiles,
   unstageFiles,
 } from "../repo/changes";
+import { getLocalCommitFiles, listLocalCommits } from "../repo/commits";
 import { listRepositories, listWorktrees } from "../repo/local";
 
 type LocalChangesHandlers = Pick<
   IpcApi,
   | "getLocalChangeCount"
   | "getLocalChanges"
+  | "listLocalCommits"
+  | "getLocalCommitFiles"
   | "listWorktrees"
   | "stageFiles"
   | "unstageFiles"
@@ -25,6 +28,8 @@ interface LocalChangesDependencies {
   listWorktrees: typeof listWorktrees;
   getLocalChangeCount: typeof getLocalChangeCount;
   getLocalChanges: typeof getLocalChanges;
+  listLocalCommits: typeof listLocalCommits;
+  getLocalCommitFiles: typeof getLocalCommitFiles;
   stageFiles: typeof stageFiles;
   unstageFiles: typeof unstageFiles;
   discardChanges: typeof discardChanges;
@@ -78,6 +83,9 @@ export function createLocalChangesHandlers(
     getLocalChangeCount: (repoPath) =>
       dependencies.getLocalChangeCount(repoPath),
     getLocalChanges: (repoPath) => dependencies.getLocalChanges(repoPath),
+    listLocalCommits: (repoPath) => dependencies.listLocalCommits(repoPath),
+    getLocalCommitFiles: (repoPath, sha) =>
+      dependencies.getLocalCommitFiles(repoPath, sha),
     listWorktrees: (repoPath) => dependencies.listWorktrees(repoPath),
     stageFiles: (repoPath, paths) =>
       serializeMutation(repoPath, async () => {
@@ -107,6 +115,8 @@ export const localChangesHandlers = createLocalChangesHandlers({
   listWorktrees,
   getLocalChangeCount,
   getLocalChanges,
+  listLocalCommits,
+  getLocalCommitFiles,
   stageFiles,
   unstageFiles,
   discardChanges,

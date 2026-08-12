@@ -1,10 +1,16 @@
 import { type PointerEvent as ReactPointerEvent, useState } from "react";
 
-interface Options {
+// The width a resizable panel is allowed, and where it persists. Exported as a
+// type of its own so a panel's bounds can be declared beside the panel and
+// used by whoever lays it out.
+export interface PanelBounds {
   storageKey: string;
   min: number;
   max: number;
   fallback: number;
+}
+
+interface Options extends PanelBounds {
   // Which edge of the panel the drag handle sits on — dragging away from the
   // panel makes it wider.
   handle: "left" | "right";

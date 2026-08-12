@@ -2,7 +2,6 @@ import {
   Box,
   Center,
   Checkbox,
-  Collapsible,
   Flex,
   Heading,
   HStack,
@@ -13,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { LuChevronRight, LuSearch } from "react-icons/lu";
+import { LuSearch } from "react-icons/lu";
 import { useDebounce } from "use-debounce";
 import type {
   DraftReviewComment,
@@ -25,7 +24,7 @@ import { buildReviewThreads } from "../lib/reviewComments";
 import { scrollbar } from "../lib/scrollbar";
 import { isTestFile } from "../lib/testFiles";
 import { usePanelWidth } from "../lib/usePanelWidth";
-import CommitList from "./CommitList";
+import CommitsPanel from "./CommitsPanel";
 import DiffView from "./DiffView";
 import FileList from "./FileList";
 import ResizeHandle from "./ResizeHandle";
@@ -277,7 +276,13 @@ export default function ChangesView({ pr }: Props) {
   return (
     <Flex h="full" minH="0">
       <Flex flexShrink="0" minH="0" style={{ width: sidebarWidth }}>
-        <Flex direction="column" flex="1" minW="0" borderRightWidth="1px">
+        <Flex
+          direction="column"
+          flex="1"
+          minW="0"
+          minH="0"
+          borderRightWidth="1px"
+        >
           <HStack px="4" py="3" flexShrink="0">
             <Heading size="sm">Files</Heading>
             {selectedCommit === null && files && files.length > 0 && (
@@ -323,7 +328,9 @@ export default function ChangesView({ pr }: Props) {
               />
             </InputGroup>
           </Box>
-          <Box flex="1" overflowY="auto" px="3" pb="3" css={scrollbar}>
+          {/* minH="0" so a long file list scrolls instead of pushing the
+              commits panel and the controls below it off the bottom. */}
+          <Box flex="1" minH="0" overflowY="auto" px="3" pb="3" css={scrollbar}>
             {filesQuery.isPending ? (
               <HStack color="fg.muted" px="1">
                 <Spinner size="sm" />
@@ -354,47 +361,12 @@ export default function ChangesView({ pr }: Props) {
             )}
           </Box>
           {commits && commits.length > 1 && (
-            <Collapsible.Root flexShrink="0" borderTopWidth="1px">
-              <Collapsible.Trigger w="full" cursor="pointer">
-                <HStack gap="1.5" px="4" py="3" color="fg.muted">
-                  <Heading
-                    size="xs"
-                    color="fg.muted"
-                    textTransform="uppercase"
-                    letterSpacing="wider"
-                  >
-                    Commits ({commits.length})
-                  </Heading>
-                  {selectedCommit && (
-                    <Text fontFamily="mono" fontSize="2xs">
-                      · {selectedCommit.slice(0, 7)}
-                    </Text>
-                  )}
-                  <Collapsible.Indicator
-                    ml="auto"
-                    transition="transform 0.2s"
-                    _open={{ transform: "rotate(90deg)" }}
-                  >
-                    <LuChevronRight size="14" />
-                  </Collapsible.Indicator>
-                </HStack>
-              </Collapsible.Trigger>
-              <Collapsible.Content>
-                <Box
-                  maxH="180px"
-                  overflowY="auto"
-                  px="3"
-                  pb="3"
-                  css={scrollbar}
-                >
-                  <CommitList
-                    commits={commits}
-                    selectedSha={selectedCommit}
-                    onSelect={setSelectedCommit}
-                  />
-                </Box>
-              </Collapsible.Content>
-            </Collapsible.Root>
+            <CommitsPanel
+              commits={commits}
+              selectedSha={selectedCommit}
+              onSelect={setSelectedCommit}
+              allLabel="All changes"
+            />
           )}
           <HStack px="3" py="2" flexShrink="0" borderTopWidth="1px">
             <Text fontSize="xs" color="fg.muted">
