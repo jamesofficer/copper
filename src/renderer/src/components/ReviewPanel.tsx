@@ -15,7 +15,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   LuPanelRightOpen,
   LuSparkles,
@@ -56,6 +56,7 @@ export default function ReviewPanel({ pr }: Props) {
     () => localStorage.getItem(CHAT_COLLAPSED_KEY) === "true",
   );
   const [askRequest, setAskRequest] = useState<AskRequest | null>(null);
+  const selectedAnalysisRef = useRef<string | undefined>(undefined);
   const queryClient = useQueryClient();
 
   function collapseChat(collapsed: boolean) {
@@ -147,12 +148,39 @@ export default function ReviewPanel({ pr }: Props) {
         : { open: [], resolved: [] },
     [analysis, findings, checking],
   );
+  const chatScope = useMemo(() => {
+    if (selection.kind !== "issue") return null;
+    const issue = [...issues.open, ...issues.resolved].find(
+      (entry) => entry.id === selection.id,
+    );
+    if (!issue) return null;
+    return issue.kind === "finding"
+      ? {
+          label: "issue" as const,
+          title: issue.title,
+          text: issue.finding.body,
+          anchors: [{ path: issue.finding.path, line: issue.finding.line }],
+        }
+      : {
+          label: "issue" as const,
+          title: issue.title,
+          text: issue.risk.text,
+          anchors: issue.risk.anchors,
+        };
+  }, [issues, selection]);
 
-  // A new analysis replaces the old items; start reading from the summary.
+  // A new analysis replaces the old items; start with the most severe open
+  // issue so the review begins with the action that needs attention.
   const analyzedAt = analysis?.analyzedAt;
   useEffect(() => {
-    if (analyzedAt) setSelection({ kind: "summary" });
-  }, [analyzedAt]);
+    if (analyzedAt && selectedAnalysisRef.current !== analyzedAt) {
+      selectedAnalysisRef.current = analyzedAt;
+      const firstIssue = issues.open[0];
+      setSelection(
+        firstIssue ? { kind: "issue", id: firstIssue.id } : { kind: "summary" },
+      );
+    }
+  }, [analyzedAt, issues.open]);
 
   if (analysisQuery.isPending) {
     return (
@@ -266,7 +294,7 @@ export default function ReviewPanel({ pr }: Props) {
 
       <Flex flex="1" minH="0">
         <Box
-          w="300px"
+          w="320px"
           flexShrink="0"
           borderRightWidth="1px"
           overflowY="auto"
@@ -345,6 +373,7 @@ export default function ReviewPanel({ pr }: Props) {
                 onCollapse={() => collapseChat(true)}
                 askRequest={askRequest}
                 onClearAskRequest={() => setAskRequest(null)}
+                scope={chatScope}
               />
             </Box>
           </Flex>

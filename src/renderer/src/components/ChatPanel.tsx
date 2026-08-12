@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   LuMessageCircleQuestion,
   LuPanelRightClose,
+  LuSparkles,
   LuX,
 } from "react-icons/lu";
 import type { ChatMessage, PullRequest } from "../../../shared/types";
@@ -34,6 +35,9 @@ interface Props {
   // straight away. Owned by ReviewPanel so detail panes can set it.
   askRequest: AskRequest | null;
   onClearAskRequest(): void;
+  // The selected issue is available as the default context without forcing a
+  // question into the conversation.
+  scope: AskRequest["context"] | null;
 }
 
 type UiMessage = ChatMessage & { id: string; failed?: boolean };
@@ -43,6 +47,7 @@ export default function ChatPanel({
   onCollapse,
   askRequest,
   onClearAskRequest,
+  scope,
 }: Props) {
   // Persisted history from the main process is the base; `local` overlays it
   // once the user starts talking (it also holds streaming + failed messages).
@@ -57,7 +62,7 @@ export default function ChatPanel({
 
   const attachedContext = askRequest?.question
     ? null
-    : (askRequest?.context ?? null);
+    : (askRequest?.context ?? scope ?? null);
 
   useEffect(() => {
     if (attachedContext) inputRef.current?.focus();
@@ -204,11 +209,48 @@ export default function ChatPanel({
         css={scrollbar}
       >
         {messages.length === 0 ? (
-          <Text fontSize="sm" color="fg.muted">
-            Ask anything about this PR — what a change does, why it's there,
-            what it might affect. The chat sees the diff and the analysis, but
-            not the rest of the repository (yet).
-          </Text>
+          <VStack alignItems="stretch" gap="3">
+            <Text fontSize="sm" color="fg.muted">
+              {scope
+                ? "Ask about this issue, its evidence, or the safest fix."
+                : "Ask anything about this pull request, its changes, or what they might affect."}
+            </Text>
+            {scope && (
+              <VStack alignItems="stretch" gap="1.5">
+                {[
+                  "Explain the evidence",
+                  "What could break?",
+                  "Draft a safer fix",
+                ].map((prompt) => (
+                  <Box
+                    key={prompt}
+                    as="button"
+                    textAlign="left"
+                    borderWidth="1px"
+                    rounded="md"
+                    px="3"
+                    py="2.5"
+                    fontSize="sm"
+                    cursor="pointer"
+                    _hover={{
+                      bg: "bg.subtle",
+                      borderColor: "border.emphasized",
+                    }}
+                    onClick={() =>
+                      void send(buildQuestionWithContext(scope, prompt))
+                    }
+                  >
+                    <HStack gap="2">
+                      <Box color="orange.fg">
+                        <LuSparkles size={13} />
+                      </Box>
+                      <Text>{prompt}</Text>
+                    </HStack>
+                  </Box>
+                ))}
+              </VStack>
+            )}
+          </VStack>
         ) : (
           messages.map((message) =>
             message.role === "user" ? (

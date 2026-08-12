@@ -16,13 +16,19 @@ export function severityDotColor(severity: RiskSeverity | undefined): string {
 
 interface Props {
   severity?: RiskSeverity;
+  size?: "xs" | "sm" | "md" | "lg";
 }
 
-export default function RiskSeverityBadge({ severity }: Props) {
+export default function RiskSeverityBadge({ severity, size }: Props) {
   if (!severity) return null;
   const meta = severityMeta[severity];
   return (
-    <Badge colorPalette={meta.palette} variant="surface" flexShrink="0">
+    <Badge
+      colorPalette={meta.palette}
+      variant="surface"
+      size={size}
+      flexShrink="0"
+    >
       {meta.label}
     </Badge>
   );
