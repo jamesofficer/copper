@@ -4,12 +4,14 @@ import { toaster } from "../components/ui/toaster";
 interface Options {
   // Names what failed, since the toast is the only place a failure shows.
   errorTitle: string;
+  // When set, success is a toast instead of the brief "Copied" button state.
+  successTitle?: string;
 }
 
 // Copy-to-clipboard with the brief "Copied" state every copy button in the app
 // shows. The flag resets itself after 1.5s, and the timer is cleared on unmount
 // so a button copied and then navigated away from doesn't set state on nothing.
-export function useCopyToClipboard({ errorTitle }: Options): {
+export function useCopyToClipboard({ errorTitle, successTitle }: Options): {
   copied: boolean;
   copy(text: string): Promise<void>;
 } {
@@ -23,9 +25,13 @@ export function useCopyToClipboard({ errorTitle }: Options): {
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      clearTimeout(timeout.current);
-      timeout.current = setTimeout(() => setCopied(false), 1500);
+      if (successTitle) {
+        toaster.create({ type: "success", title: successTitle });
+      } else {
+        setCopied(true);
+        clearTimeout(timeout.current);
+        timeout.current = setTimeout(() => setCopied(false), 1500);
+      }
     } catch (cause) {
       toaster.create({
         type: "error",

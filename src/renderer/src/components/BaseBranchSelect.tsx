@@ -90,7 +90,11 @@ export default function BaseBranchSelect({ detail }: Props) {
   });
 
   if (!editable) {
-    return <Badge variant="outline">{detail.baseRef}</Badge>;
+    return (
+      <Badge variant="outline" size="lg" fontFamily="mono">
+        {detail.baseRef}
+      </Badge>
+    );
   }
 
   return (

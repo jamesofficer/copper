@@ -1,6 +1,7 @@
 import { Badge, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { LuArrowRight } from "react-icons/lu";
 import type { PullRequestDetail } from "../../../shared/types";
+import { useCopyToClipboard } from "../lib/useCopyToClipboard";
 import BaseBranchSelect from "./BaseBranchSelect";
 import PrStateBadge from "./PrStateBadge";
 import ReviewStatusBadge, { shouldShowReviewStatus } from "./ReviewStatusBadge";
@@ -15,6 +16,11 @@ interface Props {
 // reviewer is looking for when the panel paints — the badges above it made the
 // eye start on a chip instead.
 export default function PullRequestHero({ detail }: Props) {
+  const headBranch = useCopyToClipboard({
+    errorTitle: "Couldn’t copy branch name",
+    successTitle: "Branch name copied",
+  });
+
   return (
     <VStack gap="4" alignItems="stretch">
       {/* Bigger than a section heading and lighter than one: at this size the
@@ -75,7 +81,17 @@ export default function PullRequestHero({ detail }: Props) {
         flexWrap="wrap"
         aria-label={`Merges ${detail.headRef} into ${detail.baseRef}`}
       >
-        <Badge variant="outline" size="lg" fontFamily="mono">
+        <Badge
+          as="button"
+          variant="outline"
+          size="lg"
+          fontFamily="mono"
+          cursor="pointer"
+          title="Copy branch name"
+          transition="background 0.15s"
+          _hover={{ bg: "bg.emphasized" }}
+          onClick={() => void headBranch.copy(detail.headRef)}
+        >
           {detail.headRef}
         </Badge>
         <Text color="fg.subtle" aria-hidden="true">
