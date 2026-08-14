@@ -215,12 +215,13 @@ function Gutter({ value }: { value: number | null }) {
   return (
     <Text
       as="span"
-      w="12"
+      w="16"
       flexShrink="0"
       px="2"
       textAlign="right"
       color="fg.subtle"
       userSelect="none"
+      whiteSpace="nowrap"
     >
       {value ?? ""}
     </Text>

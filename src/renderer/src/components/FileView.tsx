@@ -37,12 +37,13 @@ export default function FileView({ path, text }: Props) {
         <Flex key={index}>
           <Text
             as="span"
-            w="12"
+            w="16"
             flexShrink="0"
             px="2"
             textAlign="right"
             color="fg.subtle"
             userSelect="none"
+            whiteSpace="nowrap"
           >
             {index + 1}
           </Text>
