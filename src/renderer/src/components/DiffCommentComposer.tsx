@@ -1,4 +1,4 @@
-import { Box, Button, HStack, Text, Textarea } from "@chakra-ui/react";
+import { Button, Text } from "@chakra-ui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuSparkles } from "react-icons/lu";
@@ -8,6 +8,7 @@ import type {
   Explanation,
   ReviewComment,
 } from "../../../shared/types";
+import MarkdownEditor, { type MarkdownEditorMode } from "./MarkdownEditor";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -41,6 +42,7 @@ export default function DiffCommentComposer({
 }: Props) {
   const queryClient = useQueryClient();
   const [body, setBody] = useState("");
+  const [mode, setMode] = useState<MarkdownEditorMode>("write");
 
   function newComment() {
     return { commitId, path, side, line, startLine, body: body.trim() };
@@ -117,41 +119,28 @@ export default function DiffCommentComposer({
   const busy = submit.isPending || saveDraft.isPending || explain.isPending;
   const canSubmit = body.trim().length > 0 && !busy;
 
-  function handleKeyDown(event: React.KeyboardEvent) {
-    if (
-      (event.metaKey || event.ctrlKey) &&
-      event.key === "Enter" &&
-      canSubmit
-    ) {
-      saveDraft.mutate();
-    }
-    if (event.key === "Escape") onClose();
-  }
-
   const lineLabel =
     startLine !== null ? `lines ${startLine}–${line}` : `line ${line}`;
 
   return (
-    <Box borderWidth="1px" rounded="lg" overflow="hidden" bg="bg.panel">
-      <Box px="3" py="2" bg="bg.subtle" borderBottomWidth="1px">
-        <Text fontSize="xs" color="fg.muted">
+    <MarkdownEditor
+      autoFocus
+      value={body}
+      mode={mode}
+      placeholder="Leave a comment (markdown supported)"
+      rows={3}
+      onChange={setBody}
+      onModeChange={setMode}
+      onSubmit={() => canSubmit && saveDraft.mutate()}
+      onEscape={onClose}
+      attachments={{ repo, prNumber }}
+      toolbar={
+        <Text fontSize="xs" color="fg.muted" truncate>
           Commenting on {lineLabel}
           {side === "LEFT" ? " of the old version" : ""}
         </Text>
-      </Box>
-      <Textarea
-        autoFocus
-        placeholder="Leave a comment (markdown supported)"
-        rows={3}
-        resize="vertical"
-        border="none"
-        rounded="none"
-        _focus={{ outline: "none", boxShadow: "none" }}
-        value={body}
-        onChange={(event) => setBody(event.target.value)}
-        onKeyDown={handleKeyDown}
-      />
-      <HStack gap="2" px="3" py="2" borderTopWidth="1px">
+      }
+      footerStart={
         <Button
           size="xs"
           variant="ghost"
@@ -163,29 +152,33 @@ export default function DiffCommentComposer({
         >
           <LuSparkles /> Explain
         </Button>
-        <Button size="xs" variant="ghost" ml="auto" onClick={onClose}>
-          Cancel
-        </Button>
-        {!reviewStarted && (
+      }
+      footer={
+        <>
+          <Button size="xs" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          {!reviewStarted && (
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={!canSubmit}
+              loading={submit.isPending}
+              onClick={() => submit.mutate()}
+            >
+              Add single comment
+            </Button>
+          )}
           <Button
             size="xs"
-            variant="outline"
             disabled={!canSubmit}
-            loading={submit.isPending}
-            onClick={() => submit.mutate()}
+            loading={saveDraft.isPending}
+            onClick={() => saveDraft.mutate()}
           >
-            Add single comment
+            {reviewStarted ? "Add review comment" : "Start a review"}
           </Button>
-        )}
-        <Button
-          size="xs"
-          disabled={!canSubmit}
-          loading={saveDraft.isPending}
-          onClick={() => saveDraft.mutate()}
-        >
-          {reviewStarted ? "Add review comment" : "Start a review"}
-        </Button>
-      </HStack>
-    </Box>
+        </>
+      }
+    />
   );
 }

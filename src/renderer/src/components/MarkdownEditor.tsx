@@ -20,10 +20,17 @@ interface Props {
   mode: MarkdownEditorMode;
   placeholder: string;
   rows?: number;
+  autoFocus?: boolean;
   onChange(value: string): void;
   onModeChange(mode: MarkdownEditorMode): void;
   // Fired on Cmd/Ctrl+Enter in the textarea.
   onSubmit?(): void;
+  onEscape?(): void;
+  // Extra content on the right of the Write/Preview tabs (a line-range
+  // label, for example).
+  toolbar?: ReactNode;
+  // Rendered on the left of the footer row, inside the border.
+  footerStart?: ReactNode;
   // Rendered right-aligned below the editor, inside the border.
   footer?: ReactNode;
   // Set to allow images and videos to be pasted, dropped, or picked. Uploaded
@@ -32,16 +39,21 @@ interface Props {
   attachments?: AttachmentTarget;
 }
 
-// A bordered Write/Preview markdown editor — used for conversation comments
-// and PR descriptions. Mode is controlled so the parent can reset it.
+// A bordered Write/Preview markdown editor — used for conversation comments,
+// inline review comments, and PR descriptions. Mode is controlled so the
+// parent can reset it.
 export default function MarkdownEditor({
   value,
   mode,
   placeholder,
   rows = 4,
+  autoFocus,
   onChange,
   onModeChange,
   onSubmit,
+  onEscape,
+  toolbar,
+  footerStart,
   footer,
   attachments,
 }: Props) {
@@ -61,8 +73,15 @@ export default function MarkdownEditor({
   const previewMinHeight = `${rows * 25 + 2}px`;
 
   function handleKeyDown(event: KeyboardEvent) {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+    if (
+      event.target instanceof HTMLTextAreaElement &&
+      (event.metaKey || event.ctrlKey) &&
+      event.key === "Enter"
+    ) {
       onSubmit?.();
+    }
+    if (event.key === "Escape") {
+      onEscape?.();
     }
   }
 
@@ -104,6 +123,7 @@ export default function MarkdownEditor({
       rounded="lg"
       overflow="hidden"
       borderColor={dragging ? "colorPalette.solid" : undefined}
+      onKeyDown={handleKeyDown}
     >
       <HStack gap="1" px="2" py="1.5" bg="bg.subtle" borderBottomWidth="1px">
         <ModeButton
@@ -116,10 +136,16 @@ export default function MarkdownEditor({
           onClick={() => onModeChange("preview")}
           label="Preview"
         />
+        {toolbar && (
+          <Box ml="auto" minW="0" px="1">
+            {toolbar}
+          </Box>
+        )}
       </HStack>
       {mode === "write" ? (
         <Textarea
           ref={textareaRef}
+          autoFocus={autoFocus}
           placeholder={placeholder}
           rows={rows}
           resize="vertical"
@@ -128,7 +154,6 @@ export default function MarkdownEditor({
           _focus={{ outline: "none", boxShadow: "none" }}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -184,9 +209,14 @@ export default function MarkdownEditor({
           )}
         </HStack>
       )}
-      {footer && (
-        <HStack justifyContent="flex-end" px="3" py="2" borderTopWidth="1px">
-          {footer}
+      {(footer || footerStart) && (
+        <HStack px="3" py="2" borderTopWidth="1px" gap="2">
+          {footerStart}
+          {footer && (
+            <HStack gap="2" ml="auto">
+              {footer}
+            </HStack>
+          )}
         </HStack>
       )}
     </Box>

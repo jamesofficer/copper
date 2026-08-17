@@ -1,18 +1,10 @@
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, IconButton, Text } from "@chakra-ui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuPencil, LuTrash2 } from "react-icons/lu";
 import type { DraftReviewComment } from "../../../shared/types";
 import Markdown from "./Markdown";
+import MarkdownEditor, { type MarkdownEditorMode } from "./MarkdownEditor";
 import { toaster } from "./ui/toaster";
 
 interface Props {
@@ -27,6 +19,7 @@ export default function DraftCommentCard({ draft, repo, prNumber }: Props) {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState(draft.body);
+  const [mode, setMode] = useState<MarkdownEditorMode>("write");
   const [confirming, setConfirming] = useState(false);
 
   const draftsKey = ["draftComments", repo, prNumber];
@@ -41,6 +34,7 @@ export default function DraftCommentCard({ draft, repo, prNumber }: Props) {
         ),
       );
       setEditing(false);
+      setMode("write");
     },
     onError: (cause) => {
       toaster.create({
@@ -72,16 +66,16 @@ export default function DraftCommentCard({ draft, repo, prNumber }: Props) {
 
   const canSave = body.trim().length > 0 && !update.isPending;
 
+  function startEdit() {
+    setBody(draft.body);
+    setMode("write");
+    setEditing(true);
+  }
+
   function cancelEdit() {
     setEditing(false);
     setBody(draft.body);
-  }
-
-  function handleKeyDown(event: React.KeyboardEvent) {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && canSave) {
-      update.mutate();
-    }
-    if (event.key === "Escape") cancelEdit();
+    setMode("write");
   }
 
   return (
@@ -119,7 +113,7 @@ export default function DraftCommentCard({ draft, repo, prNumber }: Props) {
               variant="ghost"
               color="fg.muted"
               aria-label="Edit draft comment"
-              onClick={() => setEditing(true)}
+              onClick={startEdit}
             >
               <LuPencil />
             </IconButton>
@@ -136,29 +130,35 @@ export default function DraftCommentCard({ draft, repo, prNumber }: Props) {
         )}
       </HStack>
       {editing ? (
-        <VStack alignItems="stretch" gap="2" p="2">
-          <Textarea
+        <Box p="2">
+          <MarkdownEditor
             autoFocus
-            rows={3}
-            resize="vertical"
             value={body}
-            onChange={(event) => setBody(event.target.value)}
-            onKeyDown={handleKeyDown}
+            mode={mode}
+            placeholder="Leave a comment (markdown supported)"
+            rows={3}
+            onChange={setBody}
+            onModeChange={setMode}
+            onSubmit={() => canSave && update.mutate()}
+            onEscape={cancelEdit}
+            attachments={{ repo, prNumber }}
+            footer={
+              <>
+                <Button size="xs" variant="ghost" onClick={cancelEdit}>
+                  Cancel
+                </Button>
+                <Button
+                  size="xs"
+                  disabled={!canSave}
+                  loading={update.isPending}
+                  onClick={() => update.mutate()}
+                >
+                  Save
+                </Button>
+              </>
+            }
           />
-          <HStack justifyContent="flex-end" gap="2">
-            <Button size="xs" variant="ghost" onClick={cancelEdit}>
-              Cancel
-            </Button>
-            <Button
-              size="xs"
-              disabled={!canSave}
-              loading={update.isPending}
-              onClick={() => update.mutate()}
-            >
-              Save
-            </Button>
-          </HStack>
-        </VStack>
+        </Box>
       ) : (
         <Box px="3" py="2.5">
           <Markdown>{draft.body}</Markdown>

@@ -1,18 +1,11 @@
-import {
-  Box,
-  Button,
-  HStack,
-  IconButton,
-  Text,
-  Textarea,
-  VStack,
-} from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Text } from "@chakra-ui/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { LuTrash2 } from "react-icons/lu";
 import type { ReviewComment } from "../../../shared/types";
 import type { ReviewThread } from "../lib/reviewComments";
 import Markdown from "./Markdown";
+import MarkdownEditor, { type MarkdownEditorMode } from "./MarkdownEditor";
 import ReactionBar from "./ReactionBar";
 import RelativeTime from "./RelativeTime";
 import UserAvatar from "./UserAvatar";
@@ -36,6 +29,7 @@ export default function DiffCommentThread({
   const queryClient = useQueryClient();
   const [replying, setReplying] = useState(false);
   const [body, setBody] = useState("");
+  const [mode, setMode] = useState<MarkdownEditorMode>("write");
   // The comment whose delete button is waiting for confirmation.
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
 
@@ -62,6 +56,7 @@ export default function DiffCommentThread({
         (existing) => [...(existing ?? []), comment],
       );
       setBody("");
+      setMode("write");
       setReplying(false);
     },
     onError: (cause) => {
@@ -121,16 +116,10 @@ export default function DiffCommentThread({
 
   const canReply = body.trim().length > 0 && !reply.isPending;
 
-  function handleKeyDown(event: React.KeyboardEvent) {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && canReply) {
-      reply.mutate();
-    }
-    if (event.key === "Escape") cancelReply();
-  }
-
   function cancelReply() {
     setReplying(false);
     setBody("");
+    setMode("write");
   }
 
   return (
@@ -206,31 +195,35 @@ export default function DiffCommentThread({
       ))}
       <Box borderTopWidth="1px" px="2" py="1.5" bg="bg.subtle">
         {replying ? (
-          <VStack alignItems="stretch" gap="2" p="1">
-            <Textarea
+          <Box p="1">
+            <MarkdownEditor
               autoFocus
+              value={body}
+              mode={mode}
               placeholder="Reply (markdown supported)"
               rows={2}
-              resize="vertical"
-              bg="bg.panel"
-              value={body}
-              onChange={(event) => setBody(event.target.value)}
-              onKeyDown={handleKeyDown}
+              onChange={setBody}
+              onModeChange={setMode}
+              onSubmit={() => canReply && reply.mutate()}
+              onEscape={cancelReply}
+              attachments={{ repo, prNumber }}
+              footer={
+                <>
+                  <Button size="xs" variant="ghost" onClick={cancelReply}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="xs"
+                    disabled={!canReply}
+                    loading={reply.isPending}
+                    onClick={() => reply.mutate()}
+                  >
+                    Reply
+                  </Button>
+                </>
+              }
             />
-            <HStack justifyContent="flex-end" gap="2">
-              <Button size="xs" variant="ghost" onClick={cancelReply}>
-                Cancel
-              </Button>
-              <Button
-                size="xs"
-                disabled={!canReply}
-                loading={reply.isPending}
-                onClick={() => reply.mutate()}
-              >
-                Reply
-              </Button>
-            </HStack>
-          </VStack>
+          </Box>
         ) : (
           <HStack gap="1">
             <Button
