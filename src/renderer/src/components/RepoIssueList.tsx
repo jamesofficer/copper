@@ -1,9 +1,8 @@
 import { Box, Text } from "@chakra-ui/react";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef } from "react";
 import { REPO_ISSUE_LIMIT, type RepoIssue } from "../../../shared/types";
 import {
   applyQueueFilters,
-  defaultQueueFilters,
   type QueueFilters,
   sortTimeField,
 } from "../lib/listFilters";
@@ -17,17 +16,26 @@ const PAGE_SIZE = 25;
 interface Props {
   issues: RepoIssue[];
   preview: RepoIssue | null;
+  filters: QueueFilters;
+  requestedPage: number;
   onSelect(issue: RepoIssue): void;
+  onFiltersChange(filters: QueueFilters): void;
+  onPageChange(page: number): void;
 }
 
-// The selected repo's open issues, filtered client-side like the PR list —
-// the whole loaded list is already in memory. Mounted with key={repo slug} so
-// filters reset when switching repos.
-export default function RepoIssueList({ issues, preview, onSelect }: Props) {
+// One repository's open issues. The list filters the loaded data on the
+// client. Its top-level tab owns the filters and page, so they survive a tab
+// switch and an app restart.
+export default function RepoIssueList({
+  issues,
+  preview,
+  filters,
+  requestedPage,
+  onSelect,
+  onFiltersChange,
+  onPageChange,
+}: Props) {
   const topRef = useRef<HTMLDivElement>(null);
-
-  const [filters, setFilters] = useState<QueueFilters>(defaultQueueFilters);
-  const [requestedPage, setRequestedPage] = useState(1);
 
   const visible = useMemo(
     () => applyQueueFilters(issues, filters),
@@ -44,8 +52,8 @@ export default function RepoIssueList({ issues, preview, onSelect }: Props) {
   // Every filter change starts from the top: page 3 of the old filter says
   // nothing about where the new one's results are.
   function changeFilters(next: QueueFilters) {
-    setFilters(next);
-    setRequestedPage(1);
+    onFiltersChange(next);
+    onPageChange(1);
   }
 
   // The controls sit at the foot of the list, so the click that turns the page
@@ -53,7 +61,7 @@ export default function RepoIssueList({ issues, preview, onSelect }: Props) {
   // page instead of the first. scrollIntoView finds whichever ancestor scrolls,
   // which this component deliberately doesn't know.
   function goToPage(next: number) {
-    setRequestedPage(next);
+    onPageChange(next);
     topRef.current?.scrollIntoView({ block: "start" });
   }
 

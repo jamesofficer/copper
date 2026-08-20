@@ -58,7 +58,10 @@ const localGit = {
     ]),
 };
 
-function renderWelcome(activeRepo: Repository | null = repository) {
+function renderWelcome(
+  activeRepo: Repository | null = repository,
+  onOpenIssues = vi.fn(),
+) {
   return renderWithProviders(
     <Welcome
       repositories={[repository]}
@@ -66,6 +69,7 @@ function renderWelcome(activeRepo: Repository | null = repository) {
       activeRepo={activeRepo}
       onAddRepo={vi.fn()}
       onSelect={vi.fn()}
+      onOpenIssues={onOpenIssues}
       preview={null}
       onPreviewChange={vi.fn()}
       onOpenSettings={vi.fn()}
@@ -143,13 +147,25 @@ describe("Welcome review queue", () => {
 
     renderWelcome({ path: "/repos/local", name: "local", slug: null });
 
-    // Both list tabs say it, each naming what it can't load, so the noun is
-    // what tells the pull-request panel's copy from the issue panel's.
     expect(
       await screen.findByText(/no GitHub remote, so pull requests/i),
     ).toBeTruthy();
-    expect(screen.getByText(/no GitHub remote, so issues/i)).toBeTruthy();
     expect(listPullRequests).not.toHaveBeenCalled();
+  });
+
+  it("opens the repository's issues in a top-level tab", async () => {
+    const onOpenIssues = vi.fn();
+    stubApi({
+      ...credentials,
+      ...localGit,
+      listPullRequests: vi.fn().mockResolvedValue([]),
+      getRepoCounts: vi.fn().mockResolvedValue({}),
+    });
+    renderWelcome(repository, onOpenIssues);
+
+    fireEvent.click(await screen.findByRole("tab", { name: /issues/i }));
+
+    await waitFor(() => expect(onOpenIssues).toHaveBeenCalledWith(repository));
   });
 
   it("counts the tabs from GitHub's totals, not the loaded list", async () => {

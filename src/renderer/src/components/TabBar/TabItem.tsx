@@ -1,6 +1,7 @@
 import { Box, HStack, Icon, IconButton, Text } from "@chakra-ui/react";
 import type { CSSProperties, ReactElement } from "react";
 import {
+  LuCircleDot,
   LuGitBranch,
   LuGitPullRequest,
   LuLayoutList,
@@ -19,6 +20,7 @@ import TabContextMenu, { type TabMenuActions } from "./TabContextMenu";
 const icons: Record<TabIcon, ReactElement> = {
   queue: <LuLayoutList />,
   pullRequest: <LuGitPullRequest />,
+  repoIssues: <LuCircleDot />,
   branch: <LuGitBranch />,
 };
 

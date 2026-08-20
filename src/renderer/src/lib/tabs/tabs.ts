@@ -1,5 +1,6 @@
 import { z } from "zod";
-import type { PullRequest } from "../../../../shared/types";
+import type { PullRequest, Repository } from "../../../../shared/types";
+import { defaultQueueFilters, type QueueFilters } from "../listFilters";
 
 // The tabs that the app has open, and the pure functions that change them.
 //
@@ -12,9 +13,10 @@ import type { PullRequest } from "../../../../shared/types";
 // screen.
 export type ReviewTab = "overview" | "changes" | "review";
 
-// The id of the first tab. That tab shows the repository queue: the open pull
-// requests, the issues and the current changes. There is always one queue tab.
-// The user cannot close it, because it is the way back to the lists.
+// The id of the first tab. That tab shows the pull request queue and, until
+// Current changes gets its own top-level tab, the selected checkout. There is
+// always one queue tab. The user cannot close it because it is the way back to
+// the repository lists.
 export const QUEUE_TAB_ID = "queue";
 
 // The maximum number of tabs that stay in the DOM. If the user returns to a
@@ -54,6 +56,21 @@ export interface PrTab {
   ui: PrTabUi;
 }
 
+export interface RepoIssuesTabUi {
+  selectedIssueNumber: number | null;
+  filters: QueueFilters;
+  requestedPage: number;
+}
+
+export interface RepoIssuesTab {
+  id: string;
+  kind: "repoIssues";
+  // The snapshot gives the tab and its screen enough identity after a restart.
+  // Live issue data still comes from TanStack Query.
+  repo: Repository;
+  ui: RepoIssuesTabUi;
+}
+
 export interface LocalChangesTab {
   id: string;
   kind: "localChanges";
@@ -68,7 +85,7 @@ export interface LocalChangesTab {
   title: string;
 }
 
-export type Tab = QueueTab | PrTab | LocalChangesTab;
+export type Tab = QueueTab | PrTab | RepoIssuesTab | LocalChangesTab;
 
 // The tabs state. `tabs` is the row, and the queue tab is always first.
 // `activeId` is the tab that the window shows. `mru` holds the tab ids, most
@@ -88,8 +105,20 @@ export function prTabId(repo: string, prNumber: number): string {
   return `pr:${repo}#${prNumber}`;
 }
 
+export function repoIssuesTabId(repoPath: string): string {
+  return `repoIssues:${repoPath}`;
+}
+
 export function localChangesTabId(worktreePath: string): string {
   return `local:${worktreePath}`;
+}
+
+export function defaultRepoIssuesTabUi(): RepoIssuesTabUi {
+  return {
+    selectedIssueNumber: null,
+    filters: { ...defaultQueueFilters },
+    requestedPage: 1,
+  };
 }
 
 export function defaultPrTabUi(tab: ReviewTab = "overview"): PrTabUi {
@@ -153,6 +182,21 @@ export function openPullRequest(
             : entry,
         )
       : [...state.tabs, { id, kind: "pr", pr, ui: defaultPrTabUi(tab) }],
+    activeId: id,
+    mru: promote(state.mru, id),
+  };
+}
+
+export function openRepoIssues(state: TabsData, repo: Repository): TabsData {
+  const id = repoIssuesTabId(repo.path);
+  const isOpen = state.tabs.some((entry) => entry.id === id);
+  return {
+    tabs: isOpen
+      ? state.tabs
+      : [
+          ...state.tabs,
+          { id, kind: "repoIssues", repo, ui: defaultRepoIssuesTabUi() },
+        ],
     activeId: id,
     mru: promote(state.mru, id),
   };
@@ -297,6 +341,21 @@ export function moveTab(
   return { ...state, tabs };
 }
 
+export function setRepoIssuesUi(
+  state: TabsData,
+  id: string,
+  patch: Partial<RepoIssuesTabUi>,
+): TabsData {
+  return {
+    ...state,
+    tabs: state.tabs.map((entry) =>
+      entry.id === id && entry.kind === "repoIssues"
+        ? { ...entry, ui: { ...entry.ui, ...patch } }
+        : entry,
+    ),
+  };
+}
+
 export function setPrUi(
   state: TabsData,
   id: string,
@@ -330,6 +389,34 @@ const prTabUiSchema = z.object({
   chatCollapsed: z.boolean().catch(false),
 });
 
+const repoIssuesTabUiSchema = z.object({
+  selectedIssueNumber: z.number().nullable().catch(null),
+  filters: z
+    .object({
+      text: z.string().catch(""),
+      author: z.string().catch("all"),
+      assignee: z.string().catch("all"),
+      sort: z
+        .enum([
+          "newest",
+          "oldest",
+          "most_commented",
+          "least_commented",
+          "recently_updated",
+          "least_recently_updated",
+        ])
+        .catch("newest"),
+    })
+    .catch(defaultQueueFilters),
+  requestedPage: z.number().int().positive().catch(1),
+});
+
+const repositorySnapshotSchema = z.looseObject({
+  path: z.string(),
+  name: z.string(),
+  slug: z.string().nullable(),
+});
+
 const tabSchema = z.discriminatedUnion("kind", [
   z.object({ id: z.literal(QUEUE_TAB_ID), kind: z.literal("queue") }),
   z.object({
@@ -337,6 +424,12 @@ const tabSchema = z.discriminatedUnion("kind", [
     kind: z.literal("pr"),
     pr: prSnapshotSchema,
     ui: prTabUiSchema.catch(defaultPrTabUi()),
+  }),
+  z.object({
+    id: z.string(),
+    kind: z.literal("repoIssues"),
+    repo: repositorySnapshotSchema,
+    ui: repoIssuesTabUiSchema.catch(defaultRepoIssuesTabUi()),
   }),
   z.object({
     id: z.string(),

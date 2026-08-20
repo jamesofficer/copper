@@ -7,23 +7,23 @@ import {
   repoIssuesQueryOptions,
 } from "../lib/repoQueries";
 import { localChangeCountQueryOptions } from "../lib/useLocalChanges";
-import type { QueueTab } from "./QueueHeader";
 
 interface Props {
   repo: Repository | null;
-  tab: QueueTab;
   // The checkout the Changes count is read from.
   checkoutPath: string;
 }
 
-// The queue's tab triggers. On the two list tabs the bar caps the queue
-// column; on Changes it caps the file-list column, so the diff beside it can
-// start directly under the top bar. Its counts come from the same shared query
-// entries the panels read, so a second observer costs nothing.
-export default function QueueTabs({ repo, tab, checkoutPath }: Props) {
+// The queue's navigation triggers. Pull requests and Changes select a view in
+// the queue. Issues opens a top-level tab. Its counts come from the same shared
+// query entries that the destination screens read, so a second observer costs
+// nothing.
+export default function QueueTabs({ repo, checkoutPath }: Props) {
   const slug = repo?.slug ?? undefined;
   const prsQuery = useQuery(pullRequestsQueryOptions(slug));
-  const issuesQuery = useQuery(repoIssuesQueryOptions(slug, tab === "issues"));
+  // Do not fetch issues only to draw this badge. A top-level Issues tab fills
+  // this cache after the user opens one.
+  const issuesQuery = useQuery(repoIssuesQueryOptions(slug, false));
   const countsQuery = useQuery(repoCountsQueryOptions());
   // The always-visible badge uses porcelain status only. Building every file
   // patch is deferred until the Changes tab opens.

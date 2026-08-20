@@ -1,23 +1,18 @@
 import { Box, Center, Flex, Tabs, Text } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { PullRequest, RepoIssue, Repository } from "../../../shared/types";
+import type { PullRequest, Repository } from "../../../shared/types";
 import LocalChangesColumn from "../components/LocalChangesColumn";
 import LocalChangesPane from "../components/LocalChangesPane";
 import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
-import QueueHeader, { type QueueTab } from "../components/QueueHeader";
+import QueueHeader, { type QueueView } from "../components/QueueHeader";
 import QueueListState from "../components/QueueListState";
 import QueueTabs from "../components/QueueTabs";
-import RepoIssueList from "../components/RepoIssueList";
-import RepoIssuePreview from "../components/RepoIssuePreview";
 import ResizeHandle from "../components/ResizeHandle";
 import SetupBanner from "../components/SetupBanner";
 import { errorText } from "../lib/ipcError";
-import {
-  pullRequestsQueryOptions,
-  repoIssuesQueryOptions,
-} from "../lib/repoQueries";
+import { pullRequestsQueryOptions } from "../lib/repoQueries";
 import type { ReviewTab } from "../lib/tabs/tabs";
 import {
   localChangesFileListPanel,
@@ -32,6 +27,7 @@ interface Props {
   activeRepo: Repository | null;
   onAddRepo(): void;
   onSelect(pr: PullRequest, tab?: ReviewTab): void;
+  onOpenIssues(repo: Repository): void;
   preview: PullRequest | null;
   onPreviewChange(pr: PullRequest | null): void;
   onOpenSettings(): void;
@@ -43,15 +39,13 @@ export default function Welcome({
   activeRepo: active,
   onAddRepo,
   onSelect,
+  onOpenIssues,
   preview,
   onPreviewChange,
   onOpenSettings,
 }: Props) {
-  const [tab, setTab] = useState<QueueTab>("pull-requests");
+  const [tab, setTab] = useState<QueueView>("pull-requests");
   const worktree = useWorktreeSelection(active);
-  // Kept here rather than in App: unlike the PR preview it has no full screen
-  // to survive a trip to, so it never needs to outlive this screen.
-  const [previewIssue, setPreviewIssue] = useState<RepoIssue | null>(null);
 
   // The queue is a list read top to bottom, so it stays narrow and hands the
   // rest of the window to whatever is being read beside it.
@@ -63,7 +57,6 @@ export default function Welcome({
     handle: "right",
   });
   const pullRequestsTab = tab === "pull-requests";
-  const issuesTab = tab === "issues";
   const localChangesTab = tab === "local-changes";
 
   // The Changes tab has a column of its own: narrower, and resized separately
@@ -72,40 +65,38 @@ export default function Welcome({
     usePanelWidth({ ...localChangesFileListPanel, handle: "right" });
   const localChanges = useLocalChanges(worktree, localChangesTab);
 
-  // Only the two list tabs share the window with a preview panel beside them;
-  // the Changes tab splits into its own column and a diff.
-  const listTab = pullRequestsTab || issuesTab;
   const noRepositories =
     !reposPending && (!repositories || repositories.length === 0);
 
   const slug = active?.slug ?? undefined;
   const prsQuery = useQuery(pullRequestsQueryOptions(slug));
   const prs = prsQuery.data;
-  const issuesQuery = useQuery(repoIssuesQueryOptions(slug, issuesTab));
-  const issues = issuesQuery.data;
 
-  // Guarding on the slug drops a panel left over from the previous repo
-  // without an effect to clear it.
-  const shownIssue =
-    previewIssue && previewIssue.repo === active?.slug ? previewIssue : null;
+  function changeTab(next: string) {
+    if (next === "issues") {
+      if (active) onOpenIssues(active);
+      return;
+    }
+    if (next === "pull-requests" || next === "local-changes") setTab(next);
+  }
 
   return (
     <>
       <Tabs.Root
         value={tab}
-        onValueChange={(details) => setTab(details.value as QueueTab)}
+        onValueChange={(details) => changeTab(details.value)}
         display="flex"
         flexDirection="column"
         // Fixed width beside a panel; the whole remaining window otherwise.
-        flex={listTab ? undefined : "1"}
+        flex={pullRequestsTab ? undefined : "1"}
         flexShrink="0"
         minW="0"
         // The stored width can't crush the panel beside it: on a narrow window
         // the queue gives way, leaving the preview the 45% the old fixed split
         // gave it.
-        maxW={listTab ? "55%" : undefined}
+        maxW={pullRequestsTab ? "55%" : undefined}
         minH="0"
-        style={listTab ? { width: queueWidth } : undefined}
+        style={pullRequestsTab ? { width: queueWidth } : undefined}
       >
         <QueueHeader
           repo={active}
@@ -122,8 +113,8 @@ export default function Welcome({
           <SetupBanner onOpenSettings={onOpenSettings} />
         </Box>
 
-        {listTab && (
-          <QueueTabs repo={active} tab={tab} checkoutPath={worktree.path} />
+        {pullRequestsTab && (
+          <QueueTabs repo={active} checkoutPath={worktree.path} />
         )}
 
         <Tabs.Content value="pull-requests" flex="1" minH="0" p="0">
@@ -154,33 +145,6 @@ export default function Welcome({
           </Flex>
         </Tabs.Content>
 
-        <Tabs.Content value="issues" flex="1" minH="0" p="0">
-          <Flex direction="column" h="full" minH="0">
-            <QueueListState
-              noun="issues"
-              noRepositories={noRepositories}
-              addRepoPurpose="see its issues"
-              onAddRepo={onAddRepo}
-              repo={active}
-              error={
-                issuesQuery.error
-                  ? errorText(issuesQuery.error, "Couldn't load issues.")
-                  : null
-              }
-              pending={issuesQuery.isPending || !issues}
-              empty={issues?.length === 0}
-              emptyText="No open issues. Nothing to fix."
-            >
-              <RepoIssueList
-                key={active?.slug}
-                issues={issues ?? []}
-                preview={shownIssue}
-                onSelect={setPreviewIssue}
-              />
-            </QueueListState>
-          </Flex>
-        </Tabs.Content>
-
         {/* The Changes tab splits below the top bar, not below the tab bar:
             the tabs cap the file-list column, so the diff beside them runs the
             full height of the window. */}
@@ -190,7 +154,7 @@ export default function Welcome({
         <Tabs.Content value="local-changes" flex="1" minH="0" p="0">
           {!localChangesTab ? null : !active ? (
             <Flex direction="column" h="full" minH="0">
-              <QueueTabs repo={active} tab={tab} checkoutPath={worktree.path} />
+              <QueueTabs repo={active} checkoutPath={worktree.path} />
               <Center flex="1" p="4">
                 <Text color="fg.muted" fontSize="sm">
                   Select a repository to see its uncommitted changes.
@@ -206,11 +170,7 @@ export default function Welcome({
                 flexShrink="0"
                 style={{ width: fileListWidth }}
               >
-                <QueueTabs
-                  repo={active}
-                  tab={tab}
-                  checkoutPath={worktree.path}
-                />
+                <QueueTabs repo={active} checkoutPath={worktree.path} />
                 <LocalChangesColumn state={localChanges} />
               </Flex>
               <ResizeHandle onPointerDown={startFileListResize} border />
@@ -220,7 +180,7 @@ export default function Welcome({
         </Tabs.Content>
       </Tabs.Root>
 
-      {listTab && <ResizeHandle onPointerDown={startResize} border />}
+      {pullRequestsTab && <ResizeHandle onPointerDown={startResize} border />}
 
       {pullRequestsTab &&
         (preview ? (
@@ -231,16 +191,6 @@ export default function Welcome({
           />
         ) : (
           <QueuePlaceholder text="Pick a pull request to read it here." />
-        ))}
-
-      {issuesTab &&
-        (shownIssue ? (
-          <RepoIssuePreview
-            issue={shownIssue}
-            onClose={() => setPreviewIssue(null)}
-          />
-        ) : (
-          <QueuePlaceholder text="Pick an issue to read it here." />
         ))}
     </>
   );

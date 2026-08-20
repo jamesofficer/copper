@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PullRequest } from "../../../../shared/types";
+import type { PullRequest, Repository } from "../../../../shared/types";
 import {
   activateIndex,
   activateOffset,
@@ -12,11 +12,14 @@ import {
   moveTab,
   openLocalChanges,
   openPullRequest,
+  openRepoIssues,
   parse,
   pickLiveTabIds,
   prTabId,
   QUEUE_TAB_ID,
+  repoIssuesTabId,
   setPrUi,
+  setRepoIssuesUi,
   type TabsData,
   tabMenuAvailability,
 } from "./tabs";
@@ -48,6 +51,12 @@ function withPrs(...numbers: number[]): TabsData {
     initialTabsState(),
   );
 }
+
+const repository: Repository = {
+  path: "/repos/app",
+  name: "app",
+  slug: "acme/app",
+};
 
 const ids = (state: TabsData) => state.tabs.map((tab) => tab.id);
 const first = prTabId("acme/app", 1);
@@ -88,6 +97,28 @@ describe("opening tabs", () => {
   it("separates the same number in two repositories", () => {
     let state = openPullRequest(initialTabsState(), pr(1, "acme/app"));
     state = openPullRequest(state, pr(1, "acme/web"));
+
+    expect(state.tabs).toHaveLength(3);
+  });
+
+  it("opens one issues tab for a repository", () => {
+    let state = openRepoIssues(initialTabsState(), repository);
+    state = openRepoIssues(state, repository);
+
+    expect(ids(state)).toEqual([
+      QUEUE_TAB_ID,
+      repoIssuesTabId(repository.path),
+    ]);
+    expect(state.activeId).toBe(repoIssuesTabId(repository.path));
+  });
+
+  it("separates issue lists for two repositories", () => {
+    let state = openRepoIssues(initialTabsState(), repository);
+    state = openRepoIssues(state, {
+      path: "/repos/web",
+      name: "web",
+      slug: "acme/web",
+    });
 
     expect(state.tabs).toHaveLength(3);
   });
@@ -275,12 +306,43 @@ describe("the state of one tab", () => {
     expect(b?.kind === "pr" && b.ui.fileFilter).toBe("");
   });
 
-  it("makes no change to a tab that is not a pull request", () => {
-    const state = setPrUi(initialTabsState(), QUEUE_TAB_ID, {
-      fileFilter: "x",
+  it("keeps the selected issue and filters in its repository tab", () => {
+    const opened = openRepoIssues(initialTabsState(), repository);
+    const id = repoIssuesTabId(repository.path);
+    const state = setRepoIssuesUi(opened, id, {
+      selectedIssueNumber: 42,
+      filters: {
+        text: "crash",
+        author: "ada",
+        assignee: "all",
+        sort: "recently_updated",
+      },
+      requestedPage: 2,
     });
 
-    expect(state.tabs[0]).toEqual({ id: QUEUE_TAB_ID, kind: "queue" });
+    const tab = state.tabs.find((entry) => entry.id === id);
+    expect(tab?.kind === "repoIssues" && tab.ui).toEqual({
+      selectedIssueNumber: 42,
+      filters: {
+        text: "crash",
+        author: "ada",
+        assignee: "all",
+        sort: "recently_updated",
+      },
+      requestedPage: 2,
+    });
+  });
+
+  it("makes no change to a tab of another kind", () => {
+    const prState = setPrUi(initialTabsState(), QUEUE_TAB_ID, {
+      fileFilter: "x",
+    });
+    const issueState = setRepoIssuesUi(initialTabsState(), QUEUE_TAB_ID, {
+      selectedIssueNumber: 42,
+    });
+
+    expect(prState.tabs[0]).toEqual({ id: QUEUE_TAB_ID, kind: "queue" });
+    expect(issueState.tabs[0]).toEqual({ id: QUEUE_TAB_ID, kind: "queue" });
   });
 });
 
@@ -326,6 +388,38 @@ describe("reading the stored tabs", () => {
     expect(ids(state)).toEqual([QUEUE_TAB_ID, first]);
     expect(state.activeId).toBe(first);
     expect(state.mru).toEqual([first, QUEUE_TAB_ID]);
+  });
+
+  it("reads a repository issues tab and its UI state", () => {
+    const id = repoIssuesTabId(repository.path);
+    const state = parse({
+      tabs: [
+        {
+          id,
+          kind: "repoIssues",
+          repo: repository,
+          ui: {
+            selectedIssueNumber: 42,
+            filters: {
+              text: "crash",
+              author: "all",
+              assignee: "none",
+              sort: "most_commented",
+            },
+            requestedPage: 2,
+          },
+        },
+      ],
+      activeId: id,
+      mru: [id, QUEUE_TAB_ID],
+    });
+
+    expect(state.tabs[1]).toMatchObject({
+      id,
+      kind: "repoIssues",
+      ui: { selectedIssueNumber: 42, requestedPage: 2 },
+    });
+    expect(state.activeId).toBe(id);
   });
 
   it("puts the queue tab first, and puts it there one time only", () => {

@@ -1,9 +1,14 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PullRequest, Repository } from "../../shared/types";
+import type { PullRequest, RepoIssue, Repository } from "../../shared/types";
 import App from "./App";
-import { initialTabsState, prTabId, QUEUE_TAB_ID } from "./lib/tabs/tabs";
+import {
+  initialTabsState,
+  prTabId,
+  QUEUE_TAB_ID,
+  repoIssuesTabId,
+} from "./lib/tabs/tabs";
 import { useTabs } from "./lib/tabs/useTabs";
 import { stubApi } from "./testing/api";
 import { renderWithProviders } from "./testing/render";
@@ -21,6 +26,19 @@ const webRepo: Repository = {
   path: "/repos/web",
   name: "web",
   slug: "acme/web",
+};
+
+const issue: RepoIssue = {
+  repo: "acme/app",
+  number: 42,
+  title: "Fix the broken tab",
+  author: "ada",
+  url: "https://github.com/acme/app/issues/42",
+  labels: [],
+  assignees: [],
+  comments: 0,
+  createdAt: "2026-08-01T00:00:00Z",
+  updatedAt: "2026-08-01T00:00:00Z",
 };
 
 function pr(number: number, title: string, repo = "acme/app"): PullRequest {
@@ -50,6 +68,7 @@ beforeEach(() => {
   stubApi({
     listRepositories: vi.fn().mockResolvedValue([appRepo, webRepo]),
     listPullRequests: vi.fn().mockResolvedValue([]),
+    listRepoIssues: vi.fn().mockResolvedValue([issue]),
     getRepoCounts: vi.fn().mockResolvedValue({}),
     getSecretsStatus: vi.fn().mockResolvedValue({
       anthropic: false,
@@ -88,6 +107,19 @@ describe("App tabs", () => {
     ]);
     // The queue is the subject of a repository, so it comes forward.
     expect(useTabs.getState().activeId).toBe(QUEUE_TAB_ID);
+  });
+
+  it("opens the selected repository's issues in one top-level tab", async () => {
+    renderWithProviders(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: /issues/i }));
+
+    expect(useTabs.getState().activeId).toBe(repoIssuesTabId(appRepo.path));
+    expect(useTabs.getState().tabs.map((tab) => tab.id)).toEqual([
+      QUEUE_TAB_ID,
+      repoIssuesTabId(appRepo.path),
+    ]);
+    expect(await screen.findByText(issue.title)).toBeTruthy();
   });
 
   it("shows the pull request of the active tab, and keeps its pane", async () => {

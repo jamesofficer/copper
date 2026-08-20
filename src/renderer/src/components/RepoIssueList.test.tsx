@@ -1,7 +1,9 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { REPO_ISSUE_LIMIT, type RepoIssue } from "../../../shared/types";
+import { defaultQueueFilters, type QueueFilters } from "../lib/listFilters";
 import { renderWithProviders } from "../testing/render";
 import RepoIssueList from "./RepoIssueList";
 
@@ -37,8 +39,22 @@ function pick(label: string, selector: string): HTMLElement {
 }
 
 function render(list: RepoIssue[]) {
-  return renderWithProviders(
-    <RepoIssueList issues={list} preview={null} onSelect={() => {}} />,
+  return renderWithProviders(<Harness issues={list} />);
+}
+
+function Harness({ issues }: { issues: RepoIssue[] }) {
+  const [filters, setFilters] = useState<QueueFilters>(defaultQueueFilters);
+  const [page, setPage] = useState(1);
+  return (
+    <RepoIssueList
+      issues={issues}
+      preview={null}
+      filters={filters}
+      requestedPage={page}
+      onSelect={() => {}}
+      onFiltersChange={setFilters}
+      onPageChange={setPage}
+    />
   );
 }
 

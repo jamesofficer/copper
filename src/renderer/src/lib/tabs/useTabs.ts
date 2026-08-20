@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { PullRequest } from "../../../../shared/types";
+import type { PullRequest, Repository } from "../../../../shared/types";
 import * as tabs from "./tabs";
 import {
   initialTabsState,
   type PrTabUi,
   prTabId,
   QUEUE_TAB_ID,
+  type RepoIssuesTabUi,
   type ReviewTab,
   type TabsData,
 } from "./tabs";
@@ -26,6 +27,7 @@ export interface TabsStore extends TabsData {
   // Each function returns the id of the tab that becomes active, if the caller
   // needs it.
   openPullRequest(pr: PullRequest, tab?: ReviewTab): string;
+  openRepoIssues(repo: Repository): string;
   openLocalChanges(args: {
     repoPath: string;
     worktreePath: string;
@@ -40,6 +42,7 @@ export interface TabsStore extends TabsData {
   closeToRight(id: string): void;
   moveTab(id: string, toIndex: number): void;
   setPrUi(id: string, patch: Partial<PrTabUi>): void;
+  setRepoIssuesUi(id: string, patch: Partial<RepoIssuesTabUi>): void;
 }
 
 export const useTabs = create<TabsStore>()(
@@ -50,6 +53,10 @@ export const useTabs = create<TabsStore>()(
       openPullRequest(pr, tab = "overview") {
         set((state) => tabs.openPullRequest(state, pr, tab));
         return prTabId(pr.repo, pr.number);
+      },
+      openRepoIssues(repo) {
+        set((state) => tabs.openRepoIssues(state, repo));
+        return tabs.repoIssuesTabId(repo.path);
       },
       openLocalChanges(args) {
         set((state) => tabs.openLocalChanges(state, args));
@@ -81,6 +88,9 @@ export const useTabs = create<TabsStore>()(
       },
       setPrUi(id, patch) {
         set((state) => tabs.setPrUi(state, id, patch));
+      },
+      setRepoIssuesUi(id, patch) {
+        set((state) => tabs.setRepoIssuesUi(state, id, patch));
       },
     }),
     {

@@ -4,7 +4,7 @@ import { QUEUE_TAB_ID, type Tab } from "./tabs";
 // because the tab bar must decide the icon: an icon is JSX, and this layer
 // stays pure. The bar reads `icon` here and selects the picture.
 
-export type TabIcon = "queue" | "pullRequest" | "branch";
+export type TabIcon = "queue" | "pullRequest" | "repoIssues" | "branch";
 
 export interface TabLabel {
   icon: TabIcon;
@@ -35,6 +35,15 @@ export function describeTab(tab: Tab): TabLabel {
       prefix: `#${tab.pr.number}`,
       text: tab.pr.title,
       tooltip: `${tab.pr.repo} #${tab.pr.number} — ${tab.pr.title}`,
+      closable: true,
+    };
+  }
+  if (tab.kind === "repoIssues") {
+    return {
+      icon: "repoIssues",
+      prefix: tab.repo.name,
+      text: "Issues",
+      tooltip: `${tab.repo.slug ?? tab.repo.name} — Issues`,
       closable: true,
     };
   }

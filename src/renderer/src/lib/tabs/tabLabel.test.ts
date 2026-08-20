@@ -3,9 +3,11 @@ import type { PullRequest } from "../../../../shared/types";
 import { describeTab, sortableTabIds } from "./tabLabel";
 import {
   defaultPrTabUi,
+  defaultRepoIssuesTabUi,
   localChangesTabId,
   prTabId,
   QUEUE_TAB_ID,
+  repoIssuesTabId,
   type Tab,
 } from "./tabs";
 
@@ -20,6 +22,13 @@ const prTab: Tab = {
   kind: "pr",
   pr,
   ui: defaultPrTabUi(),
+};
+
+const issuesTab: Tab = {
+  id: repoIssuesTabId("/r"),
+  kind: "repoIssues",
+  repo: { path: "/r", name: "app", slug: "acme/app" },
+  ui: defaultRepoIssuesTabUi(),
 };
 
 const localTab: Tab = {
@@ -56,6 +65,16 @@ describe("describeTab", () => {
     expect(describeTab(prTab).tooltip).toBe("acme/app #42 — Add the tab bar");
   });
 
+  it("names an issues tab by repository", () => {
+    const label = describeTab(issuesTab);
+
+    expect(label.prefix).toBe("app");
+    expect(label.text).toBe("Issues");
+    expect(label.tooltip).toBe("acme/app — Issues");
+    expect(label.icon).toBe("repoIssues");
+    expect(label.closable).toBe(true);
+  });
+
   it("gives the path of a worktree in the tooltip", () => {
     // Two worktrees of one repository can have the same text on the tab. The
     // path is the only part that is always different.
@@ -70,8 +89,9 @@ describe("describeTab", () => {
 
 describe("sortableTabIds", () => {
   it("does not give the queue tab to the drag code", () => {
-    expect(sortableTabIds([queueTab, prTab, localTab])).toEqual([
+    expect(sortableTabIds([queueTab, prTab, issuesTab, localTab])).toEqual([
       prTab.id,
+      issuesTab.id,
       localTab.id,
     ]);
   });

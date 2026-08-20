@@ -16,6 +16,7 @@ import { toggleSidebar, useSidebarCollapsed } from "./lib/sidebarCollapsed";
 import type { ReviewTab } from "./lib/tabs/tabs";
 import { useTabs } from "./lib/tabs/useTabs";
 import { useRepositoryActions } from "./lib/useRepositoryActions";
+import RepoIssues from "./screens/RepoIssues/RepoIssues";
 import Review from "./screens/Review";
 import Welcome from "./screens/Welcome";
 
@@ -38,10 +39,12 @@ export default function App() {
   const tabs = useTabs((state) => state.tabs);
   const activeId = useTabs((state) => state.activeId);
   const openTab = useTabs((state) => state.openPullRequest);
+  const openRepoIssuesTab = useTabs((state) => state.openRepoIssues);
   const openQueue = useTabs((state) => state.openQueue);
   const closeTab = useTabs((state) => state.closeTab);
   const activateOffset = useTabs((state) => state.activateOffset);
   const setPrUi = useTabs((state) => state.setPrUi);
+  const setRepoIssuesUi = useTabs((state) => state.setRepoIssuesUi);
 
   // The store keeps the active id inside the row, so this always finds a tab.
   const active = tabs.find((tab) => tab.id === activeId) ?? tabs[0];
@@ -74,6 +77,12 @@ export default function App() {
     // peekPullRequest filled, and that call does no warm-up.
     void window.api.getPullRequest(pr.repo, pr.number).catch(() => {});
     openTab(pr, tab);
+  }
+
+  function openRepoIssues(repo: Repository) {
+    setActivePath(repo.path);
+    setPreview(null);
+    openRepoIssuesTab(repo);
   }
 
   // A repository is the subject of the queue, so this shows the queue tab. It
@@ -110,7 +119,11 @@ export default function App() {
         <HomeSidebar
           repositories={repos.repositories}
           reposPending={repos.reposPending}
-          activePath={activeRepo?.path ?? null}
+          activePath={
+            active?.kind === "repoIssues"
+              ? active.repo.path
+              : (activeRepo?.path ?? null)
+          }
           onSelectRepo={selectRepo}
           onAddRepo={repos.addRepository}
           onRemoveRepo={repos.removeRepository}
@@ -135,6 +148,14 @@ export default function App() {
             tab={active.ui.tab}
             onTabChange={(tab) => setPrUi(active.id, { tab })}
           />
+        ) : active?.kind === "repoIssues" ? (
+          <RepoIssues
+            key={active.id}
+            tab={active}
+            onUiChange={(patch) => setRepoIssuesUi(active.id, patch)}
+            onAddRepo={repos.addRepository}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
         ) : (
           // Welcome gives a row of panels, so it needs a row to sit in.
           <Flex flex="1" minW="0" minH="0">
@@ -144,6 +165,7 @@ export default function App() {
               activeRepo={activeRepo}
               onAddRepo={repos.addRepository}
               onSelect={openPullRequest}
+              onOpenIssues={openRepoIssues}
               preview={preview}
               onPreviewChange={setPreview}
               onOpenSettings={() => setSettingsOpen(true)}

@@ -2,10 +2,7 @@ import { HStack, IconButton, Text } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LuRefreshCw } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
-import {
-  pullRequestsQueryOptions,
-  repoIssuesQueryOptions,
-} from "../lib/repoQueries";
+import { pullRequestsQueryOptions } from "../lib/repoQueries";
 import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
 import {
@@ -17,11 +14,11 @@ import NewPullRequestDialog from "./NewPullRequestDialog";
 import QueueActionsMenu from "./QueueActionsMenu";
 import ShowSidebarButton from "./ShowSidebarButton";
 
-export type QueueTab = "pull-requests" | "issues" | "local-changes";
+export type QueueView = "pull-requests" | "local-changes";
 
 interface Props {
   repo: Repository | null;
-  tab: QueueTab;
+  tab: QueueView;
   worktree: WorktreeSelection;
   onAddRepo(): void;
   onOpenSettings(): void;
@@ -48,7 +45,6 @@ export default function QueueHeader({
   const slug = repo?.slug ?? undefined;
 
   const prsQuery = useQuery(pullRequestsQueryOptions(slug));
-  const issuesQuery = useQuery(repoIssuesQueryOptions(slug, tab === "issues"));
   const countQuery = useQuery({
     ...localChangeCountQueryOptions(worktree.path),
     enabled: Boolean(repo),
@@ -115,13 +111,6 @@ export default function QueueHeader({
               onCreated={openCreatedPullRequest}
             />
           </>
-        )}
-        {slug && tab === "issues" && (
-          <RefreshButton
-            label="Refresh issues"
-            loading={issuesQuery.isFetching}
-            onClick={() => void issuesQuery.refetch()}
-          />
         )}
         <QueueActionsMenu
           repoSlug={slug}
