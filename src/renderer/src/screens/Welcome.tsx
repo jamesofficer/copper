@@ -1,11 +1,10 @@
-import { Box, Center, Flex, Tabs, Text } from "@chakra-ui/react";
+import { Box, Center, Flex, Text } from "@chakra-ui/react";
 import { useQuery } from "@tanstack/react-query";
 import type { PullRequest, Repository } from "../../../shared/types";
 import OpenPullRequestList from "../components/OpenPullRequestList";
 import PullRequestPreview from "../components/PullRequestPreview";
 import QueueHeader from "../components/QueueHeader";
 import QueueListState from "../components/QueueListState";
-import QueueTabs from "../components/QueueTabs";
 import ResizeHandle from "../components/ResizeHandle";
 import SetupBanner from "../components/SetupBanner";
 import { errorText } from "../lib/ipcError";
@@ -19,8 +18,6 @@ interface Props {
   activeRepo: Repository | null;
   onAddRepo(): void;
   onSelect(pr: PullRequest, tab?: ReviewTab): void;
-  onOpenIssues(repo: Repository): void;
-  onOpenLocalChanges(repo: Repository): void;
   preview: PullRequest | null;
   onPreviewChange(pr: PullRequest | null): void;
   onOpenSettings(): void;
@@ -32,8 +29,6 @@ export default function Welcome({
   activeRepo: active,
   onAddRepo,
   onSelect,
-  onOpenIssues,
-  onOpenLocalChanges,
   preview,
   onPreviewChange,
   onOpenSettings,
@@ -53,19 +48,10 @@ export default function Welcome({
   const prsQuery = useQuery(pullRequestsQueryOptions(slug));
   const prs = prsQuery.data;
 
-  function openDestination(next: string) {
-    if (!active) return;
-    if (next === "issues") onOpenIssues(active);
-    if (next === "local-changes") onOpenLocalChanges(active);
-  }
-
   return (
     <>
-      <Tabs.Root
-        value="pull-requests"
-        onValueChange={(details) => openDestination(details.value)}
-        display="flex"
-        flexDirection="column"
+      <Flex
+        direction="column"
         flexShrink="0"
         minW="0"
         maxW="55%"
@@ -85,36 +71,32 @@ export default function Welcome({
           <SetupBanner onOpenSettings={onOpenSettings} />
         </Box>
 
-        <QueueTabs repo={active} checkoutPath={active?.path ?? ""} />
-
-        <Tabs.Content value="pull-requests" flex="1" minH="0" p="0">
-          <Flex direction="column" h="full" minH="0">
-            <QueueListState
-              noun="pull requests"
-              noRepositories={noRepositories}
-              addRepoPurpose="start reviewing its pull requests"
-              onAddRepo={onAddRepo}
-              repo={active}
-              error={
-                prsQuery.error
-                  ? errorText(prsQuery.error, "Couldn't load pull requests.")
-                  : null
-              }
-              pending={prsQuery.isPending || !prs}
-              empty={prs?.length === 0}
-              emptyText="No open pull requests. Nice and quiet."
-            >
-              <OpenPullRequestList
-                key={active?.slug}
-                prs={prs ?? []}
-                preview={preview}
-                onSelect={onPreviewChange}
-                onOpen={onSelect}
-              />
-            </QueueListState>
-          </Flex>
-        </Tabs.Content>
-      </Tabs.Root>
+        <Flex direction="column" flex="1" minH="0">
+          <QueueListState
+            noun="pull requests"
+            noRepositories={noRepositories}
+            addRepoPurpose="start reviewing its pull requests"
+            onAddRepo={onAddRepo}
+            repo={active}
+            error={
+              prsQuery.error
+                ? errorText(prsQuery.error, "Couldn't load pull requests.")
+                : null
+            }
+            pending={prsQuery.isPending || !prs}
+            empty={prs?.length === 0}
+            emptyText="No open pull requests. Nice and quiet."
+          >
+            <OpenPullRequestList
+              key={active?.slug}
+              prs={prs ?? []}
+              preview={preview}
+              onSelect={onPreviewChange}
+              onOpen={onSelect}
+            />
+          </QueueListState>
+        </Flex>
+      </Flex>
 
       <ResizeHandle onPointerDown={startResize} border />
 

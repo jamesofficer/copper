@@ -131,7 +131,9 @@ describe("App tabs", () => {
   it("opens the selected repository's issues in one top-level tab", async () => {
     renderWithProviders(<App />);
 
-    await userEvent.click(await screen.findByRole("tab", { name: /issues/i }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^Issues/i }),
+    );
 
     expect(useTabs.getState().activeId).toBe(repoIssuesTabId(appRepo.path));
     expect(useTabs.getState().tabs.map((tab) => tab.id)).toEqual([
@@ -144,19 +146,25 @@ describe("App tabs", () => {
   it("opens the selected repository's checkout in a top-level tab", async () => {
     renderWithProviders(<App />);
 
-    await userEvent.click(await screen.findByRole("tab", { name: /changes/i }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^Current changes/i }),
+    );
 
     expect(useTabs.getState().activeId).toBe(localChangesTabId(appRepo.path));
     expect(useTabs.getState().tabs.map((tab) => tab.id)).toEqual([
       QUEUE_TAB_ID,
       localChangesTabId(appRepo.path),
     ]);
-    expect(await screen.findByText("Current changes")).toBeTruthy();
+    expect(
+      await screen.findByRole("button", { name: "Refresh current changes" }),
+    ).toBeTruthy();
   });
 
   it("opens a second tab when the user switches worktrees", async () => {
     renderWithProviders(<App />);
-    await userEvent.click(await screen.findByRole("tab", { name: /changes/i }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /^Current changes/i }),
+    );
 
     await userEvent.click(await screen.findByTitle("Switch worktree"));
     await userEvent.click(

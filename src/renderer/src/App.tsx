@@ -12,6 +12,7 @@ import {
   listRecentPullRequests,
   recordRecentPullRequest,
 } from "./lib/recentPrs";
+import type { RepositoryDestination } from "./lib/repositoryDestination";
 import { toggleSidebar, useSidebarCollapsed } from "./lib/sidebarCollapsed";
 import type { OpenLocalChangesArgs, ReviewTab } from "./lib/tabs/tabs";
 import { useTabs } from "./lib/tabs/useTabs";
@@ -87,14 +88,6 @@ export default function App() {
     openRepoIssuesTab(repo);
   }
 
-  function openLocalChanges(repo: Repository) {
-    openWorktree({
-      repoPath: repo.path,
-      worktreePath: repo.path,
-      title: repo.name,
-    });
-  }
-
   function openWorktree(args: OpenLocalChangesArgs) {
     setActivePath(args.repoPath);
     setPreview(null);
@@ -128,6 +121,18 @@ export default function App() {
     repos.repositories?.find((repo) => repo.path === activePath) ??
     repos.repositories?.[0] ??
     null;
+  const activeRepositoryDestination: RepositoryDestination =
+    active?.kind === "queue" && activeRepo
+      ? { kind: "pullRequests", repoPath: activeRepo.path }
+      : active?.kind === "repoIssues"
+        ? { kind: "repoIssues", repoPath: active.repo.path }
+        : active?.kind === "localChanges"
+          ? {
+              kind: "localChanges",
+              repoPath: active.repoPath,
+              worktreePath: active.worktreePath,
+            }
+          : null;
 
   return (
     <Flex h="100vh" minH="0">
@@ -142,7 +147,10 @@ export default function App() {
                 ? active.repoPath
                 : (activeRepo?.path ?? null)
           }
+          activeRepositoryDestination={activeRepositoryDestination}
           onSelectRepo={selectRepo}
+          onOpenRepoIssues={openRepoIssues}
+          onOpenLocalChanges={openWorktree}
           onAddRepo={repos.addRepository}
           onRemoveRepo={repos.removeRepository}
           onReorderRepos={repos.reorderRepositories}
@@ -196,8 +204,6 @@ export default function App() {
               activeRepo={activeRepo}
               onAddRepo={repos.addRepository}
               onSelect={openPullRequest}
-              onOpenIssues={openRepoIssues}
-              onOpenLocalChanges={openLocalChanges}
               preview={preview}
               onPreviewChange={setPreview}
               onOpenSettings={() => setSettingsOpen(true)}

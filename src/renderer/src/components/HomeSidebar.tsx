@@ -33,14 +33,16 @@ import {
 import { hotkeyHint, hotkeys } from "../lib/hotkeys";
 import { type RecentPullRequest, timeAgo } from "../lib/recentPrs";
 import { repoCountsQueryOptions } from "../lib/repoQueries";
+import type { RepositoryDestination } from "../lib/repositoryDestination";
 import { scrollbar } from "../lib/scrollbar";
 import { setSidebarCollapsed } from "../lib/sidebarCollapsed";
 import { setSectionOpen, useCollapsedSections } from "../lib/sidebarSections";
 import { sidebarHover } from "../lib/sidebarStyles";
+import type { OpenLocalChangesArgs } from "../lib/tabs/tabs";
 import { dragRegion, titleBarHeight } from "../lib/titleBar";
 import AnalyzedSidebarList from "./AnalyzedSidebarList";
 import CommentCountBadge from "./CommentCountBadge";
-import RepositoryList from "./RepositoryList";
+import RepositoryList from "./RepositoryList/RepositoryList";
 import ReviewRequestActions from "./ReviewRequestActions";
 import SidebarPullRequestRow from "./SidebarPullRequestRow";
 import UserAvatar from "./UserAvatar";
@@ -49,7 +51,10 @@ interface Props {
   repositories: Repository[] | undefined;
   reposPending: boolean;
   activePath: string | null;
+  activeRepositoryDestination: RepositoryDestination;
   onSelectRepo(path: string): void;
+  onOpenRepoIssues(repo: Repository): void;
+  onOpenLocalChanges(args: OpenLocalChangesArgs): void;
   onAddRepo(): void;
   onRemoveRepo(path: string): void;
   onReorderRepos(repositories: Repository[]): void;
@@ -66,7 +71,10 @@ export default function HomeSidebar({
   repositories,
   reposPending,
   activePath,
+  activeRepositoryDestination,
   onSelectRepo,
+  onOpenRepoIssues,
+  onOpenLocalChanges,
   onAddRepo,
   onRemoveRepo,
   onReorderRepos,
@@ -190,8 +198,11 @@ export default function HomeSidebar({
             <RepositoryList
               repositories={repositories}
               activePath={activePath}
+              activeDestination={activeRepositoryDestination}
               counts={countsQuery.data}
               onSelectRepo={onSelectRepo}
+              onOpenIssues={onOpenRepoIssues}
+              onOpenLocalChanges={onOpenLocalChanges}
               onRemoveRepo={onRemoveRepo}
               onReorder={onReorderRepos}
             />
