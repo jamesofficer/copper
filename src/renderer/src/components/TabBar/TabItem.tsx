@@ -80,7 +80,7 @@ export default function TabItem({
       bg={active ? "bg.panel" : undefined}
       shadow={dragging ? "md" : undefined}
       borderWidth="1px"
-      borderColor={active ? "border.emphasized" : "transparent"}
+      borderColor={active ? "border.emphasized" : "border.subtle"}
       _hover={active ? undefined : { bg: "bg.muted" }}
       style={style}
       // The middle button closes a tab. Browsers and editors use the same rule.

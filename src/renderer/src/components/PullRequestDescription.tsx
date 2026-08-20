@@ -1,8 +1,9 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
+import { Box, Button, HStack, IconButton, Text } from "@chakra-ui/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { LuPencil } from "react-icons/lu";
+import { LuCheck, LuCopy, LuPencil } from "react-icons/lu";
 import type { PullRequestDetail } from "../../../shared/types";
+import { useCopyToClipboard } from "../lib/useCopyToClipboard";
 import Markdown from "./Markdown";
 import MarkdownEditor, { type MarkdownEditorMode } from "./MarkdownEditor";
 import SectionHeading from "./SectionHeading";
@@ -24,6 +25,9 @@ export default function PullRequestDescription({ detail, editable }: Props) {
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState("");
   const [mode, setMode] = useState<MarkdownEditorMode>("write");
+  const descriptionClipboard = useCopyToClipboard({
+    errorTitle: "Couldn’t copy the description",
+  });
 
   const save = useMutation({
     mutationFn: () =>
@@ -64,10 +68,33 @@ export default function PullRequestDescription({ detail, editable }: Props) {
     <Box>
       <HStack justifyContent="space-between" mb="3">
         <SectionHeading mb="0">Description</SectionHeading>
-        {editable && !editing && (
-          <Button size="2xs" variant="ghost" onClick={startEditing}>
-            <LuPencil /> Edit
-          </Button>
+        {!editing && (
+          <HStack gap="1">
+            {editable && (
+              <IconButton
+                aria-label="Edit description"
+                title="Edit description"
+                size="2xs"
+                variant="outline"
+                onClick={startEditing}
+              >
+                <LuPencil />
+              </IconButton>
+            )}
+            <IconButton
+              aria-label={
+                descriptionClipboard.copied
+                  ? "Description copied"
+                  : "Copy description markdown"
+              }
+              title="Copy description markdown"
+              size="2xs"
+              variant="outline"
+              onClick={() => void descriptionClipboard.copy(detail.body ?? "")}
+            >
+              {descriptionClipboard.copied ? <LuCheck /> : <LuCopy />}
+            </IconButton>
+          </HStack>
         )}
       </HStack>
 

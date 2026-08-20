@@ -15,22 +15,31 @@ const pr = {
 
 describe("PullRequestPreview", () => {
   beforeEach(() => {
+    localStorage.clear();
     stubApi({ getPullRequest: () => new Promise(() => {}) });
   });
 
-  it("opens the review screen on the Changes tab", async () => {
-    // The button says "Review changes", and the reviewer has just read the
-    // overview in this very panel — landing them on a second copy of it is the
-    // one place the label would be a lie.
+  it("opens the full pull request on its Overview tab", async () => {
     const onView = vi.fn();
     renderWithProviders(
       <PullRequestPreview pr={pr} onView={onView} onClose={() => {}} />,
     );
 
     await userEvent.click(
-      screen.getByRole("button", { name: /review changes/i }),
+      screen.getByRole("button", { name: /view pull request/i }),
     );
 
-    expect(onView).toHaveBeenCalledWith(pr, "changes");
+    expect(onView).toHaveBeenCalledWith(pr, "overview");
+  });
+
+  it("offers favourite and copy-link actions in the preview", () => {
+    renderWithProviders(
+      <PullRequestPreview pr={pr} onView={() => {}} onClose={() => {}} />,
+    );
+
+    expect(
+      screen.getByRole("button", { name: "Add to favourites" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy link" })).toBeTruthy();
   });
 });

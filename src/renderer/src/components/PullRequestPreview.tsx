@@ -1,8 +1,10 @@
 import { Box, Button, Flex, HStack, IconButton, Text } from "@chakra-ui/react";
-import { LuExternalLink, LuX } from "react-icons/lu";
+import { LuArrowRight, LuExternalLink, LuX } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
 import type { ReviewTab } from "../lib/tabs/tabs";
 import { dragRegion, titleBarHeight } from "../lib/titleBar";
+import CopyPrLinkButton from "./CopyPrLinkButton";
+import FavouritePrButton from "./FavouritePrButton";
 import PullRequestOverview from "./PullRequestOverview";
 
 interface Props {
@@ -42,11 +44,14 @@ export default function PullRequestPreview({ pr, onView, onClose }: Props) {
             View on GitHub <LuExternalLink />
           </a>
         </Button>
-        {/* The panel's one primary action: this is the button that takes the
-            reviewer from skimming to reviewing, so it opens the diff rather
-            than a second copy of the overview they've just read. */}
-        <Button size="xs" onClick={() => onView(pr, "changes")}>
-          Review changes
+        <FavouritePrButton pr={pr} />
+        <CopyPrLinkButton url={pr.url} />
+        <Button
+          size="xs"
+          variant="outline"
+          onClick={() => onView(pr, "overview")}
+        >
+          View pull request <LuArrowRight />
         </Button>
         <IconButton
           aria-label="Close preview"
