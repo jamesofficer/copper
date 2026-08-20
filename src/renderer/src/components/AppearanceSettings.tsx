@@ -15,12 +15,6 @@ import {
   getAccent,
 } from "../lib/accent";
 import {
-  applyBodyFontSize,
-  type BodyFontSize,
-  bodyFontSizes,
-  getBodyFontSize,
-} from "../lib/bodyFontSize";
-import {
   applyColorMode,
   type ColorModeSetting,
   colorModeSettings,
@@ -58,20 +52,6 @@ const accentCollection = createListCollection({
   items: accentPalettes.map((palette) => ({ label: palette, value: palette })),
 });
 
-const bodyFontSizeLabels: Record<BodyFontSize, string> = {
-  14: "Small",
-  16: "Default",
-  18: "Large",
-  20: "Extra large",
-};
-
-const bodyFontSizeCollection = createListCollection({
-  items: bodyFontSizes.map((size) => ({
-    label: `${bodyFontSizeLabels[size]} — ${size} px`,
-    value: String(size),
-  })),
-});
-
 const pathDisplayLabels: Record<FilePathDisplay, string> = {
   inline: "Full path",
   filename: "File name only",
@@ -95,8 +75,6 @@ export default function AppearanceSettings() {
   const pathDisplay = useFilePathDisplay();
   const [mode, setMode] = useState<ColorModeSetting>(getColorMode);
   const [accent, setAccent] = useState<AccentPalette>(getAccent);
-  const [bodyFontSize, setBodyFontSize] =
-    useState<BodyFontSize>(getBodyFontSize);
 
   function selectMode(setting: ColorModeSetting) {
     applyColorMode(setting);
@@ -108,15 +86,10 @@ export default function AppearanceSettings() {
     setAccent(palette);
   }
 
-  function selectBodyFontSize(size: BodyFontSize) {
-    applyBodyFontSize(size);
-    setBodyFontSize(size);
-  }
-
   return (
     <SettingsPanel
       title="Appearance"
-      description="How the app looks: its theme, text size, accent colour, code colours, and file paths."
+      description="How the app looks: its theme, accent colour, code colours, and the way file paths are written."
     >
       <SettingsGroup>
         <SettingRow
@@ -193,41 +166,6 @@ export default function AppearanceSettings() {
                       <Swatch palette={item.value} />
                       <Text textTransform="capitalize">{item.label}</Text>
                     </HStack>
-                    <Select.ItemIndicator />
-                  </Select.Item>
-                ))}
-              </Select.Content>
-            </Select.Positioner>
-          </Select.Root>
-        </SettingRow>
-
-        <SettingRow
-          title="Text size"
-          description="Sets the base size for body text. Controls and spacing scale with it."
-        >
-          <Select.Root
-            collection={bodyFontSizeCollection}
-            value={[String(bodyFontSize)]}
-            onValueChange={(event) =>
-              selectBodyFontSize(Number(event.value[0]) as BodyFontSize)
-            }
-            size="sm"
-            w="52"
-          >
-            <Select.HiddenSelect aria-label="Text size" />
-            <Select.Control>
-              <Select.Trigger cursor="pointer" aria-label="Text size">
-                <Select.ValueText />
-              </Select.Trigger>
-              <Select.IndicatorGroup>
-                <Select.Indicator />
-              </Select.IndicatorGroup>
-            </Select.Control>
-            <Select.Positioner>
-              <Select.Content>
-                {bodyFontSizeCollection.items.map((item) => (
-                  <Select.Item item={item} key={item.value}>
-                    <Text flex="1">{item.label}</Text>
                     <Select.ItemIndicator />
                   </Select.Item>
                 ))}

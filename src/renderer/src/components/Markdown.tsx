@@ -214,7 +214,7 @@ const schema = {
   },
 };
 
-export default function Markdown({ children, fontSize = "sm" }: Props) {
+export default function Markdown({ children, fontSize = "md" }: Props) {
   // Code blocks sit on the syntax theme's own canvas, like the diffs; the
   // bg.muted in prose is only the fallback until this rule lands on top.
   // Inline code keeps its neutral chip — it has no token colours to match.

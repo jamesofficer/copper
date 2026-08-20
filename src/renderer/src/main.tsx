@@ -9,13 +9,11 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import { Toaster } from "./components/ui/toaster";
 import { applyAccent, getAccent } from "./lib/accent";
-import { applyBodyFontSize, getBodyFontSize } from "./lib/bodyFontSize";
 import { applyColorMode, getColorMode } from "./lib/colorMode";
 import { persistOptions, queryClient } from "./lib/queryClient";
 import { system } from "./theme";
 
 applyAccent(getAccent());
-applyBodyFontSize(getBodyFontSize());
 applyColorMode(getColorMode());
 
 const rootElement = document.getElementById("root");
