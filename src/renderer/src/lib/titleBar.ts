@@ -13,8 +13,16 @@ export const trafficLightSpace = isMac ? "96px" : "4";
 // Height of the app's top bars, so the buttons sit centred in all of them.
 export const titleBarHeight = "12";
 
-// Cast because the app-region property is Electron's, not part of the CSS
-// types Chakra ships.
+// Cast because the app-region property belongs to Electron. It is not part of
+// the CSS types that Chakra supplies. The name is in camel case. Both spellings
+// give the same CSS, but the kebab-case spelling also makes a warning.
 export const dragRegion = (
-  isMac ? { "-webkit-app-region": "drag" } : {}
+  isMac ? { WebkitAppRegion: "drag" } : {}
+) as SystemStyleObject;
+
+// A drag region makes all of its children drag the window, and a click on them
+// does nothing. Each control inside a drag region needs this style. The tab bar
+// needs it most, because the bar is a drag region that is almost all controls.
+export const noDragRegion = (
+  isMac ? { WebkitAppRegion: "no-drag" } : {}
 ) as SystemStyleObject;
