@@ -58,7 +58,8 @@
     "shiki": "^4.4.1",
     "typescript": "^7.0.2",
     "vite": "^7.3.6",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "zustand": "^5.0.15"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
