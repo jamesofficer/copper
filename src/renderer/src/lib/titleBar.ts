@@ -6,10 +6,6 @@ import type { SystemStyleObject } from "@chakra-ui/react";
 // platforms the window keeps its frame and neither is needed.
 export const isMac = navigator.userAgent.includes("Mac");
 
-// Left padding for a top bar: clear of the three buttons at their configured x
-// offset on macOS, the usual gutter everywhere else.
-export const trafficLightSpace = isMac ? "96px" : "4";
-
 // Height of the app's top bars, so the buttons sit centred in all of them.
 export const titleBarHeight = "12";
 

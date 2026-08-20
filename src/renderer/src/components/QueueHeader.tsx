@@ -3,13 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LuRefreshCw } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
 import { pullRequestsQueryOptions } from "../lib/repoQueries";
-import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
-import {
-  dragRegion,
-  noDragRegion,
-  titleBarHeight,
-  trafficLightSpace,
-} from "../lib/titleBar";
+import { dragRegion, noDragRegion, titleBarHeight } from "../lib/titleBar";
 import NewPullRequestDialog from "./NewPullRequestDialog";
 import QueueActionsMenu from "./QueueActionsMenu";
 import ShowSidebarButton from "./ShowSidebarButton";
@@ -30,7 +24,6 @@ export default function QueueHeader({
   onOpenPullRequest,
 }: Props) {
   const queryClient = useQueryClient();
-  const collapsed = useSidebarCollapsed();
   const slug = repo?.slug ?? undefined;
   const prsQuery = useQuery(pullRequestsQueryOptions(slug));
 
@@ -45,7 +38,7 @@ export default function QueueHeader({
     <HStack
       flexShrink="0"
       h={titleBarHeight}
-      pl={collapsed ? trafficLightSpace : "4"}
+      pl="4"
       pr="3"
       gap="2"
       borderBottomWidth="1px"

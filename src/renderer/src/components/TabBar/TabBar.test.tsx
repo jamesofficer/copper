@@ -2,6 +2,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PullRequest } from "../../../../shared/types";
+import { setSidebarCollapsed } from "../../lib/sidebarCollapsed";
 import { initialTabsState, prTabId, QUEUE_TAB_ID } from "../../lib/tabs/tabs";
 import { useTabs } from "../../lib/tabs/useTabs";
 import { renderWithProviders } from "../../testing/render";
@@ -36,6 +37,7 @@ const second = prTabId("acme/app", 2);
 
 beforeEach(() => {
   localStorage.clear();
+  setSidebarCollapsed(false);
   useTabs.setState(initialTabsState());
 });
 
@@ -49,6 +51,15 @@ describe("TabBar", () => {
     expect(screen.getByText("Add the tab bar")).toBeTruthy();
     expect(screen.getByText("Fix the diff")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
+  });
+
+  it("keeps the reveal button at the normal left gutter", () => {
+    setSidebarCollapsed(true);
+    renderWithProviders(<TabBar />);
+
+    expect(getComputedStyle(screen.getByRole("banner")).paddingLeft).toBe(
+      "var(--chakra-spacing-2)",
+    );
   });
 
   it("gives the queue tab no close button", () => {

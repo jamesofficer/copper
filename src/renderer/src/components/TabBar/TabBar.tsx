@@ -16,7 +16,6 @@ import {
 } from "@dnd-kit/sortable";
 import { useState } from "react";
 import { scrollbar } from "../../lib/scrollbar";
-import { useSidebarCollapsed } from "../../lib/sidebarCollapsed";
 import { sortableTabIds } from "../../lib/tabs/tabLabel";
 import {
   QUEUE_TAB_ID,
@@ -24,19 +23,13 @@ import {
   tabMenuAvailability,
 } from "../../lib/tabs/tabs";
 import { useTabs } from "../../lib/tabs/useTabs";
-import {
-  dragRegion,
-  noDragRegion,
-  titleBarHeight,
-  trafficLightSpace,
-} from "../../lib/titleBar";
+import { dragRegion, noDragRegion, titleBarHeight } from "../../lib/titleBar";
 import ShowSidebarButton from "../ShowSidebarButton";
 import SortableTab from "./SortableTab";
 import TabItem from "./TabItem";
 
 // The row of open tabs, at the top of the window. On macOS it is also the drag
-// bar for the window, and it keeps space for the traffic lights while the
-// sidebar is hidden.
+// bar for the window.
 //
 // The tabs do not become narrow when the row is full. The row scrolls instead.
 // A narrow tab hides its title, and the title is the only part that tells two
@@ -51,11 +44,6 @@ export default function TabBar() {
   const closeToRight = useTabs((state) => state.closeToRight);
   const moveTab = useTabs((state) => state.moveTab);
   const [dragged, setDragged] = useState<Tab | null>(null);
-  // The sidebar is on the left of this bar, and it goes to the top of the
-  // window. Thus the traffic lights are above the sidebar. This bar keeps space
-  // for them only while the sidebar is hidden.
-  const collapsed = useSidebarCollapsed();
-
   // The drag starts after 4px of movement, so a plain click still selects the
   // tab. This is the same rule as the repository rows.
   const sensors = useSensors(
@@ -94,7 +82,7 @@ export default function TabBar() {
       flexShrink="0"
       align="stretch"
       gap="1"
-      pl={collapsed ? trafficLightSpace : "2"}
+      pl="2"
       pr="2"
       borderBottomWidth="1px"
       borderColor="border.subtle"
