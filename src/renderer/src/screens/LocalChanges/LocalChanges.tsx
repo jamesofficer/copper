@@ -1,0 +1,126 @@
+import { Flex, HStack, IconButton, Text } from "@chakra-ui/react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { LuRefreshCw } from "react-icons/lu";
+import type { Repository } from "../../../../shared/types";
+import LocalChangesColumn from "../../components/LocalChangesColumn";
+import LocalChangesPane from "../../components/LocalChangesPane";
+import QueueActionsMenu from "../../components/QueueActionsMenu";
+import ResizeHandle from "../../components/ResizeHandle";
+import { invalidateLocalChangeQueries } from "../../lib/localChangesMutations";
+import { worktreesQueryOptions } from "../../lib/repoQueries";
+import { localChangesTitle } from "../../lib/tabs/tabLabel";
+import type {
+  LocalChangesTab,
+  OpenLocalChangesArgs,
+} from "../../lib/tabs/tabs";
+import { dragRegion, noDragRegion, titleBarHeight } from "../../lib/titleBar";
+import {
+  localChangesFileListPanel,
+  useLocalChanges,
+} from "../../lib/useLocalChanges";
+import { usePanelWidth } from "../../lib/usePanelWidth";
+import type { WorktreeSelection } from "../../lib/worktreeSelection";
+
+interface Props {
+  tab: LocalChangesTab;
+  repo: Repository | null;
+  onOpenWorktree(args: OpenLocalChangesArgs): void;
+  onAddRepo(): void;
+  onOpenSettings(): void;
+}
+
+// One checkout's local changes. A worktree switch opens another tab instead of
+// changing this tab's identity.
+export default function LocalChanges({
+  tab,
+  repo,
+  onOpenWorktree,
+  onAddRepo,
+  onOpenSettings,
+}: Props) {
+  const queryClient = useQueryClient();
+  const worktreesQuery = useQuery(worktreesQueryOptions(tab.repoPath));
+  const repoName = repo?.name ?? tab.title.split(" (")[0];
+
+  function selectWorktree(path: string) {
+    const worktree = worktreesQuery.data?.find((entry) => entry.path === path);
+    if (!worktree) return;
+    onOpenWorktree({
+      repoPath: tab.repoPath,
+      worktreePath: path,
+      title: localChangesTitle(repoName, worktree),
+    });
+  }
+
+  const worktree: WorktreeSelection = {
+    worktrees: worktreesQuery.data,
+    path: tab.worktreePath,
+    select: selectWorktree,
+    refetch: () => void worktreesQuery.refetch(),
+  };
+  const state = useLocalChanges(worktree, true);
+  const { width, startResize } = usePanelWidth({
+    ...localChangesFileListPanel,
+    handle: "right",
+  });
+
+  function refresh() {
+    void worktreesQuery.refetch();
+    void invalidateLocalChangeQueries(queryClient, tab.worktreePath);
+    void queryClient.invalidateQueries({
+      queryKey: ["localCommits", tab.worktreePath],
+    });
+  }
+
+  return (
+    <Flex direction="column" flex="1" minW="0" minH="0">
+      <HStack
+        h={titleBarHeight}
+        flexShrink="0"
+        gap="2"
+        px="4"
+        borderBottomWidth="1px"
+        css={dragRegion}
+      >
+        <Text fontSize="sm" fontWeight="semibold">
+          Current changes
+        </Text>
+        <Text fontSize="xs" fontFamily="mono" color="fg.muted" truncate>
+          {tab.title}
+        </Text>
+        <HStack ml="auto" gap="1" flexShrink="0" css={noDragRegion}>
+          <IconButton
+            aria-label="Refresh current changes"
+            title="Refresh"
+            variant="ghost"
+            size="xs"
+            color="fg.muted"
+            loading={state.changesRefreshing || worktreesQuery.isFetching}
+            onClick={refresh}
+          >
+            <LuRefreshCw />
+          </IconButton>
+          <QueueActionsMenu
+            repoSlug={repo?.slug ?? undefined}
+            onAddRepo={onAddRepo}
+            onOpenSettings={onOpenSettings}
+          />
+        </HStack>
+      </HStack>
+
+      <Flex flex="1" minH="0">
+        <Flex
+          direction="column"
+          minH="0"
+          minW="0"
+          flexShrink="0"
+          style={{ width }}
+        >
+          <LocalChangesColumn state={state} />
+        </Flex>
+        <ResizeHandle onPointerDown={startResize} border />
+        <LocalChangesPane state={state} />
+      </Flex>
+    </Flex>
+  );
+}

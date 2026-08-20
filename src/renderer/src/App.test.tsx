@@ -5,6 +5,7 @@ import type { PullRequest, RepoIssue, Repository } from "../../shared/types";
 import App from "./App";
 import {
   initialTabsState,
+  localChangesTabId,
   prTabId,
   QUEUE_TAB_ID,
   repoIssuesTabId,
@@ -77,7 +78,25 @@ beforeEach(() => {
     }),
     getLlmStatus: vi.fn().mockResolvedValue({ provider: "api", ready: false }),
     getLocalChangeCount: vi.fn().mockResolvedValue(0),
-    listWorktrees: vi.fn().mockResolvedValue([]),
+    getLocalChanges: vi.fn().mockResolvedValue({
+      branch: "main",
+      staged: [],
+      unstaged: [],
+      untracked: [],
+    }),
+    listLocalCommits: vi.fn().mockResolvedValue({
+      branch: "main",
+      base: "origin/main",
+      commits: [],
+    }),
+    listWorktrees: vi.fn().mockResolvedValue([
+      { path: appRepo.path, branch: "main", isMain: true },
+      {
+        path: "/repos/app-feature",
+        branch: "feat/tabs",
+        isMain: false,
+      },
+    ]),
     listReviewRequestedPullRequests: vi.fn().mockResolvedValue([]),
     listMyPullRequests: vi.fn().mockResolvedValue([]),
     listAnalyzedPullRequests: vi.fn().mockResolvedValue([]),
@@ -89,7 +108,7 @@ describe("App tabs", () => {
   it("starts on the queue tab", async () => {
     renderWithProviders(<App />);
 
-    expect(await screen.findByText("Queue")).toBeTruthy();
+    expect(await screen.findByText("Pull Requests")).toBeTruthy();
     expect(useTabs.getState().activeId).toBe(QUEUE_TAB_ID);
   });
 
@@ -122,6 +141,38 @@ describe("App tabs", () => {
     expect(await screen.findByText(issue.title)).toBeTruthy();
   });
 
+  it("opens the selected repository's checkout in a top-level tab", async () => {
+    renderWithProviders(<App />);
+
+    await userEvent.click(await screen.findByRole("tab", { name: /changes/i }));
+
+    expect(useTabs.getState().activeId).toBe(localChangesTabId(appRepo.path));
+    expect(useTabs.getState().tabs.map((tab) => tab.id)).toEqual([
+      QUEUE_TAB_ID,
+      localChangesTabId(appRepo.path),
+    ]);
+    expect(await screen.findByText("Current changes")).toBeTruthy();
+  });
+
+  it("opens a second tab when the user switches worktrees", async () => {
+    renderWithProviders(<App />);
+    await userEvent.click(await screen.findByRole("tab", { name: /changes/i }));
+
+    await userEvent.click(await screen.findByTitle("Switch worktree"));
+    await userEvent.click(
+      await screen.findByRole("option", { name: /feat\/tabs/i }),
+    );
+
+    expect(useTabs.getState().tabs.map((tab) => tab.id)).toEqual([
+      QUEUE_TAB_ID,
+      localChangesTabId(appRepo.path),
+      localChangesTabId("/repos/app-feature"),
+    ]);
+    expect(useTabs.getState().activeId).toBe(
+      localChangesTabId("/repos/app-feature"),
+    );
+  });
+
   it("shows the pull request of the active tab, and keeps its pane", async () => {
     useTabs.getState().openPullRequest(pr(1, "Add the tab bar"), "changes");
     renderWithProviders(<App />);
@@ -145,6 +196,6 @@ describe("App tabs", () => {
     );
 
     expect(useTabs.getState().activeId).toBe(QUEUE_TAB_ID);
-    expect(await screen.findByText("Queue")).toBeTruthy();
+    expect(await screen.findByText("Pull Requests")).toBeTruthy();
   });
 });

@@ -4,6 +4,7 @@ import type { PullRequest, Repository } from "../../../../shared/types";
 import * as tabs from "./tabs";
 import {
   initialTabsState,
+  type OpenLocalChangesArgs,
   type PrTabUi,
   prTabId,
   QUEUE_TAB_ID,
@@ -28,11 +29,7 @@ export interface TabsStore extends TabsData {
   // needs it.
   openPullRequest(pr: PullRequest, tab?: ReviewTab): string;
   openRepoIssues(repo: Repository): string;
-  openLocalChanges(args: {
-    repoPath: string;
-    worktreePath: string;
-    title: string;
-  }): string;
+  openLocalChanges(args: OpenLocalChangesArgs): string;
   openQueue(): void;
   activateTab(id: string): void;
   activateOffset(delta: number): void;

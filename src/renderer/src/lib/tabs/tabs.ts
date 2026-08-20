@@ -13,10 +13,9 @@ import { defaultQueueFilters, type QueueFilters } from "../listFilters";
 // screen.
 export type ReviewTab = "overview" | "changes" | "review";
 
-// The id of the first tab. That tab shows the pull request queue and, until
-// Current changes gets its own top-level tab, the selected checkout. There is
-// always one queue tab. The user cannot close it because it is the way back to
-// the repository lists.
+// The id of the first tab. That tab shows one repository's pull requests.
+// There is always one queue tab. The user cannot close it because it is the
+// way back to the repository lists.
 export const QUEUE_TAB_ID = "queue";
 
 // The maximum number of tabs that stay in the DOM. If the user returns to a
@@ -69,6 +68,12 @@ export interface RepoIssuesTab {
   // Live issue data still comes from TanStack Query.
   repo: Repository;
   ui: RepoIssuesTabUi;
+}
+
+export interface OpenLocalChangesArgs {
+  repoPath: string;
+  worktreePath: string;
+  title: string;
 }
 
 export interface LocalChangesTab {
@@ -204,7 +209,7 @@ export function openRepoIssues(state: TabsData, repo: Repository): TabsData {
 
 export function openLocalChanges(
   state: TabsData,
-  args: { repoPath: string; worktreePath: string; title: string },
+  args: OpenLocalChangesArgs,
 ): TabsData {
   const id = localChangesTabId(args.worktreePath);
   const isOpen = state.tabs.some((entry) => entry.id === id);

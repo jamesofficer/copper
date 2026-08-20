@@ -4,55 +4,35 @@ import { LuRefreshCw } from "react-icons/lu";
 import type { PullRequest, Repository } from "../../../shared/types";
 import { pullRequestsQueryOptions } from "../lib/repoQueries";
 import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
-import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
 import {
-  localChangeCountQueryOptions,
-  localChangesQueryOptions,
-} from "../lib/useLocalChanges";
-import type { WorktreeSelection } from "../lib/useWorktreeSelection";
+  dragRegion,
+  noDragRegion,
+  titleBarHeight,
+  trafficLightSpace,
+} from "../lib/titleBar";
 import NewPullRequestDialog from "./NewPullRequestDialog";
 import QueueActionsMenu from "./QueueActionsMenu";
 import ShowSidebarButton from "./ShowSidebarButton";
 
-export type QueueView = "pull-requests" | "local-changes";
-
 interface Props {
   repo: Repository | null;
-  tab: QueueView;
-  worktree: WorktreeSelection;
   onAddRepo(): void;
   onOpenSettings(): void;
   onOpenPullRequest(pr: PullRequest): void;
 }
 
-// The queue's top bar, across the whole window: the title, the current tab's
-// refresh, and the actions menu. It reads the same queries the panels below it
-// do rather than taking them as props — they are shared cache entries, so a
-// second observer is free and the alternative is threading query objects
-// through the layout.
+// The pull request queue's toolbar. It reads the same query as the list below,
+// so refresh state does not need to pass through the screen.
 export default function QueueHeader({
   repo,
-  tab,
-  worktree,
   onAddRepo,
   onOpenSettings,
   onOpenPullRequest,
 }: Props) {
   const queryClient = useQueryClient();
-  // With the sidebar hidden its header is gone too, so this bar takes over
-  // holding the window's traffic lights clear.
   const collapsed = useSidebarCollapsed();
   const slug = repo?.slug ?? undefined;
-
   const prsQuery = useQuery(pullRequestsQueryOptions(slug));
-  const countQuery = useQuery({
-    ...localChangeCountQueryOptions(worktree.path),
-    enabled: Boolean(repo),
-  });
-  const changesQuery = useQuery({
-    ...localChangesQueryOptions(worktree.path),
-    enabled: Boolean(repo) && tab === "local-changes",
-  });
 
   function openCreatedPullRequest(pr: PullRequest) {
     void queryClient.invalidateQueries({ queryKey: ["pullRequests", pr.repo] });
@@ -71,31 +51,21 @@ export default function QueueHeader({
       borderBottomWidth="1px"
       css={dragRegion}
     >
-      <ShowSidebarButton />
+      <HStack css={noDragRegion}>
+        <ShowSidebarButton />
+      </HStack>
       <Text fontSize="sm" fontWeight="semibold" truncate>
-        Review queue
+        Pull requests
       </Text>
-      <HStack ml="auto" gap="1" flexShrink="0">
-        {repo && tab === "local-changes" && (
-          <RefreshButton
-            label="Refresh"
-            loading={changesQuery.isFetching}
-            onClick={() => {
-              worktree.refetch();
-              void countQuery.refetch();
-              void changesQuery.refetch();
-              // The commit list lives in the column below, so it is
-              // invalidated rather than refetched from up here.
-              void queryClient.invalidateQueries({
-                queryKey: ["localCommits", worktree.path],
-              });
-            }}
-          />
-        )}
-        {slug && tab === "pull-requests" && (
+      <HStack ml="auto" gap="1" flexShrink="0" css={noDragRegion}>
+        {slug && (
           <>
-            <RefreshButton
-              label="Refresh pull requests"
+            <IconButton
+              aria-label="Refresh pull requests"
+              title="Refresh"
+              variant="ghost"
+              size="xs"
+              color="fg.muted"
               loading={prsQuery.isFetching}
               onClick={() => {
                 void prsQuery.refetch();
@@ -103,7 +73,9 @@ export default function QueueHeader({
                   queryKey: ["repoCounts"],
                 });
               }}
-            />
+            >
+              <LuRefreshCw />
+            </IconButton>
             <NewPullRequestDialog
               key={slug}
               repo={slug}
@@ -119,32 +91,5 @@ export default function QueueHeader({
         />
       </HStack>
     </HStack>
-  );
-}
-
-// Every tab refreshes the same way, so they look and read the same way. The
-// title is fixed: the aria-label carries what is being refreshed, for a reader
-// who can't see which tab is open.
-function RefreshButton({
-  label,
-  loading,
-  onClick,
-}: {
-  label: string;
-  loading: boolean;
-  onClick(): void;
-}) {
-  return (
-    <IconButton
-      aria-label={label}
-      title="Refresh"
-      variant="ghost"
-      size="xs"
-      color="fg.muted"
-      loading={loading}
-      onClick={onClick}
-    >
-      <LuRefreshCw />
-    </IconButton>
   );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequest } from "../../../../shared/types";
-import { describeTab, sortableTabIds } from "./tabLabel";
+import { describeTab, localChangesTitle, sortableTabIds } from "./tabLabel";
 import {
   defaultPrTabUi,
   defaultRepoIssuesTabUi,
@@ -45,7 +45,7 @@ describe("describeTab", () => {
   it("gives the queue tab a name and no close button", () => {
     const label = describeTab(queueTab);
 
-    expect(label.text).toBe("Queue");
+    expect(label.text).toBe("Pull Requests");
     expect(label.closable).toBe(false);
     expect(label.icon).toBe("queue");
   });
@@ -84,6 +84,35 @@ describe("describeTab", () => {
     expect(label.tooltip).toBe("Current changes — /r/wt");
     expect(label.icon).toBe("branch");
     expect(label.closable).toBe(true);
+  });
+});
+
+describe("localChangesTitle", () => {
+  it("uses the repository name for the main worktree", () => {
+    expect(
+      localChangesTitle("app", {
+        path: "/r",
+        branch: "main",
+        isMain: true,
+      }),
+    ).toBe("app");
+  });
+
+  it("identifies a linked worktree by branch or folder", () => {
+    expect(
+      localChangesTitle("app", {
+        path: "/r/feature",
+        branch: "feat/tabs",
+        isMain: false,
+      }),
+    ).toBe("app (feat/tabs)");
+    expect(
+      localChangesTitle("app", {
+        path: "C:\\worktrees\\detached",
+        branch: null,
+        isMain: false,
+      }),
+    ).toBe("app (detached)");
   });
 });
 

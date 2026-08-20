@@ -20,9 +20,8 @@ function folderName(path: string): string {
   return path.split("/").pop() ?? path;
 }
 
-// Picks which of the repo's checkouts the Current changes tab reads — the
-// main worktree or a linked git worktree (e.g. one an agent is working in).
-// Only rendered when the repo has more than one.
+// Opens the Current Changes tab for a main or linked worktree. This control is
+// only present when the repository has more than one checkout.
 export default function WorktreeSelect({ worktrees, value, onChange }: Props) {
   const collection = useMemo(
     () =>

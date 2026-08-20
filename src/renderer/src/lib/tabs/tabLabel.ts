@@ -1,3 +1,4 @@
+import type { Worktree } from "../../../../shared/types";
 import { QUEUE_TAB_ID, type Tab } from "./tabs";
 
 // The text on a tab, and the text in its tooltip. This file has no React code,
@@ -24,8 +25,8 @@ export function describeTab(tab: Tab): TabLabel {
     return {
       icon: "queue",
       prefix: null,
-      text: "Queue",
-      tooltip: "The repository queue",
+      text: "Pull Requests",
+      tooltip: "Repository pull requests",
       closable: false,
     };
   }
@@ -60,6 +61,15 @@ export function describeTab(tab: Tab): TabLabel {
 
 // The tabs that the user can move. The queue tab is always first, so the drag
 // code must not receive it.
+export function localChangesTitle(
+  repoName: string,
+  worktree: Worktree,
+): string {
+  if (worktree.isMain) return repoName;
+  const folder = worktree.path.split(/[\\/]/).filter(Boolean).at(-1);
+  return `${repoName} (${worktree.branch ?? folder ?? "detached"})`;
+}
+
 export function sortableTabIds(tabs: readonly Tab[]): string[] {
   return tabs.filter((tab) => tab.id !== QUEUE_TAB_ID).map((tab) => tab.id);
 }

@@ -61,6 +61,7 @@ const localGit = {
 function renderWelcome(
   activeRepo: Repository | null = repository,
   onOpenIssues = vi.fn(),
+  onOpenLocalChanges = vi.fn(),
 ) {
   return renderWithProviders(
     <Welcome
@@ -70,6 +71,7 @@ function renderWelcome(
       onAddRepo={vi.fn()}
       onSelect={vi.fn()}
       onOpenIssues={onOpenIssues}
+      onOpenLocalChanges={onOpenLocalChanges}
       preview={null}
       onPreviewChange={vi.fn()}
       onOpenSettings={vi.fn()}
@@ -77,15 +79,11 @@ function renderWelcome(
   );
 }
 
-describe("Welcome current changes queries", () => {
-  it("loads a cheap count on the PR tab and defers file patches until the changes tab opens", async () => {
+describe("Welcome current changes launcher", () => {
+  it("loads the cheap count and opens a top-level tab without building patches", async () => {
     const getLocalChangeCount = vi.fn().mockResolvedValue(2);
-    const getLocalChanges = vi.fn().mockResolvedValue({
-      branch: "main",
-      staged: [],
-      unstaged: [],
-      untracked: [],
-    });
+    const getLocalChanges = vi.fn();
+    const onOpenLocalChanges = vi.fn();
     stubApi({
       ...credentials,
       ...localGit,
@@ -95,16 +93,15 @@ describe("Welcome current changes queries", () => {
       getRepoCounts: vi.fn().mockResolvedValue({}),
     });
 
-    renderWelcome();
+    renderWelcome(repository, vi.fn(), onOpenLocalChanges);
 
     await waitFor(() => expect(getLocalChangeCount).toHaveBeenCalled());
-    expect(getLocalChanges).not.toHaveBeenCalled();
-
     fireEvent.click(screen.getByRole("tab", { name: /changes/i }));
 
     await waitFor(() =>
-      expect(getLocalChanges).toHaveBeenCalledWith(repository.path),
+      expect(onOpenLocalChanges).toHaveBeenCalledWith(repository),
     );
+    expect(getLocalChanges).not.toHaveBeenCalled();
   });
 });
 

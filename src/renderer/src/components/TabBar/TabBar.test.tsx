@@ -45,7 +45,7 @@ describe("TabBar", () => {
     useTabs.getState().openPullRequest(pr(2, "Fix the diff"));
     renderWithProviders(<TabBar />);
 
-    expect(screen.getByText("Queue")).toBeTruthy();
+    expect(screen.getByText("Pull Requests")).toBeTruthy();
     expect(screen.getByText("Add the tab bar")).toBeTruthy();
     expect(screen.getByText("Fix the diff")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
@@ -54,7 +54,9 @@ describe("TabBar", () => {
   it("gives the queue tab no close button", () => {
     renderWithProviders(<TabBar />);
 
-    expect(screen.queryByRole("button", { name: "Close Queue" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Close Pull Requests" }),
+    ).toBeNull();
   });
 
   it("selects a tab when the user clicks it", async () => {

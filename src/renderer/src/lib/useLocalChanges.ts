@@ -27,7 +27,7 @@ import {
   localCommitsQueryOptions,
 } from "./repoQueries";
 import type { PanelBounds } from "./usePanelWidth";
-import type { WorktreeSelection } from "./useWorktreeSelection";
+import type { WorktreeSelection } from "./worktreeSelection";
 
 // The working tree changes under the app constantly: always refetch on mount
 // and window focus, and never persist (queryClient's doNotPersist). Shared
@@ -94,6 +94,7 @@ export interface LocalChangesState {
   filtering: boolean;
 
   changesPending: boolean;
+  changesRefreshing: boolean;
   changesError: unknown;
   commitFilesPending: boolean;
   commitFilesError: unknown;
@@ -277,6 +278,7 @@ export function useLocalChanges(
     filtering: Boolean(query),
 
     changesPending: changesQuery.isPending,
+    changesRefreshing: changesQuery.isFetching || commitsQuery.isFetching,
     changesError: changesQuery.isError ? changesQuery.error : null,
     commitFilesPending: commitFilesQuery.isPending,
     commitFilesError: commitFilesQuery.isError ? commitFilesQuery.error : null,

@@ -13,9 +13,10 @@ import {
   recordRecentPullRequest,
 } from "./lib/recentPrs";
 import { toggleSidebar, useSidebarCollapsed } from "./lib/sidebarCollapsed";
-import type { ReviewTab } from "./lib/tabs/tabs";
+import type { OpenLocalChangesArgs, ReviewTab } from "./lib/tabs/tabs";
 import { useTabs } from "./lib/tabs/useTabs";
 import { useRepositoryActions } from "./lib/useRepositoryActions";
+import LocalChanges from "./screens/LocalChanges/LocalChanges";
 import RepoIssues from "./screens/RepoIssues/RepoIssues";
 import Review from "./screens/Review";
 import Welcome from "./screens/Welcome";
@@ -40,6 +41,7 @@ export default function App() {
   const activeId = useTabs((state) => state.activeId);
   const openTab = useTabs((state) => state.openPullRequest);
   const openRepoIssuesTab = useTabs((state) => state.openRepoIssues);
+  const openLocalChangesTab = useTabs((state) => state.openLocalChanges);
   const openQueue = useTabs((state) => state.openQueue);
   const closeTab = useTabs((state) => state.closeTab);
   const activateOffset = useTabs((state) => state.activateOffset);
@@ -85,6 +87,20 @@ export default function App() {
     openRepoIssuesTab(repo);
   }
 
+  function openLocalChanges(repo: Repository) {
+    openWorktree({
+      repoPath: repo.path,
+      worktreePath: repo.path,
+      title: repo.name,
+    });
+  }
+
+  function openWorktree(args: OpenLocalChangesArgs) {
+    setActivePath(args.repoPath);
+    setPreview(null);
+    openLocalChangesTab(args);
+  }
+
   // A repository is the subject of the queue, so this shows the queue tab. It
   // closes no tabs. A reviewer who opens a second repository still has the pull
   // requests of the first one open, and that is the point of the tabs.
@@ -122,7 +138,9 @@ export default function App() {
           activePath={
             active?.kind === "repoIssues"
               ? active.repo.path
-              : (activeRepo?.path ?? null)
+              : active?.kind === "localChanges"
+                ? active.repoPath
+                : (activeRepo?.path ?? null)
           }
           onSelectRepo={selectRepo}
           onAddRepo={repos.addRepository}
@@ -156,6 +174,19 @@ export default function App() {
             onAddRepo={repos.addRepository}
             onOpenSettings={() => setSettingsOpen(true)}
           />
+        ) : active?.kind === "localChanges" ? (
+          <LocalChanges
+            key={active.id}
+            tab={active}
+            repo={
+              repos.repositories?.find(
+                (repo) => repo.path === active.repoPath,
+              ) ?? null
+            }
+            onOpenWorktree={openWorktree}
+            onAddRepo={repos.addRepository}
+            onOpenSettings={() => setSettingsOpen(true)}
+          />
         ) : (
           // Welcome gives a row of panels, so it needs a row to sit in.
           <Flex flex="1" minW="0" minH="0">
@@ -166,6 +197,7 @@ export default function App() {
               onAddRepo={repos.addRepository}
               onSelect={openPullRequest}
               onOpenIssues={openRepoIssues}
+              onOpenLocalChanges={openLocalChanges}
               preview={preview}
               onPreviewChange={setPreview}
               onOpenSettings={() => setSettingsOpen(true)}

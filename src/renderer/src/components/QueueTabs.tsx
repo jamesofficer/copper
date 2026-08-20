@@ -14,10 +14,9 @@ interface Props {
   checkoutPath: string;
 }
 
-// The queue's navigation triggers. Pull requests and Changes select a view in
-// the queue. Issues opens a top-level tab. Its counts come from the same shared
-// query entries that the destination screens read, so a second observer costs
-// nothing.
+// The queue's navigation triggers. Open marks the current destination. Issues
+// and Changes open top-level tabs. The destination screens share these query
+// entries, so the extra observers do not add requests.
 export default function QueueTabs({ repo, checkoutPath }: Props) {
   const slug = repo?.slug ?? undefined;
   const prsQuery = useQuery(pullRequestsQueryOptions(slug));
@@ -25,8 +24,8 @@ export default function QueueTabs({ repo, checkoutPath }: Props) {
   // this cache after the user opens one.
   const issuesQuery = useQuery(repoIssuesQueryOptions(slug, false));
   const countsQuery = useQuery(repoCountsQueryOptions());
-  // The always-visible badge uses porcelain status only. Building every file
-  // patch is deferred until the Changes tab opens.
+  // The badge uses porcelain status only. The app does not build file patches
+  // until the Current Changes tab opens.
   const countQuery = useQuery({
     ...localChangeCountQueryOptions(checkoutPath),
     enabled: Boolean(repo),
