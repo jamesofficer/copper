@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { PullRequest } from "../../../../shared/types";
@@ -79,5 +79,22 @@ describe("TabBar", () => {
     expect(useTabs.getState().tabs.map((tab) => tab.id)).toEqual([
       QUEUE_TAB_ID,
     ]);
+  });
+
+  it("closes tabs to the right from the context menu", async () => {
+    useTabs.getState().openPullRequest(pr(1, "Add the tab bar"));
+    useTabs.getState().openPullRequest(pr(2, "Fix the diff"));
+    renderWithProviders(<TabBar />);
+
+    fireEvent.contextMenu(screen.getByText("Add the tab bar"));
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Close to the right" }),
+    );
+
+    expect(useTabs.getState().tabs.map((tab) => tab.id)).toEqual([
+      QUEUE_TAB_ID,
+      first,
+    ]);
+    expect(useTabs.getState().activeId).toBe(first);
   });
 });

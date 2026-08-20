@@ -18,7 +18,11 @@ import { useState } from "react";
 import { scrollbar } from "../../lib/scrollbar";
 import { useSidebarCollapsed } from "../../lib/sidebarCollapsed";
 import { sortableTabIds } from "../../lib/tabs/tabLabel";
-import { QUEUE_TAB_ID, type Tab } from "../../lib/tabs/tabs";
+import {
+  QUEUE_TAB_ID,
+  type Tab,
+  tabMenuAvailability,
+} from "../../lib/tabs/tabs";
 import { useTabs } from "../../lib/tabs/useTabs";
 import {
   dragRegion,
@@ -43,6 +47,8 @@ export default function TabBar() {
   const activeId = useTabs((state) => state.activeId);
   const activateTab = useTabs((state) => state.activateTab);
   const closeTab = useTabs((state) => state.closeTab);
+  const closeOthers = useTabs((state) => state.closeOthers);
+  const closeToRight = useTabs((state) => state.closeToRight);
   const moveTab = useTabs((state) => state.moveTab);
   const [dragged, setDragged] = useState<Tab | null>(null);
   // The sidebar is on the left of this bar, and it goes to the top of the
@@ -67,6 +73,15 @@ export default function TabBar() {
     const to = tabs.findIndex((tab) => tab.id === over.id);
     if (to < 0) return;
     moveTab(String(active.id), to);
+  }
+
+  function menuActions(id: string) {
+    return {
+      availability: tabMenuAvailability(tabs, id),
+      onClose: () => closeTab(id),
+      onCloseOthers: () => closeOthers(id),
+      onCloseToRight: () => closeToRight(id),
+    };
   }
 
   const queue = tabs.find((tab) => tab.id === QUEUE_TAB_ID);
@@ -114,6 +129,7 @@ export default function TabBar() {
               tab={queue}
               active={activeId === queue.id}
               onSelect={activateTab}
+              menuActions={menuActions(queue.id)}
             />
           )}
           <SortableContext
@@ -127,6 +143,7 @@ export default function TabBar() {
                 active={activeId === tab.id}
                 onSelect={activateTab}
                 onClose={closeTab}
+                menuActions={menuActions(tab.id)}
               />
             ))}
           </SortableContext>

@@ -228,6 +228,58 @@ export function closeOthers(state: TabsData, id: string): TabsData {
   };
 }
 
+// Closes every tab after this one. The queue tab is first, so it always
+// stays. If the user does this on the queue tab, every other tab closes.
+export function closeToRight(state: TabsData, id: string): TabsData {
+  const index = state.tabs.findIndex((entry) => entry.id === id);
+  if (index === -1) return state;
+  const tabs = state.tabs.slice(0, index + 1);
+  if (tabs.length === state.tabs.length) return state;
+  const keep = new Set(tabs.map((entry) => entry.id));
+  // The active tab can be one of the closed tabs. The tab that the user acted
+  // on becomes active then, because it is the one still on the screen.
+  const activeId = keep.has(state.activeId) ? state.activeId : id;
+  return {
+    tabs,
+    activeId,
+    mru: promote(
+      state.mru.filter((entry) => keep.has(entry)),
+      activeId,
+    ),
+  };
+}
+
+// Which items the context menu of a tab can offer. An item that can do nothing
+// is disabled and not hidden: a menu that changes shape between tabs makes the
+// user hunt for the item each time.
+export interface TabMenuAvailability {
+  canClose: boolean;
+  canCloseOthers: boolean;
+  canCloseToRight: boolean;
+}
+
+export function tabMenuAvailability(
+  tabs: readonly Tab[],
+  id: string,
+): TabMenuAvailability {
+  const index = tabs.findIndex((entry) => entry.id === id);
+  if (index === -1) {
+    return {
+      canClose: false,
+      canCloseOthers: false,
+      canCloseToRight: false,
+    };
+  }
+  return {
+    canClose: id !== QUEUE_TAB_ID,
+    canCloseOthers: tabs.some(
+      (entry) => entry.id !== id && entry.id !== QUEUE_TAB_ID,
+    ),
+    // The queue tab is first, so no tab after this one is the queue tab.
+    canCloseToRight: index < tabs.length - 1,
+  };
+}
+
 export function moveTab(
   state: TabsData,
   id: string,

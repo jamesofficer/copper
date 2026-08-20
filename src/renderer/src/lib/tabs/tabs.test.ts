@@ -6,6 +6,7 @@ import {
   activateTab,
   closeOthers,
   closeTab,
+  closeToRight,
   initialTabsState,
   localChangesTabId,
   moveTab,
@@ -17,6 +18,7 @@ import {
   QUEUE_TAB_ID,
   setPrUi,
   type TabsData,
+  tabMenuAvailability,
 } from "./tabs";
 
 function pr(number: number, repo = "acme/app"): PullRequest {
@@ -154,6 +156,60 @@ describe("closing tabs", () => {
     expect(ids(state)).toEqual([QUEUE_TAB_ID, second]);
     expect(state.activeId).toBe(second);
     expect(state.mru).toEqual([second, QUEUE_TAB_ID]);
+  });
+
+  it("closes every tab to the right", () => {
+    const state = closeToRight(withPrs(1, 2, 3), first);
+
+    expect(ids(state)).toEqual([QUEUE_TAB_ID, first]);
+    expect(state.activeId).toBe(first);
+    expect(state.mru).toEqual([first, QUEUE_TAB_ID]);
+  });
+
+  it("keeps the active tab when it is left of the closed tabs", () => {
+    const state = closeToRight(
+      activateTab(withPrs(1, 2, 3), QUEUE_TAB_ID),
+      second,
+    );
+
+    expect(ids(state)).toEqual([QUEUE_TAB_ID, first, second]);
+    expect(state.activeId).toBe(QUEUE_TAB_ID);
+  });
+
+  it("does nothing when no tab is to the right", () => {
+    const state = withPrs(1, 2);
+
+    expect(closeToRight(state, second)).toBe(state);
+  });
+});
+
+describe("tab context menu", () => {
+  it("offers actions that can change the selected tab row", () => {
+    const tabs = withPrs(1, 2).tabs;
+
+    expect(tabMenuAvailability(tabs, QUEUE_TAB_ID)).toEqual({
+      canClose: false,
+      canCloseOthers: true,
+      canCloseToRight: true,
+    });
+    expect(tabMenuAvailability(tabs, first)).toEqual({
+      canClose: true,
+      canCloseOthers: true,
+      canCloseToRight: true,
+    });
+    expect(tabMenuAvailability(tabs, second)).toEqual({
+      canClose: true,
+      canCloseOthers: true,
+      canCloseToRight: false,
+    });
+  });
+
+  it("disables actions that cannot change a row with one tab", () => {
+    expect(tabMenuAvailability(initialTabsState().tabs, QUEUE_TAB_ID)).toEqual({
+      canClose: false,
+      canCloseOthers: false,
+      canCloseToRight: false,
+    });
   });
 });
 

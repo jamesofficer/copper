@@ -37,6 +37,7 @@ export interface TabsStore extends TabsData {
   activateIndex(index: number): void;
   closeTab(id: string): void;
   closeOthers(id: string): void;
+  closeToRight(id: string): void;
   moveTab(id: string, toIndex: number): void;
   setPrUi(id: string, patch: Partial<PrTabUi>): void;
 }
@@ -71,6 +72,9 @@ export const useTabs = create<TabsStore>()(
       },
       closeOthers(id) {
         set((state) => tabs.closeOthers(state, id));
+      },
+      closeToRight(id) {
+        set((state) => tabs.closeToRight(state, id));
       },
       moveTab(id, toIndex) {
         set((state) => tabs.moveTab(state, id, toIndex));

@@ -1,6 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Tab } from "../../lib/tabs/tabs";
+import type { TabMenuActions } from "./TabContextMenu";
 import TabItem from "./TabItem";
 
 // A tab that the user can drag. It adds the drag behaviour to TabItem and
@@ -12,9 +13,16 @@ interface Props {
   active: boolean;
   onSelect(id: string): void;
   onClose(id: string): void;
+  menuActions: TabMenuActions;
 }
 
-export default function SortableTab({ tab, active, onSelect, onClose }: Props) {
+export default function SortableTab({
+  tab,
+  active,
+  onSelect,
+  onClose,
+  menuActions,
+}: Props) {
   const {
     attributes,
     listeners,
@@ -38,6 +46,7 @@ export default function SortableTab({ tab, active, onSelect, onClose }: Props) {
       }}
       dimmed={isDragging}
       handleProps={{ ...attributes, ...listeners }}
+      menuActions={menuActions}
     />
   );
 }

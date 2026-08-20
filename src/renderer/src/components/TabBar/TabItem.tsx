@@ -8,6 +8,7 @@ import {
 } from "react-icons/lu";
 import { describeTab, type TabIcon } from "../../lib/tabs/tabLabel";
 import { QUEUE_TAB_ID, type Tab } from "../../lib/tabs/tabs";
+import TabContextMenu, { type TabMenuActions } from "./TabContextMenu";
 
 // One tab in the row. The name is TabItem and not TabContent. Chakra gives the
 // name Tabs.Content to the panel below a tab, and this component is the tab.
@@ -38,6 +39,8 @@ export interface TabItemProps {
   dimmed?: boolean;
   dragging?: boolean;
   handleProps?: Record<string, unknown>;
+  // Absent on the copy that moves with the pointer, which is only a picture.
+  menuActions?: TabMenuActions;
 }
 
 export default function TabItem({
@@ -50,11 +53,12 @@ export default function TabItem({
   dimmed,
   dragging,
   handleProps,
+  menuActions,
 }: TabItemProps) {
   const label = describeTab(tab);
   const queue = tab.id === QUEUE_TAB_ID;
 
-  return (
+  const item = (
     <HStack
       ref={ref}
       className="group"
@@ -141,4 +145,7 @@ export default function TabItem({
       )}
     </HStack>
   );
+
+  if (!menuActions) return item;
+  return <TabContextMenu {...menuActions}>{item}</TabContextMenu>;
 }
