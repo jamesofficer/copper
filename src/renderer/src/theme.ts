@@ -5,6 +5,7 @@ import {
   type SystemStyleObject,
 } from "@chakra-ui/react";
 import { accentPalettes, defaultAccent } from "./lib/accent";
+import { bodyFontSizes, defaultBodyFontSize } from "./lib/bodyFontSize";
 
 // One rule per palette: whichever data-accent <html> carries wins. applyAccent
 // in lib/accent.ts sets the attribute; the default covers first paint.
@@ -12,6 +13,13 @@ const accentRules = Object.fromEntries(
   accentPalettes.map((palette) => [
     `html[data-accent="${palette}"]`,
     { colorPalette: palette },
+  ]),
+);
+
+const bodyFontSizeRules = Object.fromEntries(
+  bodyFontSizes.map((size) => [
+    `html[data-body-font-size="${size}"]`,
+    { fontSize: `${size}px` },
   ]),
 );
 
@@ -24,8 +32,10 @@ const config = defineConfig({
   globalCss: {
     html: {
       colorPalette: defaultAccent,
+      fontSize: `${defaultBodyFontSize}px`,
     },
     ...accentRules,
+    ...bodyFontSizeRules,
     body: {
       bg: "bg",
       color: "fg",
