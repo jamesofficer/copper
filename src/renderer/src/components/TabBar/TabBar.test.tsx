@@ -1,15 +1,15 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { PullRequest } from "../../../shared/types";
-import { initialTabsState, prTabId, QUEUE_TAB_ID } from "../lib/tabs";
-import { useTabs } from "../lib/useTabs";
-import { renderWithProviders } from "../testing/render";
+import type { PullRequest } from "../../../../shared/types";
+import { initialTabsState, prTabId, QUEUE_TAB_ID } from "../../lib/tabs/tabs";
+import { useTabs } from "../../lib/tabs/useTabs";
+import { renderWithProviders } from "../../testing/render";
 import TabBar from "./TabBar";
 
-// The logic is in lib/tabs.ts and lib/tabLabel.ts, and those files have their
-// own tests. These tests check the connections only: the bar must show the
-// tabs, and its controls must call the store.
+// The logic is in lib/tabs/, and those files have their own tests. These
+// tests check the connections only: the bar must show the tabs, and its
+// controls must call the store.
 
 function pr(number: number, title: string): PullRequest {
   return {

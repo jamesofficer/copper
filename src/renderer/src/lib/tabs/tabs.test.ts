@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PullRequest } from "../../../shared/types";
+import type { PullRequest } from "../../../../shared/types";
 import {
   activateIndex,
   activateOffset,

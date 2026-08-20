@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PullRequest } from "../../../shared/types";
+import type { PullRequest } from "../../../../shared/types";
 
 // The tabs that the app has open, and the pure functions that change them.
 //

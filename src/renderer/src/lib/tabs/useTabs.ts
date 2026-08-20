@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { PullRequest } from "../../../shared/types";
+import type { PullRequest } from "../../../../shared/types";
 import * as tabs from "./tabs";
 import {
   initialTabsState,
