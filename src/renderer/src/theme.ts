@@ -34,7 +34,9 @@ const config = defineConfig({
     // region swallows clicks on whatever sits inside it — so anything meant to
     // be clicked opts out, wherever it is.
     "button, a, input, textarea, select, [role='button']": {
-      "-webkit-app-region": "no-drag",
+      // Camel case, like lib/titleBar.ts. Both spellings give the same CSS, but
+      // the kebab-case spelling also makes a warning on each render.
+      WebkitAppRegion: "no-drag",
     } as SystemStyleObject,
   },
   theme: {

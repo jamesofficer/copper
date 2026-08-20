@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useState } from "react";
 import { scrollbar } from "../../lib/scrollbar";
+import { useSidebarCollapsed } from "../../lib/sidebarCollapsed";
 import { sortableTabIds } from "../../lib/tabs/tabLabel";
 import { QUEUE_TAB_ID, type Tab } from "../../lib/tabs/tabs";
 import { useTabs } from "../../lib/tabs/useTabs";
@@ -44,6 +45,10 @@ export default function TabBar() {
   const closeTab = useTabs((state) => state.closeTab);
   const moveTab = useTabs((state) => state.moveTab);
   const [dragged, setDragged] = useState<Tab | null>(null);
+  // The sidebar is on the left of this bar, and it goes to the top of the
+  // window. Thus the traffic lights are above the sidebar. This bar keeps space
+  // for them only while the sidebar is hidden.
+  const collapsed = useSidebarCollapsed();
 
   // The drag starts after 4px of movement, so a plain click still selects the
   // tab. This is the same rule as the repository rows.
@@ -74,7 +79,7 @@ export default function TabBar() {
       flexShrink="0"
       align="stretch"
       gap="1"
-      pl={trafficLightSpace}
+      pl={collapsed ? trafficLightSpace : "2"}
       pr="2"
       borderBottomWidth="1px"
       borderColor="border.subtle"

@@ -18,13 +18,13 @@ import {
   pullRequestsQueryOptions,
   repoIssuesQueryOptions,
 } from "../lib/repoQueries";
+import type { ReviewTab } from "../lib/tabs/tabs";
 import {
   localChangesFileListPanel,
   useLocalChanges,
 } from "../lib/useLocalChanges";
 import { usePanelWidth } from "../lib/usePanelWidth";
 import { useWorktreeSelection } from "../lib/useWorktreeSelection";
-import type { ReviewTab } from "./Review";
 
 interface Props {
   repositories: Repository[] | undefined;

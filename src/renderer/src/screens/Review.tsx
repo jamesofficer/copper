@@ -11,7 +11,6 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  LuArrowLeft,
   LuExternalLink,
   LuFileDiff,
   LuInfo,
@@ -31,20 +30,16 @@ import PullRequestActionsMenu from "../components/PullRequestActionsMenu";
 import PullRequestOverview from "../components/PullRequestOverview";
 import ReanalyzeButton from "../components/ReanalyzeButton";
 import ReviewPanel from "../components/ReviewPanel";
-import ShowSidebarButton from "../components/ShowSidebarButton";
-import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
-import { dragRegion, titleBarHeight, trafficLightSpace } from "../lib/titleBar";
-
-// The review screen's three tabs. Exported because the callers that open a PR
-// choose which one it lands on — "Review changes" goes straight to the diff.
-export type ReviewTab = "overview" | "changes" | "review";
+import type { ReviewTab } from "../lib/tabs/tabs";
+import { titleBarHeight } from "../lib/titleBar";
 
 interface Props {
   pr: PullRequest;
-  // Which tab this PR opens on. Defaults to the overview: most ways in are
-  // "show me this PR", and the overview is what that means.
-  initialTab?: ReviewTab;
-  onBack(): void;
+  // Which pane is showing. The tab that holds this pull request keeps the
+  // value. Thus the pane is the same one after the user goes to another tab
+  // and comes back.
+  tab: ReviewTab;
+  onTabChange(tab: ReviewTab): void;
 }
 
 // What's newer on GitHub than the data on screen — the polled snapshot vs the
@@ -77,19 +72,9 @@ function describeActivity(
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-export default function Review({ pr, initialTab, onBack }: Props) {
-  const tabKey = `${pr.repo}#${pr.number}#${initialTab ?? "overview"}`;
-  const [tabState, setTabState] = useState({
-    key: tabKey,
-    value: initialTab ?? "overview",
-  });
-  const activeTab =
-    tabState.key === tabKey ? tabState.value : (initialTab ?? "overview");
+export default function Review({ pr, tab, onTabChange }: Props) {
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
-  // With the sidebar hidden its header is gone too, so this bar takes over
-  // holding the window's traffic lights clear.
-  const collapsed = useSidebarCollapsed();
 
   // Same key as the Overview tab's query, so the two share one fetch.
   const detailQuery = useQuery({
@@ -110,10 +95,6 @@ export default function Review({ pr, initialTab, onBack }: Props) {
   });
   const newActivity = describeActivity(detail, activityQuery.data);
 
-  function selectTab(tab: ReviewTab) {
-    setTabState({ key: tabKey, value: tab });
-  }
-
   // Refetch everything this PR shows — detail, diffs, comments, reviews. Match
   // by predicate so any query scoped to this repo + PR number is busted.
   async function refresh() {
@@ -130,22 +111,17 @@ export default function Review({ pr, initialTab, onBack }: Props) {
 
   return (
     <Flex direction="column" flex="1" minW="0" minH="0">
-      {/* One row, the same height as the home screen's bar, so the window's
-          traffic lights sit centred in both. */}
+      {/* The actions for this pull request. The tab bar above holds the window
+          controls, so this row is a toolbar and nothing else. */}
       <HStack
         gap="2"
-        pl={collapsed ? trafficLightSpace : "4"}
+        pl="4"
         pr="4"
         h={titleBarHeight}
         borderBottomWidth="1px"
         flexShrink="0"
         align="center"
-        css={dragRegion}
       >
-        <ShowSidebarButton />
-        <Button variant="outline" size="xs" onClick={onBack}>
-          <LuArrowLeft /> Back
-        </Button>
         <HStack gap="2" flex="1" minW="0" alignItems="baseline">
           <Heading size="sm" truncate>
             {pr.title}
@@ -190,15 +166,9 @@ export default function Review({ pr, initialTab, onBack }: Props) {
         {detail && <PullRequestActionsMenu pr={pr} detail={detail} />}
       </HStack>
 
-      {/* Keyed by PR *and* entry tab, since `defaultValue` only applies on
-          mount: without the PR the tabs would keep whichever one the last PR
-          was left on ("Review changes" landing on the overview), and without
-          the tab a caller reopening the same PR on a different one would be
-          silently ignored. */}
       <Tabs.Root
-        key={`${pr.repo}#${pr.number}#${initialTab ?? "overview"}`}
-        defaultValue={initialTab ?? "overview"}
-        onValueChange={(event) => selectTab(event.value as ReviewTab)}
+        value={tab}
+        onValueChange={(event) => onTabChange(event.value as ReviewTab)}
         display="flex"
         flexDirection="column"
         flex="1"
@@ -214,7 +184,7 @@ export default function Review({ pr, initialTab, onBack }: Props) {
           <Tabs.Trigger value="review">
             <LuSparkles /> Review
           </Tabs.Trigger>
-          {activeTab !== "changes" && (
+          {tab !== "changes" && (
             <Box ml="auto">
               <DiffViewModeSelect />
             </Box>

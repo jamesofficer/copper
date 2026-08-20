@@ -1,8 +1,8 @@
 import { Box, Button, Flex, HStack, IconButton, Text } from "@chakra-ui/react";
 import { LuExternalLink, LuX } from "react-icons/lu";
 import type { PullRequest } from "../../../shared/types";
+import type { ReviewTab } from "../lib/tabs/tabs";
 import { dragRegion, titleBarHeight } from "../lib/titleBar";
-import type { ReviewTab } from "../screens/Review";
 import PullRequestOverview from "./PullRequestOverview";
 
 interface Props {

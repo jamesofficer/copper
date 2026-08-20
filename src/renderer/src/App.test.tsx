@@ -1,0 +1,118 @@
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PullRequest, Repository } from "../../shared/types";
+import App from "./App";
+import { initialTabsState, prTabId, QUEUE_TAB_ID } from "./lib/tabs/tabs";
+import { useTabs } from "./lib/tabs/useTabs";
+import { stubApi } from "./testing/api";
+import { renderWithProviders } from "./testing/render";
+
+// The logic is in lib/tabs/, and it has its own tests. These tests cover the
+// connections that only App makes, and one rule that a user notices at once:
+// a new repository must not close the tabs.
+
+const appRepo: Repository = {
+  path: "/repos/app",
+  name: "app",
+  slug: "acme/app",
+};
+const webRepo: Repository = {
+  path: "/repos/web",
+  name: "web",
+  slug: "acme/web",
+};
+
+function pr(number: number, title: string, repo = "acme/app"): PullRequest {
+  return {
+    repo,
+    number,
+    title,
+    author: "ada",
+    draft: false,
+    reviewStatus: "awaiting_review",
+    headSha: "abc1234",
+    url: `https://github.com/${repo}/pull/${number}`,
+    additions: 1,
+    deletions: 0,
+    changedFiles: 1,
+    commits: 1,
+    comments: 0,
+    assignees: [],
+    createdAt: "2026-08-01T00:00:00Z",
+    updatedAt: "2026-08-01T00:00:00Z",
+  };
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  useTabs.setState(initialTabsState());
+  stubApi({
+    listRepositories: vi.fn().mockResolvedValue([appRepo, webRepo]),
+    listPullRequests: vi.fn().mockResolvedValue([]),
+    getRepoCounts: vi.fn().mockResolvedValue({}),
+    getSecretsStatus: vi.fn().mockResolvedValue({
+      anthropic: false,
+      github: false,
+      openai: false,
+    }),
+    getLlmStatus: vi.fn().mockResolvedValue({ provider: "api", ready: false }),
+    getLocalChangeCount: vi.fn().mockResolvedValue(0),
+    listWorktrees: vi.fn().mockResolvedValue([]),
+    listReviewRequestedPullRequests: vi.fn().mockResolvedValue([]),
+    listMyPullRequests: vi.fn().mockResolvedValue([]),
+    listAnalyzedPullRequests: vi.fn().mockResolvedValue([]),
+    getPullRequest: vi.fn().mockResolvedValue(null),
+  });
+});
+
+describe("App tabs", () => {
+  it("starts on the queue tab", async () => {
+    renderWithProviders(<App />);
+
+    expect(await screen.findByText("Queue")).toBeTruthy();
+    expect(useTabs.getState().activeId).toBe(QUEUE_TAB_ID);
+  });
+
+  it("keeps the open tabs when the user picks another repository", async () => {
+    // This is the whole reason for the tabs. Before them, a new repository
+    // closed the pull request on the screen.
+    useTabs.getState().openPullRequest(pr(1, "Add the tab bar"));
+    renderWithProviders(<App />);
+
+    await userEvent.click(await screen.findByText("web"));
+
+    expect(useTabs.getState().tabs.map((tab) => tab.id)).toEqual([
+      QUEUE_TAB_ID,
+      prTabId("acme/app", 1),
+    ]);
+    // The queue is the subject of a repository, so it comes forward.
+    expect(useTabs.getState().activeId).toBe(QUEUE_TAB_ID);
+  });
+
+  it("shows the pull request of the active tab, and keeps its pane", async () => {
+    useTabs.getState().openPullRequest(pr(1, "Add the tab bar"), "changes");
+    renderWithProviders(<App />);
+
+    // The screen shows the pane that the caller asked for.
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /changes/i })).toBeTruthy(),
+    );
+    const tab = useTabs
+      .getState()
+      .tabs.find((entry) => entry.id === prTabId("acme/app", 1));
+    expect(tab?.kind === "pr" && tab.ui.tab).toBe("changes");
+  });
+
+  it("goes back to the queue when the user closes the last tab", async () => {
+    useTabs.getState().openPullRequest(pr(1, "Add the tab bar"));
+    renderWithProviders(<App />);
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Close Add the tab bar" }),
+    );
+
+    expect(useTabs.getState().activeId).toBe(QUEUE_TAB_ID);
+    expect(await screen.findByText("Queue")).toBeTruthy();
+  });
+});
