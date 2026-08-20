@@ -5,6 +5,7 @@ import {
   Flex,
   Heading,
   HStack,
+  IconButton,
   Input,
   InputGroup,
   Spinner,
@@ -15,6 +16,7 @@ import {
   LuChevronRight,
   LuMinus,
   LuPlus,
+  LuRefreshCw,
   LuSearch,
   LuUndo2,
 } from "react-icons/lu";
@@ -28,17 +30,30 @@ import CommitComposer from "./CommitComposer";
 import CommitsPanel from "./CommitsPanel";
 import DiscardChangesDialog from "./DiscardChangesDialog";
 import FileList, { type RowAction } from "./FileList";
+import QueueActionsMenu from "./QueueActionsMenu";
 import WorktreeSelect from "./WorktreeSelect";
 
 interface Props {
   state: LocalChangesState;
+  repoSlug?: string;
+  refreshing: boolean;
+  onRefresh(): void;
+  onAddRepo(): void;
+  onOpenSettings(): void;
 }
 
 // The Changes tab's left column: which checkout is being read, the files in it
 // — the uncommitted work split the way git sees it, or one commit's changes —
 // the branch's commits, and the commit box. The PR-only affordances
 // (commenting, viewed state, context expansion) stay out.
-export default function LocalChangesColumn({ state }: Props) {
+export default function LocalChangesColumn({
+  state,
+  repoSlug,
+  refreshing,
+  onRefresh,
+  onAddRepo,
+  onOpenSettings,
+}: Props) {
   const {
     worktree,
     path,
@@ -61,6 +76,28 @@ export default function LocalChangesColumn({ state }: Props) {
 
   return (
     <Flex direction="column" flex="1" minW="0" minH="0">
+      <HStack h="9" px="3" gap="1" flexShrink="0" borderBottomWidth="1px">
+        <Text fontSize="sm" fontWeight="semibold" flex="1">
+          Current changes
+        </Text>
+        <IconButton
+          aria-label="Refresh current changes"
+          title="Refresh"
+          variant="ghost"
+          size="xs"
+          color="fg.muted"
+          loading={refreshing}
+          onClick={onRefresh}
+        >
+          <LuRefreshCw />
+        </IconButton>
+        <QueueActionsMenu
+          repoSlug={repoSlug}
+          onAddRepo={onAddRepo}
+          onOpenSettings={onOpenSettings}
+        />
+      </HStack>
+
       {/* Which checkout everything below is read from, at the head of the
           column rather than in the window's top bar: it belongs with the files
           it decides. Headed and separated like the sections under it, so the

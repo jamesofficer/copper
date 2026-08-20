@@ -1,10 +1,8 @@
-import { Flex, HStack, IconButton, Text } from "@chakra-ui/react";
+import { Flex } from "@chakra-ui/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { LuRefreshCw } from "react-icons/lu";
 import type { Repository } from "../../../../shared/types";
 import LocalChangesColumn from "../../components/LocalChangesColumn";
 import LocalChangesPane from "../../components/LocalChangesPane";
-import QueueActionsMenu from "../../components/QueueActionsMenu";
 import ResizeHandle from "../../components/ResizeHandle";
 import { invalidateLocalChangeQueries } from "../../lib/localChangesMutations";
 import { worktreesQueryOptions } from "../../lib/repoQueries";
@@ -13,7 +11,6 @@ import type {
   LocalChangesTab,
   OpenLocalChangesArgs,
 } from "../../lib/tabs/tabs";
-import { dragRegion, noDragRegion, titleBarHeight } from "../../lib/titleBar";
 import {
   localChangesFileListPanel,
   useLocalChanges,
@@ -73,54 +70,25 @@ export default function LocalChanges({
   }
 
   return (
-    <Flex direction="column" flex="1" minW="0" minH="0">
-      <HStack
-        h={titleBarHeight}
+    <Flex flex="1" minW="0" minH="0">
+      <Flex
+        direction="column"
+        minH="0"
+        minW="0"
         flexShrink="0"
-        gap="2"
-        px="4"
-        borderBottomWidth="1px"
-        css={dragRegion}
+        style={{ width }}
       >
-        <Text fontSize="sm" fontWeight="semibold">
-          Current changes
-        </Text>
-        <Text fontSize="xs" fontFamily="mono" color="fg.muted" truncate>
-          {tab.title}
-        </Text>
-        <HStack ml="auto" gap="1" flexShrink="0" css={noDragRegion}>
-          <IconButton
-            aria-label="Refresh current changes"
-            title="Refresh"
-            variant="ghost"
-            size="xs"
-            color="fg.muted"
-            loading={state.changesRefreshing || worktreesQuery.isFetching}
-            onClick={refresh}
-          >
-            <LuRefreshCw />
-          </IconButton>
-          <QueueActionsMenu
-            repoSlug={repo?.slug ?? undefined}
-            onAddRepo={onAddRepo}
-            onOpenSettings={onOpenSettings}
-          />
-        </HStack>
-      </HStack>
-
-      <Flex flex="1" minH="0">
-        <Flex
-          direction="column"
-          minH="0"
-          minW="0"
-          flexShrink="0"
-          style={{ width }}
-        >
-          <LocalChangesColumn state={state} />
-        </Flex>
-        <ResizeHandle onPointerDown={startResize} border />
-        <LocalChangesPane state={state} />
+        <LocalChangesColumn
+          state={state}
+          repoSlug={repo?.slug ?? undefined}
+          refreshing={state.changesRefreshing || worktreesQuery.isFetching}
+          onRefresh={refresh}
+          onAddRepo={onAddRepo}
+          onOpenSettings={onOpenSettings}
+        />
       </Flex>
+      <ResizeHandle onPointerDown={startResize} border />
+      <LocalChangesPane state={state} />
     </Flex>
   );
 }
