@@ -85,7 +85,7 @@ export default function TabBar() {
       pl="2"
       pr="2"
       borderBottomWidth="1px"
-      borderColor="border.subtle"
+      borderColor="border"
       bg="bg.subtle"
       css={dragRegion}
     >
