@@ -58,6 +58,8 @@ describe("RepositoryList", () => {
     expect(
       screen.queryByRole("button", { name: /^Pull requests/i }),
     ).toBeNull();
+    expect(screen.queryByText("12")).toBeNull();
+    expect(screen.queryByText("8")).toBeNull();
     expect(listWorktrees).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Expand app" }));
     expect(listWorktrees).toHaveBeenCalledWith(repository.path);

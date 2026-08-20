@@ -144,7 +144,6 @@ export default function RepositoryList({
               repo={dragged}
               selected={dragged.path === activePath}
               open={expanded.has(dragged.path)}
-              counts={dragged.slug ? counts?.[dragged.slug] : undefined}
             />
           </HStack>
         )}

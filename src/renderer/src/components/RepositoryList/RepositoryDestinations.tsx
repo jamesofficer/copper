@@ -159,7 +159,13 @@ function DestinationRow({
         {label}
       </Text>
       {count !== undefined && (
-        <Badge ml="auto" size="xs" variant="surface" fontFamily="mono">
+        <Badge
+          ml="auto"
+          size="xs"
+          variant="surface"
+          colorPalette="gray"
+          fontFamily="mono"
+        >
           {count}
         </Badge>
       )}

@@ -1,21 +1,7 @@
-import {
-  Badge,
-  Center,
-  HStack,
-  Icon,
-  IconButton,
-  Stack,
-  Text,
-} from "@chakra-ui/react";
+import { HStack, Icon, IconButton, Stack, Text } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  LuChevronRight,
-  LuCircleDot,
-  LuFolderGit2,
-  LuGitPullRequest,
-  LuTrash2,
-} from "react-icons/lu";
+import { LuChevronRight, LuFolderGit2, LuTrash2 } from "react-icons/lu";
 import type { RepoCounts, Repository } from "../../../../shared/types";
 import type { RepositoryDestination } from "../../lib/repositoryDestination";
 import { sidebarHover, sidebarSelected } from "../../lib/sidebarStyles";
@@ -81,7 +67,6 @@ export default function RepositoryRow({
           repo={repo}
           selected={selected}
           open={open}
-          counts={counts}
           onOpenChange={onOpenChange}
           onSelect={onSelect}
           onRemove={onRemove}
@@ -107,7 +92,6 @@ interface ContentProps {
   repo: Repository;
   selected: boolean;
   open: boolean;
-  counts: RepoCounts | undefined;
   // Actions are absent on the drag copy because it is visual only.
   onOpenChange?(open: boolean): void;
   onSelect?(path: string): void;
@@ -118,7 +102,6 @@ export function RepositoryRowContent({
   repo,
   selected,
   open,
-  counts,
   onOpenChange,
   onSelect,
   onRemove,
@@ -165,51 +148,21 @@ export function RepositoryRowContent({
           {repo.slug?.split("/")[1] ?? repo.name}
         </Text>
       </HStack>
-      <Center position="relative" minW="5" h="5" mr="2" flexShrink="0">
-        <HStack
-          gap="1"
-          css={onRemove ? { [revealed]: { opacity: 0 } } : undefined}
+      {onRemove && (
+        <IconButton
+          aria-label="Remove repository"
+          size="2xs"
+          variant="outline"
+          borderColor={selected ? "border.emphasized" : undefined}
+          flexShrink="0"
+          mr="2"
+          opacity="0"
+          css={{ [revealed]: { opacity: 1 } }}
+          onClick={() => onRemove(repo.path)}
         >
-          {counts?.pullRequests ? (
-            <Badge
-              size="xs"
-              variant="surface"
-              fontFamily="mono"
-              title={`${counts.pullRequests} open pull requests`}
-            >
-              <LuGitPullRequest size={9} />
-              {counts.pullRequests}
-            </Badge>
-          ) : null}
-          {counts?.issues ? (
-            <Badge
-              size="xs"
-              variant="surface"
-              colorPalette="gray"
-              fontFamily="mono"
-              title={`${counts.issues} open issues`}
-            >
-              <LuCircleDot size={9} />
-              {counts.issues}
-            </Badge>
-          ) : null}
-        </HStack>
-        {onRemove && (
-          <IconButton
-            aria-label="Remove repository"
-            size="2xs"
-            variant="outline"
-            borderColor={selected ? "border.emphasized" : undefined}
-            position="absolute"
-            inset="0"
-            opacity="0"
-            css={{ [revealed]: { opacity: 1 } }}
-            onClick={() => onRemove(repo.path)}
-          >
-            <LuTrash2 />
-          </IconButton>
-        )}
-      </Center>
+          <LuTrash2 />
+        </IconButton>
+      )}
     </>
   );
 }
