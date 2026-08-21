@@ -373,8 +373,8 @@ export interface LocalCommitList {
   // Current branch of the checkout; null on a detached HEAD.
   branch: string | null;
   // The ref the branch was compared against ("origin/main"), so the UI can say
-  // what the list means. Null when the checkout is level with its trunk and
-  // upstream, and the list is plain recent history.
+  // what the list means. Null when the list is recent trunk or detached-HEAD
+  // history rather than commits unique to another branch.
   base: string | null;
   commits: LocalCommit[];
 }
@@ -383,6 +383,12 @@ export interface LocalCommitList {
 export interface CommitResult {
   sha: string;
   subject: string;
+}
+
+// The branch and remote ref updated by a push from Current changes.
+export interface PushResult {
+  branch: string;
+  target: string;
 }
 
 // "attention" = changed logic worth careful thought, "routine" = ordinary

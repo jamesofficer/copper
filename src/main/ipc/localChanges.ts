@@ -7,7 +7,11 @@ import {
   stageFiles,
   unstageFiles,
 } from "../repo/changes";
-import { getLocalCommitFiles, listLocalCommits } from "../repo/commits";
+import {
+  getLocalCommitFiles,
+  listLocalCommits,
+  pushLocalBranch,
+} from "../repo/commits";
 import { listRepositories, listWorktrees } from "../repo/local";
 
 type LocalChangesHandlers = Pick<
@@ -21,6 +25,7 @@ type LocalChangesHandlers = Pick<
   | "unstageFiles"
   | "discardChanges"
   | "commitChanges"
+  | "pushLocalBranch"
 >;
 
 interface LocalChangesDependencies {
@@ -34,13 +39,14 @@ interface LocalChangesDependencies {
   unstageFiles: typeof unstageFiles;
   discardChanges: typeof discardChanges;
   commitChanges: typeof commitChanges;
+  pushLocalBranch: typeof pushLocalBranch;
 }
 
 export function createLocalChangesHandlers(
   dependencies: LocalChangesDependencies,
 ): LocalChangesHandlers {
-  // Git uses one index lock per checkout. Keep calls in invocation order so a
-  // commit cannot race ahead of the stage operation it was meant to include.
+  // Git uses one index lock per checkout. Keep writes in invocation order.
+  // A commit must follow its stage operation, and a push must follow its commit.
   const pendingWrites = new Map<string, Promise<void>>();
 
   function serializeMutation<T>(
@@ -107,6 +113,11 @@ export function createLocalChangesHandlers(
         await assertRegisteredCheckout(repoPath);
         return dependencies.commitChanges(repoPath, message);
       }),
+    pushLocalBranch: (repoPath) =>
+      serializeMutation(repoPath, async () => {
+        await assertRegisteredCheckout(repoPath);
+        return dependencies.pushLocalBranch(repoPath);
+      }),
   };
 }
 
@@ -121,4 +132,5 @@ export const localChangesHandlers = createLocalChangesHandlers({
   unstageFiles,
   discardChanges,
   commitChanges,
+  pushLocalBranch,
 });

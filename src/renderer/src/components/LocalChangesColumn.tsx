@@ -26,7 +26,7 @@ import { localChangesBulkLabel } from "../lib/localChangesSelection";
 import { scrollbar } from "../lib/scrollbar";
 import type { LocalChangesState } from "../lib/useLocalChanges";
 import BranchLabel from "./BranchLabel";
-import CommitComposer from "./CommitComposer";
+import CommitComposer from "./CommitComposer/CommitComposer";
 import CommitsPanel from "./CommitsPanel";
 import DiscardChangesDialog from "./DiscardChangesDialog";
 import FileList, { type RowAction } from "./FileList";
@@ -250,6 +250,7 @@ export default function LocalChangesColumn({
           unmounting it would shift everything above it as commits are picked. */}
       <CommitComposer
         path={path}
+        branch={branch}
         stagedCount={state.stagedCount}
         disabled={Boolean(commit)}
       />

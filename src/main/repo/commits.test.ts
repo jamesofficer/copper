@@ -4,7 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { getLocalCommitFiles, listLocalCommits } from "./commits";
+import {
+  getLocalCommitFiles,
+  listLocalCommits,
+  pushLocalBranch,
+} from "./commits";
 
 const run = promisify(execFile);
 
@@ -12,6 +16,7 @@ const run = promisify(execFile);
 // answers the way this module assumes — branch ranges, merge diffs, and the
 // log format a mock could only ever confirm back at me.
 let repo: string;
+let remote: string | null;
 
 async function git(...args: string[]): Promise<string> {
   const { stdout } = await run("git", ["-C", repo, ...args]);
@@ -26,6 +31,7 @@ async function commit(path: string, contents: string, message: string) {
 
 beforeEach(async () => {
   repo = await mkdtemp(join(tmpdir(), "reviewr-commits-"));
+  remote = null;
   await git("init", "-q", "-b", "main");
   await git("config", "user.email", "test@example.com");
   await git("config", "user.name", "Test");
@@ -34,6 +40,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await rm(repo, { recursive: true, force: true });
+  if (remote) await rm(remote, { recursive: true, force: true });
 });
 
 describe("listLocalCommits", () => {
@@ -67,7 +74,7 @@ describe("listLocalCommits", () => {
     expect(entry.body).toBe("why it was done\nand how");
   });
 
-  it("falls back to recent history when the branch is level with its trunk", async () => {
+  it("shows recent trunk history when the branch is level with its upstream", async () => {
     await commit("a.txt", "a\n", "first");
 
     const list = await listLocalCommits(repo);
@@ -76,11 +83,83 @@ describe("listLocalCommits", () => {
     expect(list.commits.map((entry) => entry.subject)).toEqual(["first"]);
   });
 
+  it("does not fill an empty feature branch with trunk history", async () => {
+    await commit("a.txt", "a\n", "on trunk");
+    await git("checkout", "-q", "-b", "feature");
+
+    const list = await listLocalCommits(repo);
+
+    expect(list.base).toBe("main");
+    expect(list.commits).toEqual([]);
+  });
+
+  it("limits recent history to 20 commits", async () => {
+    for (let index = 1; index <= 22; index++) {
+      await commit("count.txt", `${index}\n`, `commit ${index}`);
+    }
+
+    const list = await listLocalCommits(repo);
+
+    expect(list.commits).toHaveLength(20);
+    expect(list.commits[0].subject).toBe("commit 22");
+    expect(list.commits[19].subject).toBe("commit 3");
+  });
+
   it("reports an empty branch rather than failing on a repo with no commits", async () => {
     const list = await listLocalCommits(repo);
 
     expect(list.commits).toEqual([]);
     expect(list.branch).toBe("main");
+  });
+});
+
+describe("pushLocalBranch", () => {
+  it("pushes a new branch and then uses its recorded upstream", async () => {
+    await commit("a.txt", "a\n", "first");
+    remote = await mkdtemp(join(tmpdir(), "reviewr-remote-"));
+    await run("git", ["init", "--bare", "-q", remote]);
+    await git("remote", "add", "origin", remote);
+
+    const result = await pushLocalBranch(repo);
+
+    expect(result).toEqual({ branch: "main", target: "origin/main" });
+    expect((await git("rev-parse", "--abbrev-ref", "@{upstream}")).trim()).toBe(
+      "origin/main",
+    );
+    const { stdout } = await run("git", [
+      "--git-dir",
+      remote,
+      "rev-parse",
+      "refs/heads/main",
+    ]);
+    expect(stdout.trim()).toBe((await git("rev-parse", "HEAD")).trim());
+
+    await git("checkout", "-q", "-b", "other");
+    await git("push", "-q", "--set-upstream", "origin", "other");
+    const remoteOther = (await git("rev-parse", "origin/other")).trim();
+    await commit("other.txt", "other\n", "unpublished other branch");
+    await git("checkout", "-q", "main");
+    await commit("b.txt", "b\n", "second");
+    await git("config", "push.default", "matching");
+
+    await expect(pushLocalBranch(repo)).resolves.toEqual({
+      branch: "main",
+      target: "origin/main",
+    });
+    const { stdout: updated } = await run("git", [
+      "--git-dir",
+      remote,
+      "rev-parse",
+      "refs/heads/main",
+    ]);
+    expect(updated.trim()).toBe((await git("rev-parse", "HEAD")).trim());
+    const { stdout: other } = await run("git", [
+      "--git-dir",
+      remote,
+      "rev-parse",
+      "refs/heads/other",
+    ]);
+    expect(other.trim()).toBe(remoteOther);
   });
 });
 

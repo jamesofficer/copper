@@ -40,6 +40,8 @@ const api: WindowApi = {
     ipcRenderer.invoke("discardChanges", repoPath, paths),
   commitChanges: (repoPath, message) =>
     ipcRenderer.invoke("commitChanges", repoPath, message),
+  pushLocalBranch: (repoPath) =>
+    ipcRenderer.invoke("pushLocalBranch", repoPath),
   listPullRequests: (repo) => ipcRenderer.invoke("listPullRequests", repo),
   listReviewRequestedPullRequests: () =>
     ipcRenderer.invoke("listReviewRequestedPullRequests"),

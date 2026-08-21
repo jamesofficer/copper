@@ -28,6 +28,7 @@ import type {
   PullRequestFile,
   PullRequestReactions,
   PullRequestReview,
+  PushResult,
   ReactionContent,
   RepoBranchInfo,
   RepoCounts,
@@ -78,6 +79,9 @@ export interface IpcApi {
   discardChanges(repoPath: string, paths: string[]): Promise<void>;
   // Commits the index — never the working tree — in the given checkout.
   commitChanges(repoPath: string, message: string): Promise<CommitResult>;
+  // Pushes the current branch to its upstream. A new branch gets an upstream
+  // on origin, or on the only configured remote when origin does not exist.
+  pushLocalBranch(repoPath: string): Promise<PushResult>;
   listPullRequests(repo: string): Promise<PullRequest[]>;
   // Open PRs across the registered repos where the logged-in user's review is
   // requested.
@@ -346,6 +350,7 @@ export const ipcChannels = [
   "unstageFiles",
   "discardChanges",
   "commitChanges",
+  "pushLocalBranch",
   "listPullRequests",
   "listReviewRequestedPullRequests",
   "listMyPullRequests",

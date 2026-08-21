@@ -327,7 +327,7 @@ export async function getLocalChanges(repoPath: string): Promise<LocalChanges> {
 // commonest commit failure there is — goes to stdout, as does the output of
 // many pre-commit hooks. Reading stderr alone left those cases showing the
 // generic fallback, which says nothing at all.
-function gitError(error: unknown, fallback: string): Error {
+export function gitError(error: unknown, fallback: string): Error {
   const streams = error as { stderr?: unknown; stdout?: unknown };
   const text = [streams.stderr, streams.stdout]
     .map((stream) => (typeof stream === "string" ? stream.trim() : ""))

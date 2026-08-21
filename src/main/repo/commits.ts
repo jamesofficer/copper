@@ -2,13 +2,12 @@ import type {
   LocalCommit,
   LocalCommitList,
   PullRequestFile,
+  PushResult,
 } from "../../shared/types";
-import { parseGitDiff, runGit } from "./changes";
+import { gitError, parseGitDiff, runGit } from "./changes";
 
-// Enough history for any branch worth reviewing commit by commit, and a hard
-// stop on a long-lived branch that would otherwise ship thousands of entries
-// over IPC.
-const maxCommits = 200;
+// The panel is a short branch review aid, not a replacement for git log.
+const maxCommits = 20;
 
 // Field separator inside one log entry; entries themselves are NUL-terminated
 // by "-z". Both characters can't appear in a commit message.
@@ -77,23 +76,24 @@ async function aheadOf(repoPath: string, base: string): Promise<number> {
   }
 }
 
-// What this branch should be compared against. The trunk comes first: on a
-// feature branch "trunk..HEAD" is exactly the work done here. On the trunk
-// itself that range is empty, so the upstream answers instead and the list
-// becomes the unpushed commits. Neither having anything means the checkout is
-// level with both, and recent history is the only useful thing left to show.
-async function resolveBase(repoPath: string): Promise<string | null> {
+function branchNameForRef(ref: string): string {
+  return ref.startsWith("origin/") ? ref.slice("origin/".length) : ref;
+}
+
+// A feature branch is always compared with trunk, even when it has no unique
+// commits. This prevents an empty feature branch from falling back to trunk's
+// whole recent history. Trunk uses its upstream only while it is ahead; when
+// it is level, recent trunk history is the useful view.
+async function resolveBase(
+  repoPath: string,
+  branch: string | null,
+): Promise<string | null> {
   const [trunk, upstream] = await Promise.all([
     defaultBranchRef(repoPath),
     upstreamRef(repoPath),
   ]);
-  const candidates = [trunk, upstream].filter(
-    (ref, index, refs): ref is string =>
-      ref !== null && refs.indexOf(ref) === index,
-  );
-  for (const base of candidates) {
-    if ((await aheadOf(repoPath, base)) > 0) return base;
-  }
+  if (trunk && branch && branch !== branchNameForRef(trunk)) return trunk;
+  if (upstream && (await aheadOf(repoPath, upstream)) > 0) return upstream;
   return null;
 }
 
@@ -129,10 +129,8 @@ function parseLog(output: string): LocalCommit[] {
 export async function listLocalCommits(
   repoPath: string,
 ): Promise<LocalCommitList> {
-  const [branch, base] = await Promise.all([
-    currentBranch(repoPath),
-    resolveBase(repoPath),
-  ]);
+  const branch = await currentBranch(repoPath);
+  const base = await resolveBase(repoPath, branch);
 
   let output = "";
   try {
@@ -149,6 +147,76 @@ export async function listLocalCommits(
     return { branch, base, commits: [] };
   }
   return { branch, base, commits: parseLog(output) };
+}
+
+interface UpstreamPushTarget {
+  remote: string;
+  remoteRef: string;
+  label: string;
+}
+
+async function upstreamPushTarget(
+  repoPath: string,
+  branch: string,
+): Promise<UpstreamPushTarget | null> {
+  const output = (
+    await runGit(repoPath, [
+      "for-each-ref",
+      "--format=%(upstream:remotename)%00%(upstream:remoteref)%00%(upstream:short)",
+      `refs/heads/${branch}`,
+    ])
+  ).trim();
+  const [remote, remoteRef, label] = output.split("\0");
+  return remote && remoteRef && label ? { remote, remoteRef, label } : null;
+}
+
+async function remoteForNewUpstream(repoPath: string): Promise<string> {
+  const remotes = (await runGit(repoPath, ["remote"]))
+    .split("\n")
+    .map((remote) => remote.trim())
+    .filter(Boolean);
+  if (remotes.includes("origin")) return "origin";
+  if (remotes.length === 1) return remotes[0];
+  if (remotes.length === 0) {
+    throw new Error("This repository has no Git remote to push to.");
+  }
+  throw new Error(
+    "This branch has no upstream. Set one before pushing because the repository has more than one remote.",
+  );
+}
+
+// Pushes only the checked-out branch. Existing upstream configuration selects
+// the remote and destination. A new branch uses origin, or the only remote.
+export async function pushLocalBranch(repoPath: string): Promise<PushResult> {
+  const branch = await currentBranch(repoPath);
+  if (!branch) throw new Error("Check out a branch before pushing.");
+
+  const upstream = await upstreamPushTarget(repoPath, branch);
+  if (upstream) {
+    try {
+      await runGit(repoPath, [
+        "push",
+        upstream.remote,
+        `refs/heads/${branch}:${upstream.remoteRef}`,
+      ]);
+    } catch (error) {
+      throw gitError(error, "Couldn't push this branch.");
+    }
+    return { branch, target: upstream.label };
+  }
+
+  const remote = await remoteForNewUpstream(repoPath);
+  try {
+    await runGit(repoPath, [
+      "push",
+      "--set-upstream",
+      remote,
+      `refs/heads/${branch}:refs/heads/${branch}`,
+    ]);
+  } catch (error) {
+    throw gitError(error, "Couldn't push this branch.");
+  }
+  return { branch, target: `${remote}/${branch}` };
 }
 
 // One commit's changes, shaped like a PR's changed files so the diff UI renders

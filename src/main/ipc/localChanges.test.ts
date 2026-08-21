@@ -3,6 +3,7 @@ import type {
   CommitResult,
   LocalChanges,
   LocalCommitList,
+  PushResult,
 } from "../../shared/types";
 import { createLocalChangesHandlers } from "./localChanges";
 
@@ -38,6 +39,10 @@ function dependencies() {
       sha: "abc1234",
       subject: "test",
     } satisfies CommitResult),
+    pushLocalBranch: vi.fn().mockResolvedValue({
+      branch: "main",
+      target: "origin/main",
+    } satisfies PushResult),
   };
 }
 
@@ -120,6 +125,7 @@ describe("local changes IPC handlers", () => {
       () => handlers.unstageFiles("/tmp/other", ["one.ts"]),
       () => handlers.discardChanges("/tmp/other", ["one.ts"]),
       () => handlers.commitChanges("/tmp/other", "chore: nope"),
+      () => handlers.pushLocalBranch("/tmp/other"),
     ];
 
     for (const attempt of attempts) {
@@ -132,5 +138,6 @@ describe("local changes IPC handlers", () => {
     expect(deps.unstageFiles).not.toHaveBeenCalled();
     expect(deps.discardChanges).not.toHaveBeenCalled();
     expect(deps.commitChanges).not.toHaveBeenCalled();
+    expect(deps.pushLocalBranch).not.toHaveBeenCalled();
   });
 });
