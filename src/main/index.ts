@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { app, BrowserWindow, nativeImage, shell } from "electron";
+import { windowFullscreenChannel } from "../shared/ipc";
 import { handleAssetRequests, registerAssetScheme } from "./github/assets";
 import { registerIpcHandlers } from "./ipc/router";
 
@@ -44,6 +45,19 @@ function createWindow(): void {
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
     },
+  });
+
+  function sendFullscreenState(fullscreen: boolean): void {
+    if (!window.webContents.isDestroyed()) {
+      window.webContents.send(windowFullscreenChannel, fullscreen);
+    }
+  }
+
+  window.on("enter-full-screen", () => sendFullscreenState(true));
+  window.on("leave-full-screen", () => sendFullscreenState(false));
+  // A renderer reload can happen while the window is already full screen.
+  window.webContents.on("did-finish-load", () => {
+    sendFullscreenState(window.isFullScreen());
   });
 
   // Keep external links in the system browser instead of navigating the app.

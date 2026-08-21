@@ -30,6 +30,7 @@ import {
   titleBarHeight,
   trafficLightSpace,
 } from "../../lib/titleBar";
+import { useWindowFullscreen } from "../../lib/windowFullscreen";
 import ShowSidebarButton from "../ShowSidebarButton";
 import SortableTab from "./SortableTab";
 import TabItem from "./TabItem";
@@ -50,6 +51,7 @@ export default function TabBar() {
   const closeToRight = useTabs((state) => state.closeToRight);
   const moveTab = useTabs((state) => state.moveTab);
   const collapsed = useSidebarCollapsed();
+  const fullscreen = useWindowFullscreen();
   const [dragged, setDragged] = useState<Tab | null>(null);
   // The drag starts after 4px of movement, so a plain click still selects the
   // tab. This is the same rule as the repository rows.
@@ -89,7 +91,7 @@ export default function TabBar() {
       flexShrink="0"
       align="stretch"
       gap="1"
-      pl={collapsed ? trafficLightSpace : "2"}
+      pl={collapsed && !fullscreen ? trafficLightSpace : "2"}
       pr="2"
       borderBottomWidth="1px"
       borderColor="border"

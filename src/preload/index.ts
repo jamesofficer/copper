@@ -3,7 +3,19 @@ import {
   type ChatChunk,
   chatChunkChannel,
   type WindowApi,
+  windowFullscreenChannel,
 } from "../shared/ipc";
+
+let windowFullscreen = false;
+const windowFullscreenListeners = new Set<(fullscreen: boolean) => void>();
+
+ipcRenderer.on(
+  windowFullscreenChannel,
+  (_event: IpcRendererEvent, fullscreen: boolean) => {
+    windowFullscreen = fullscreen;
+    for (const listener of windowFullscreenListeners) listener(fullscreen);
+  },
+);
 
 const api: WindowApi = {
   listRepositories: () => ipcRenderer.invoke("listRepositories"),
@@ -169,6 +181,11 @@ const api: WindowApi = {
       listener(chunk);
     ipcRenderer.on(chatChunkChannel, handler);
     return () => ipcRenderer.off(chatChunkChannel, handler);
+  },
+  isWindowFullscreen: () => windowFullscreen,
+  onWindowFullscreenChange: (listener) => {
+    windowFullscreenListeners.add(listener);
+    return () => windowFullscreenListeners.delete(listener);
   },
 };
 

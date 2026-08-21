@@ -323,9 +323,12 @@ export interface ChatChunk {
 }
 
 export const chatChunkChannel = "chatChunk";
+export const windowFullscreenChannel = "windowFullscreen";
 
 export interface RendererEvents {
   onChatChunk(listener: (chunk: ChatChunk) => void): () => void;
+  isWindowFullscreen(): boolean;
+  onWindowFullscreenChange(listener: (fullscreen: boolean) => void): () => void;
 }
 
 export type WindowApi = IpcApi & RendererEvents;

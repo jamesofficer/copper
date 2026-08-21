@@ -8,11 +8,17 @@ import { useTabs } from "../../lib/tabs/useTabs";
 import { renderWithProviders } from "../../testing/render";
 import TabBar from "./TabBar";
 
+const windowState = vi.hoisted(() => ({ fullscreen: false }));
+
 vi.mock("../../lib/titleBar", () => ({
   dragRegion: {},
   noDragRegion: {},
   titleBarHeight: "12",
   trafficLightSpace: "88px",
+}));
+
+vi.mock("../../lib/windowFullscreen", () => ({
+  useWindowFullscreen: () => windowState.fullscreen,
 }));
 
 // The logic is in lib/tabs/, and those files have their own tests. These
@@ -46,6 +52,7 @@ beforeEach(() => {
   localStorage.clear();
   setSidebarCollapsed(false);
   useTabs.setState(initialTabsState());
+  windowState.fullscreen = false;
 });
 
 describe("TabBar", () => {
@@ -66,6 +73,16 @@ describe("TabBar", () => {
 
     expect(getComputedStyle(screen.getByRole("banner")).paddingLeft).toBe(
       "88px",
+    );
+  });
+
+  it("removes the traffic-light inset in macOS full screen", () => {
+    setSidebarCollapsed(true);
+    windowState.fullscreen = true;
+    renderWithProviders(<TabBar />);
+
+    expect(getComputedStyle(screen.getByRole("banner")).paddingLeft).toBe(
+      "var(--chakra-spacing-2)",
     );
   });
 

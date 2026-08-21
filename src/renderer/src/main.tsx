@@ -11,10 +11,12 @@ import { Toaster } from "./components/ui/toaster";
 import { applyAccent, getAccent } from "./lib/accent";
 import { applyColorMode, getColorMode } from "./lib/colorMode";
 import { persistOptions, queryClient } from "./lib/queryClient";
+import { startWindowFullscreenTracking } from "./lib/windowFullscreen";
 import { system } from "./theme";
 
 applyAccent(getAccent());
 applyColorMode(getColorMode());
+startWindowFullscreenTracking();
 
 const rootElement = document.getElementById("root");
 if (!rootElement) throw new Error("Root element #root not found");
