@@ -16,6 +16,7 @@ import {
 } from "@dnd-kit/sortable";
 import { useState } from "react";
 import { scrollbar } from "../../lib/scrollbar";
+import { useSidebarCollapsed } from "../../lib/sidebarCollapsed";
 import { sortableTabIds } from "../../lib/tabs/tabLabel";
 import {
   QUEUE_TAB_ID,
@@ -23,7 +24,12 @@ import {
   tabMenuAvailability,
 } from "../../lib/tabs/tabs";
 import { useTabs } from "../../lib/tabs/useTabs";
-import { dragRegion, noDragRegion, titleBarHeight } from "../../lib/titleBar";
+import {
+  dragRegion,
+  noDragRegion,
+  titleBarHeight,
+  trafficLightSpace,
+} from "../../lib/titleBar";
 import ShowSidebarButton from "../ShowSidebarButton";
 import SortableTab from "./SortableTab";
 import TabItem from "./TabItem";
@@ -43,6 +49,7 @@ export default function TabBar() {
   const closeOthers = useTabs((state) => state.closeOthers);
   const closeToRight = useTabs((state) => state.closeToRight);
   const moveTab = useTabs((state) => state.moveTab);
+  const collapsed = useSidebarCollapsed();
   const [dragged, setDragged] = useState<Tab | null>(null);
   // The drag starts after 4px of movement, so a plain click still selects the
   // tab. This is the same rule as the repository rows.
@@ -82,7 +89,7 @@ export default function TabBar() {
       flexShrink="0"
       align="stretch"
       gap="1"
-      pl="2"
+      pl={collapsed ? trafficLightSpace : "2"}
       pr="2"
       borderBottomWidth="1px"
       borderColor="border"

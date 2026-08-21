@@ -6,6 +6,10 @@ import type { SystemStyleObject } from "@chakra-ui/react";
 // platforms the window keeps its frame and neither is needed.
 export const isMac = navigator.userAgent.includes("Mac");
 
+// The top tab row reaches the window edge when the sidebar is hidden. Keep its
+// controls clear of the native buttons at x=18; lower toolbars need no inset.
+export const trafficLightSpace = isMac ? "88px" : "2";
+
 // Height of the app's top bars, so the buttons sit centred in all of them.
 export const titleBarHeight = "12";
 
