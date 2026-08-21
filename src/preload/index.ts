@@ -64,6 +64,24 @@ const api: WindowApi = {
     ipcRenderer.invoke("setPullRequestBody", repo, prNumber, body),
   removeReviewRequest: (repo, prNumber) =>
     ipcRenderer.invoke("removeReviewRequest", repo, prNumber),
+  listRepositoryPeople: (repo) =>
+    ipcRenderer.invoke("listRepositoryPeople", repo),
+  setPullRequestReviewer: (repo, prNumber, login, requested) =>
+    ipcRenderer.invoke(
+      "setPullRequestReviewer",
+      repo,
+      prNumber,
+      login,
+      requested,
+    ),
+  setPullRequestAssignee: (repo, prNumber, login, assigned) =>
+    ipcRenderer.invoke(
+      "setPullRequestAssignee",
+      repo,
+      prNumber,
+      login,
+      assigned,
+    ),
   peekPullRequest: (repo, prNumber) =>
     ipcRenderer.invoke("peekPullRequest", repo, prNumber),
   peekPullRequestActivity: (repo, prNumber) =>

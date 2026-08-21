@@ -36,6 +36,11 @@ export interface GitHubLabel {
   color: string;
 }
 
+export interface RepositoryPeople {
+  reviewers: string[];
+  assignees: string[];
+}
+
 export interface PullRequestDetail {
   repo: string;
   number: number;

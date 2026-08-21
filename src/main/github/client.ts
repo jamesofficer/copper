@@ -19,6 +19,7 @@ import type {
   RepoIssue,
   RepoIssueDetail,
   RepoMergeSettings,
+  RepositoryPeople,
   ReviewComment,
   ReviewDecision,
   ReviewState,
@@ -614,6 +615,50 @@ export async function getRepoIssue(
     comments: issue.comments,
     createdAt: issue.created_at,
     updatedAt: issue.updated_at,
+  };
+}
+
+interface GitHubLogin {
+  login: string;
+}
+
+async function listLoginPages(token: string, path: string): Promise<string[]> {
+  const logins: string[] = [];
+  for (let page = 1; page <= 10; page++) {
+    const separator = path.includes("?") ? "&" : "?";
+    const batch = await githubFetch<GitHubLogin[]>(
+      token,
+      `${path}${separator}per_page=100&page=${page}`,
+    );
+    logins.push(...batch.map((user) => user.login));
+    if (batch.length < 100) break;
+  }
+  return logins;
+}
+
+function uniqueLogins(...groups: string[][]): string[] {
+  return [...new Set(groups.flat())].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" }),
+  );
+}
+
+// Loads picker candidates only when a reviewer opens a people control.
+// Assignees are also valid reviewer fallbacks when collaborator listing fails.
+export async function listRepositoryPeople(
+  repo: string,
+): Promise<RepositoryPeople> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error("Connect a GitHub token in settings to manage PR people.");
+  }
+
+  const [assignees, collaborators] = await Promise.all([
+    listLoginPages(token, `/repos/${repo}/assignees`),
+    listLoginPages(token, `/repos/${repo}/collaborators`).catch(() => null),
+  ]);
+  return {
+    reviewers: uniqueLogins(collaborators ?? [], assignees),
+    assignees: uniqueLogins(assignees),
   };
 }
 
@@ -1290,6 +1335,43 @@ export async function removeReviewRequest(
     `/repos/${repo}/pulls/${prNumber}/requested_reviewers`,
     { method: "DELETE", body: { reviewers: [viewer] } },
   );
+}
+
+export async function setPullRequestReviewer(
+  repo: string,
+  prNumber: number,
+  login: string,
+  requested: boolean,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to update pull requests.",
+    );
+  }
+  await githubFetch(
+    token,
+    `/repos/${repo}/pulls/${prNumber}/requested_reviewers`,
+    { method: requested ? "POST" : "DELETE", body: { reviewers: [login] } },
+  );
+}
+
+export async function setPullRequestAssignee(
+  repo: string,
+  prNumber: number,
+  login: string,
+  assigned: boolean,
+): Promise<void> {
+  const token = await getGitHubToken();
+  if (!token) {
+    throw new Error(
+      "Connect a GitHub token in settings to update pull requests.",
+    );
+  }
+  await githubFetch(token, `/repos/${repo}/issues/${prNumber}/assignees`, {
+    method: assigned ? "POST" : "DELETE",
+    body: { assignees: [login] },
+  });
 }
 
 export async function setPullRequestBody(

@@ -35,6 +35,7 @@ import {
   listPullRequestReviews,
   listReactions,
   listRepoIssues,
+  listRepositoryPeople,
   listResolvedReviewThreads,
   listReviewComments,
   listReviewRequestedPullRequests,
@@ -45,9 +46,11 @@ import {
   removeReviewRequest,
   replyToReviewComment,
   setFileViewed,
+  setPullRequestAssignee,
   setPullRequestBase,
   setPullRequestBody,
   setPullRequestReady,
+  setPullRequestReviewer,
   setPullRequestState,
   setReaction,
   setReviewThreadResolved,
@@ -99,6 +102,11 @@ const handlers: IpcApi = {
   setPullRequestBody: (repo, prNumber, body) =>
     setPullRequestBody(repo, prNumber, body),
   removeReviewRequest: (repo, prNumber) => removeReviewRequest(repo, prNumber),
+  listRepositoryPeople: (repo) => listRepositoryPeople(repo),
+  setPullRequestReviewer: (repo, prNumber, login, requested) =>
+    setPullRequestReviewer(repo, prNumber, login, requested),
+  setPullRequestAssignee: (repo, prNumber, login, assigned) =>
+    setPullRequestAssignee(repo, prNumber, login, assigned),
   peekPullRequest: (repo, prNumber) => getPullRequest(repo, prNumber),
   peekPullRequestActivity: (repo, prNumber) =>
     peekPullRequestActivity(repo, prNumber),

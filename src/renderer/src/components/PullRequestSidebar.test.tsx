@@ -9,6 +9,8 @@ const detail = {
   repo: "acme/app",
   number: 7,
   headSha: "abc123",
+  state: "open",
+  merged: false,
   changedFiles: 2,
   labels: [],
   reviewers: [],
@@ -32,6 +34,20 @@ describe("PullRequestSidebar", () => {
     expect(screen.getByText("No reviewers yet")).toBeTruthy();
     expect(screen.getByText("Nobody assigned")).toBeTruthy();
     expect(screen.getByText("No labels")).toBeTruthy();
+  });
+
+  it("offers people controls on an editable open pull request", () => {
+    renderWithProviders(
+      <PullRequestSidebar
+        detail={detail}
+        reviews={[]}
+        showProgress={false}
+        editable
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Edit reviewers" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Edit assignees" })).toBeTruthy();
   });
 
   it("leaves review status out of the preview panel", () => {

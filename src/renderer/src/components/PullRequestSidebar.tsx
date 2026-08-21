@@ -5,6 +5,7 @@ import type {
 } from "../../../shared/types";
 import LabelBadges from "./LabelBadges";
 import OpenedUpdatedLine from "./OpenedUpdatedLine";
+import PeoplePicker from "./PeoplePicker/PeoplePicker";
 import RailSection from "./RailSection";
 import ReviewerList from "./ReviewerList";
 import ReviewProgress from "./ReviewProgress";
@@ -17,6 +18,8 @@ interface Props {
   // act on (viewed files, draft comments), and each read is a request; the
   // home-screen preview is a quick look, so it doesn't spend them.
   showProgress?: boolean;
+  // People controls only appear in the full review screen for an open PR.
+  editable?: boolean;
 }
 
 // The overview's right-hand rail: the PR's standing facts — where the review
@@ -27,7 +30,10 @@ export default function PullRequestSidebar({
   detail,
   reviews,
   showProgress,
+  editable,
 }: Props) {
+  const canManagePeople = editable && detail.state === "open" && !detail.merged;
+
   return (
     <VStack gap="5" alignItems="stretch" separator={<Separator />}>
       {showProgress && (
@@ -36,11 +42,25 @@ export default function PullRequestSidebar({
         </RailSection>
       )}
 
-      <RailSection title="Reviewers">
+      <RailSection
+        title="Reviewers"
+        action={
+          canManagePeople ? (
+            <PeoplePicker detail={detail} kind="reviewers" />
+          ) : undefined
+        }
+      >
         <ReviewerList reviews={reviews} requestedReviewers={detail.reviewers} />
       </RailSection>
 
-      <RailSection title="Assignees">
+      <RailSection
+        title="Assignees"
+        action={
+          canManagePeople ? (
+            <PeoplePicker detail={detail} kind="assignees" />
+          ) : undefined
+        }
+      >
         <UserList logins={detail.assignees} empty="Nobody assigned" />
       </RailSection>
 

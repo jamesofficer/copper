@@ -52,9 +52,11 @@ const decisionMeta: Record<
 // vanishing — an empty "Reviewers" section is the answer to "who's looking at
 // this?", not clutter.
 export default function ReviewerList({ reviews, requestedReviewers }: Props) {
-  const decisions = decisionsByReviewer(reviews);
-  const decided = new Set(decisions.map((d) => d.author));
-  const awaiting = requestedReviewers.filter((login) => !decided.has(login));
+  const requested = new Set(requestedReviewers);
+  const decisions = decisionsByReviewer(reviews).filter(
+    (decision) => !requested.has(decision.author),
+  );
+  const awaiting = [...requested];
 
   if (decisions.length === 0 && awaiting.length === 0) {
     return (

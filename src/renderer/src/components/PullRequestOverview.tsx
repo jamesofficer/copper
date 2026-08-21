@@ -171,6 +171,7 @@ export default function PullRequestOverview({ pr, showActions }: Props) {
           detail={detail}
           reviews={reviews}
           showProgress={showActions}
+          editable={showActions}
         />
       }
     >

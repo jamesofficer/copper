@@ -36,6 +36,7 @@ import type {
   RepoIssueDetail,
   RepoMergeSettings,
   Repository,
+  RepositoryPeople,
   ReviewComment,
   ReviewDecision,
   ReviewPersonality,
@@ -108,6 +109,20 @@ export interface IpcApi {
   setPullRequestReady(repo: string, prNumber: number): Promise<void>;
   // Take the signed-in user off a PR's requested reviewers.
   removeReviewRequest(repo: string, prNumber: number): Promise<void>;
+  // People GitHub permits in the PR's reviewer and assignee pickers.
+  listRepositoryPeople(repo: string): Promise<RepositoryPeople>;
+  setPullRequestReviewer(
+    repo: string,
+    prNumber: number,
+    login: string,
+    requested: boolean,
+  ): Promise<void>;
+  setPullRequestAssignee(
+    repo: string,
+    prNumber: number,
+    login: string,
+    assigned: boolean,
+  ): Promise<void>;
   // Rewrite a pull request's description.
   setPullRequestBody(
     repo: string,
@@ -364,6 +379,9 @@ export const ipcChannels = [
   "setPullRequestBase",
   "setPullRequestBody",
   "removeReviewRequest",
+  "listRepositoryPeople",
+  "setPullRequestReviewer",
+  "setPullRequestAssignee",
   "peekPullRequest",
   "peekPullRequestActivity",
   "listPullRequestFiles",
