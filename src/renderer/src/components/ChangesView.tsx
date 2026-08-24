@@ -242,7 +242,7 @@ export default function ChangesView({ pr }: Props) {
   // against the head, a picked commit against itself.
   const fileContext = useMemo(() => {
     const sha = selectedCommit ?? headSha;
-    return sha ? { repo: pr.repo, sha } : undefined;
+    return sha ? { kind: "commit" as const, repo: pr.repo, sha } : undefined;
   }, [selectedCommit, headSha, pr.repo]);
 
   const commenting = useMemo(

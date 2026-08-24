@@ -17,6 +17,7 @@ export async function invalidateLocalChangeQueries(
 ): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["localChanges", repoPath] }),
+    queryClient.invalidateQueries({ queryKey: ["localFile", repoPath] }),
     queryClient.invalidateQueries({
       queryKey: ["localChangeCount", repoPath],
     }),

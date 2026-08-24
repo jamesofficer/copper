@@ -1,9 +1,12 @@
 import { execFile } from "node:child_process";
+import { lstat, readFile, readlink, realpath } from "node:fs/promises";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { promisify } from "node:util";
 import type {
   CommitResult,
   FileStatus,
   LocalChanges,
+  LocalFileSource,
   PullRequestFile,
 } from "../../shared/types";
 
@@ -38,6 +41,65 @@ async function git(repoPath: string, args: string[]): Promise<string> {
 // The same runner serves the commit list (repo/commits.ts): one place decides
 // the literal-pathspec and buffer settings every local git call needs.
 export { git as runGit };
+
+const maxFullFileLength = 64 * 1024 * 1024;
+
+function pathIsInside(root: string, target: string): boolean {
+  const fromRoot = relative(root, target);
+  return (
+    fromRoot === "" ||
+    (!isAbsolute(fromRoot) &&
+      fromRoot !== ".." &&
+      !fromRoot.startsWith(`..${sep}`))
+  );
+}
+
+function textContent(content: Buffer | string): string | null {
+  if (Buffer.byteLength(content) > maxFullFileLength) return null;
+  const text = typeof content === "string" ? content : content.toString("utf8");
+  return text.includes("\u0000") ? null : text;
+}
+
+async function readWorkingFile(
+  repoPath: string,
+  path: string,
+): Promise<string | null> {
+  const root = await realpath(repoPath);
+  const target = resolve(root, path);
+  if (!path || !pathIsInside(root, target)) return null;
+
+  // A tracked symbolic link contains its target text. Read the link instead
+  // of the file that the link identifies.
+  const parent = await realpath(dirname(target));
+  if (!pathIsInside(root, parent)) return null;
+  const stats = await lstat(target);
+  if (stats.isSymbolicLink()) return textContent(await readlink(target));
+  if (!stats.isFile() || stats.size > maxFullFileLength) return null;
+  return textContent(await readFile(target));
+}
+
+// Reads the version represented by the diff's new side. Missing, binary, and
+// oversized files return null so the existing diff-only fallback remains.
+export async function getLocalFile(
+  repoPath: string,
+  source: LocalFileSource,
+  path: string,
+): Promise<string | null> {
+  try {
+    const target = resolve(repoPath, path);
+    if (!path || !pathIsInside(resolve(repoPath), target)) return null;
+    if (source.kind === "working") return await readWorkingFile(repoPath, path);
+    if (source.kind === "commit" && !/^[0-9a-f]{40}$/i.test(source.sha)) {
+      return null;
+    }
+    const revision = source.kind === "index" ? "" : source.sha;
+    return textContent(
+      await git(repoPath, ["cat-file", "blob", `${revision}:${path}`]),
+    );
+  } catch {
+    return null;
+  }
+}
 
 // git C-quotes a path containing quotes, backslashes, or control characters
 // (core.quotepath=off only stops the escaping of non-ASCII).

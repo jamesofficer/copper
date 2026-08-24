@@ -32,6 +32,7 @@ function dependencies() {
       commits: [],
     } satisfies LocalCommitList),
     getLocalCommitFiles: vi.fn().mockResolvedValue([]),
+    getLocalFile: vi.fn().mockResolvedValue("export const value = 1;\n"),
     stageFiles: vi.fn().mockResolvedValue(undefined),
     unstageFiles: vi.fn().mockResolvedValue(undefined),
     discardChanges: vi.fn().mockResolvedValue(undefined),
@@ -55,6 +56,24 @@ describe("local changes IPC handlers", () => {
 
     expect(deps.getLocalChangeCount).toHaveBeenCalledWith("/repos/app");
     expect(deps.getLocalChanges).not.toHaveBeenCalled();
+  });
+
+  it("reads full files only from registered checkouts", async () => {
+    const deps = dependencies();
+    const handlers = createLocalChangesHandlers(deps);
+
+    await expect(
+      handlers.getLocalFile(
+        "/worktrees/feature",
+        { kind: "working" },
+        "src/app.ts",
+      ),
+    ).resolves.toBe("export const value = 1;\n");
+    await expect(
+      handlers.getLocalFile("/tmp/other", { kind: "working" }, "src/app.ts"),
+    ).rejects.toThrow(/registered repository/i);
+
+    expect(deps.getLocalFile).toHaveBeenCalledOnce();
   });
 
   it("allows a mutation in a worktree belonging to a registered repository", async () => {

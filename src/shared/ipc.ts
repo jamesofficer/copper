@@ -17,6 +17,7 @@ import type {
   LlmTask,
   LocalChanges,
   LocalCommitList,
+  LocalFileSource,
   MergeMethod,
   NewPullRequest,
   NewReviewComment,
@@ -68,6 +69,13 @@ export interface IpcApi {
     repoPath: string,
     sha: string,
   ): Promise<PullRequestFile[]>;
+  // Full contents from the working tree, index, or a local commit. This powers
+  // context expansion and full-file view in Current Changes.
+  getLocalFile(
+    repoPath: string,
+    source: LocalFileSource,
+    path: string,
+  ): Promise<string | null>;
   // The repo's checkouts — the main worktree plus any linked git worktrees —
   // so Current changes can switch between them. [] when listing fails.
   listWorktrees(repoPath: string): Promise<Worktree[]>;

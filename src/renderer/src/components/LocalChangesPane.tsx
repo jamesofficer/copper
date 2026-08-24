@@ -1,7 +1,7 @@
 import { Box, Center, Flex, Text } from "@chakra-ui/react";
 import type { LocalChangesState } from "../lib/useLocalChanges";
 import CommitMessageHeader from "./CommitMessageHeader";
-import DiffView from "./DiffView";
+import DiffView, { type DiffFileContext } from "./DiffView";
 
 interface Props {
   state: LocalChangesState;
@@ -28,6 +28,17 @@ function placeholder(state: LocalChangesState): string {
 // and not the window.
 export default function LocalChangesPane({ state }: Props) {
   const { commit, shownFile } = state;
+  const fileContext: DiffFileContext = commit
+    ? {
+        kind: "local",
+        repoPath: state.path,
+        source: { kind: "commit", sha: commit.sha },
+      }
+    : {
+        kind: "local",
+        repoPath: state.path,
+        source: { kind: state.selectedArea === "staged" ? "index" : "working" },
+      };
 
   return (
     <Flex direction="column" flex="1" minH="0" minW="0">
@@ -35,8 +46,9 @@ export default function LocalChangesPane({ state }: Props) {
       <Box flex="1" minH="0" minW="0">
         {shownFile ? (
           <DiffView
-            key={`${commit?.sha ?? state.selectedArea}:${shownFile.path}`}
+            key={`${state.path}:${commit?.sha ?? state.selectedArea}:${shownFile.path}`}
             file={shownFile}
+            fileContext={fileContext}
           />
         ) : (
           <Center h="full" p="4">

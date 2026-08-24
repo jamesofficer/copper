@@ -4,6 +4,7 @@ import {
   discardChanges,
   getLocalChangeCount,
   getLocalChanges,
+  getLocalFile,
   stageFiles,
   unstageFiles,
 } from "../repo/changes";
@@ -20,6 +21,7 @@ type LocalChangesHandlers = Pick<
   | "getLocalChanges"
   | "listLocalCommits"
   | "getLocalCommitFiles"
+  | "getLocalFile"
   | "listWorktrees"
   | "stageFiles"
   | "unstageFiles"
@@ -35,6 +37,7 @@ interface LocalChangesDependencies {
   getLocalChanges: typeof getLocalChanges;
   listLocalCommits: typeof listLocalCommits;
   getLocalCommitFiles: typeof getLocalCommitFiles;
+  getLocalFile: typeof getLocalFile;
   stageFiles: typeof stageFiles;
   unstageFiles: typeof unstageFiles;
   discardChanges: typeof discardChanges;
@@ -92,6 +95,10 @@ export function createLocalChangesHandlers(
     listLocalCommits: (repoPath) => dependencies.listLocalCommits(repoPath),
     getLocalCommitFiles: (repoPath, sha) =>
       dependencies.getLocalCommitFiles(repoPath, sha),
+    getLocalFile: async (repoPath, source, path) => {
+      await assertRegisteredCheckout(repoPath);
+      return dependencies.getLocalFile(repoPath, source, path);
+    },
     listWorktrees: (repoPath) => dependencies.listWorktrees(repoPath),
     stageFiles: (repoPath, paths) =>
       serializeMutation(repoPath, async () => {
@@ -128,6 +135,7 @@ export const localChangesHandlers = createLocalChangesHandlers({
   getLocalChanges,
   listLocalCommits,
   getLocalCommitFiles,
+  getLocalFile,
   stageFiles,
   unstageFiles,
   discardChanges,

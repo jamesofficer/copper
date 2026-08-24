@@ -350,6 +350,12 @@ export interface Worktree {
   isMain: boolean;
 }
 
+// The new side of a local diff comes from one of these Git sources.
+export type LocalFileSource =
+  | { kind: "working" }
+  | { kind: "index" }
+  | { kind: "commit"; sha: string };
+
 // Uncommitted work in a registered local checkout, split the way git sees it.
 // Each entry is shaped like a PR's changed file so the diff UI renders them
 // unchanged.

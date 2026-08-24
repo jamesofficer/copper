@@ -10,6 +10,7 @@ import {
   discardChanges,
   getLocalChangeCount,
   getLocalChanges,
+  getLocalFile,
   stageFiles,
   unstageFiles,
 } from "./changes";
@@ -72,6 +73,37 @@ describe("getLocalChangeCount", () => {
     await git("mv", "tracked.txt", "renamed.txt");
 
     expect(await getLocalChangeCount(repo)).toBe(1);
+  });
+});
+
+describe("getLocalFile", () => {
+  it("reads the new side from a commit, the index, and the working tree", async () => {
+    await commitInitial();
+    const sha = (await git("rev-parse", "HEAD")).trim();
+    await write("tracked.txt", "staged\n");
+    await git("add", "tracked.txt");
+    await write("tracked.txt", "working\n");
+
+    await expect(
+      getLocalFile(repo, { kind: "commit", sha }, "tracked.txt"),
+    ).resolves.toBe("v1\n");
+    await expect(
+      getLocalFile(repo, { kind: "index" }, "tracked.txt"),
+    ).resolves.toBe("staged\n");
+    await expect(
+      getLocalFile(repo, { kind: "working" }, "tracked.txt"),
+    ).resolves.toBe("working\n");
+  });
+
+  it("rejects paths outside the checkout and binary contents", async () => {
+    await write("binary.dat", "before\u0000after");
+
+    await expect(
+      getLocalFile(repo, { kind: "working" }, "../outside.txt"),
+    ).resolves.toBeNull();
+    await expect(
+      getLocalFile(repo, { kind: "working" }, "binary.dat"),
+    ).resolves.toBeNull();
   });
 });
 

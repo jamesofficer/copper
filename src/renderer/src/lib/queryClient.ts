@@ -40,6 +40,7 @@ const doNotPersist = [
   "localChanges",
   "localCommits",
   "localCommitFiles",
+  "localFile",
   "worktrees",
 ];
 

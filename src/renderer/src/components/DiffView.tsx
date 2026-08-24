@@ -19,7 +19,7 @@ import {
   LuFileDiff,
   LuSquare,
 } from "react-icons/lu";
-import type { PullRequestFile } from "../../../shared/types";
+import type { LocalFileSource, PullRequestFile } from "../../../shared/types";
 import { statusMeta } from "../lib/fileStatus";
 import { scrollbar } from "../lib/scrollbar";
 import { syntaxBackground } from "../lib/syntaxColors";
@@ -30,6 +30,10 @@ import DiffLines, {
 } from "./DiffLines";
 import DiffViewModeSelect from "./DiffViewModeSelect";
 import FileView from "./FileView";
+
+export type DiffFileContext =
+  | { kind: "commit"; repo: string; sha: string }
+  | { kind: "local"; repoPath: string; source: LocalFileSource };
 
 interface Props {
   file: PullRequestFile;
@@ -46,9 +50,9 @@ interface Props {
   onMarkViewedAndNext?(): void;
   markViewedLabel?: string;
   markViewedDisabled?: boolean;
-  // Where to read the full file from — enables expand-hidden-lines,
+  // Where to read the full file from. This enables hidden-line expansion,
   // whole-file syntax highlighting, and the full-file view.
-  fileContext?: { repo: string; sha: string };
+  fileContext?: DiffFileContext;
 }
 
 export default function DiffView({
@@ -76,19 +80,40 @@ export default function DiffView({
   // Deleted files don't exist at the diff's commit.
   const canReadFile = Boolean(fileContext) && file.status !== "deleted";
 
-  // Fetched eagerly (not just on demand): DiffLines uses the full file to fix
-  // fragment-highlighting artifacts even when nothing is expanded. Content at
-  // a fixed sha never changes, hence the infinite staleTime.
+  // DiffLines uses the full file to correct syntax highlighting. The read
+  // starts before the user expands a section. A commit cannot change. The
+  // working tree and index can change, so those queries remain stale.
+  const localSource = fileContext?.kind === "local" ? fileContext.source : null;
+  const mutableLocalFile =
+    localSource?.kind === "working" || localSource?.kind === "index";
   const fileQuery = useQuery({
-    queryKey: ["fileAtCommit", fileContext?.repo, fileContext?.sha, file.path],
-    queryFn: () =>
-      window.api.getFileAtCommit(
-        fileContext?.repo ?? "",
-        fileContext?.sha ?? "",
-        file.path,
-      ),
+    queryKey:
+      fileContext?.kind === "commit"
+        ? ["fileAtCommit", fileContext.repo, fileContext.sha, file.path]
+        : [
+            "localFile",
+            fileContext?.repoPath,
+            localSource?.kind,
+            localSource?.kind === "commit" ? localSource.sha : null,
+            file.path,
+          ],
+    queryFn: () => {
+      if (!fileContext) return Promise.resolve(null);
+      return fileContext.kind === "commit"
+        ? window.api.getFileAtCommit(
+            fileContext.repo,
+            fileContext.sha,
+            file.path,
+          )
+        : window.api.getLocalFile(
+            fileContext.repoPath,
+            fileContext.source,
+            file.path,
+          );
+    },
     enabled: canReadFile,
-    staleTime: Number.POSITIVE_INFINITY,
+    staleTime: mutableLocalFile ? 0 : Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: mutableLocalFile,
   });
   const fullFile = fileQuery.data ?? null;
 
@@ -226,7 +251,7 @@ export default function DiffView({
         ) : fullFile === null ? (
           <Center flex="1" p="8">
             <Text color="fg.muted" fontSize="sm" textAlign="center">
-              The file couldn’t be read from the local repo clone.
+              The full file couldn’t be read.
             </Text>
           </Center>
         ) : (
