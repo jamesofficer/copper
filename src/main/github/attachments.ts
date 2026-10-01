@@ -134,8 +134,8 @@ function composerUrl(repo: string, prNumber?: number): string {
 // shares a container with the comment textarea" is easy to express), tag it,
 // then address the tag over the DevTools protocol.
 const markComposerInput = `(() => {
-  for (const marked of document.querySelectorAll("[data-reviewr-upload]")) {
-    marked.removeAttribute("data-reviewr-upload");
+  for (const marked of document.querySelectorAll("[data-copper-upload]")) {
+    marked.removeAttribute("data-copper-upload");
   }
 
   const isCopilot = (el) =>
@@ -171,7 +171,7 @@ const markComposerInput = `(() => {
       candidates: inputs.length,
     });
   }
-  chosen.setAttribute("data-reviewr-upload", "1");
+  chosen.setAttribute("data-copper-upload", "1");
   return JSON.stringify({ found: true, candidates: inputs.length });
 })()`;
 
@@ -201,7 +201,7 @@ async function findFileInput(
       });
       const { nodeId } = await debug.sendCommand("DOM.querySelector", {
         nodeId: root.nodeId,
-        selector: '[data-reviewr-upload="1"]',
+        selector: '[data-copper-upload="1"]',
       });
       if (nodeId) return { nodeId };
     }
@@ -256,7 +256,7 @@ async function readUploadError(window: BrowserWindow): Promise<string | null> {
       // Widest sensible scope first: the error is often a sibling of the
       // upload widget, so closest("file-attachment") would look inside it and
       // miss the message entirely.
-      const input = document.querySelector('[data-reviewr-upload="1"]');
+      const input = document.querySelector('[data-copper-upload="1"]');
       const scope =
         input?.closest('form') ??
         input?.closest('[data-testid*="markdown"]') ??
@@ -319,7 +319,7 @@ async function performUpload(
 
   // The upload needs a real file on disk: a pasted screenshot arrives as bytes
   // with no path of its own.
-  const directory = await mkdtemp(join(tmpdir(), "reviewr-upload-"));
+  const directory = await mkdtemp(join(tmpdir(), "copper-upload-"));
   const filePath = join(directory, safeFileName(file.name));
   await writeFile(filePath, file.data);
 

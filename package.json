@@ -1,9 +1,13 @@
 {
-  "name": "pr-reviewer",
+  "name": "copper",
   "productName": "Copper",
   "version": "0.1.0",
   "description": "Guided, agent-assisted pull request review",
   "author": "James Officer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jamesofficer/copper.git"
+  },
   "private": true,
   "main": "out/main/index.js",
   "scripts": {

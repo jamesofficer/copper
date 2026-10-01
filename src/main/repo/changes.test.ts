@@ -37,7 +37,7 @@ function exists(path: string): boolean {
 }
 
 beforeEach(async () => {
-  repo = await mkdtemp(join(tmpdir(), "reviewr-changes-"));
+  repo = await mkdtemp(join(tmpdir(), "copper-changes-"));
   await git("init", "-q", "-b", "main");
   await git("config", "user.email", "test@example.com");
   await git("config", "user.name", "Test");
@@ -159,7 +159,7 @@ describe("getLocalChanges", () => {
     await write("tracked.txt", "staged\n");
     await git("add", "tracked.txt");
 
-    const bin = await mkdtemp(join(tmpdir(), "reviewr-fake-git-"));
+    const bin = await mkdtemp(join(tmpdir(), "copper-fake-git-"));
     const shim = join(bin, "git");
     const { stdout: realGit } = await run("which", ["git"]);
     await writeFile(
@@ -317,7 +317,7 @@ describe("stageFiles and unstageFiles", () => {
     // Put a deterministic failing restore in front of real git. The old
     // fallback swallowed every restore failure and ran `rm --cached`, even in
     // a repository with a valid HEAD.
-    const bin = await mkdtemp(join(tmpdir(), "reviewr-fake-git-"));
+    const bin = await mkdtemp(join(tmpdir(), "copper-fake-git-"));
     const shim = join(bin, "git");
     const { stdout: realGit } = await run("which", ["git"]);
     await writeFile(

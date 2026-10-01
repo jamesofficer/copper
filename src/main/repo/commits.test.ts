@@ -30,7 +30,7 @@ async function commit(path: string, contents: string, message: string) {
 }
 
 beforeEach(async () => {
-  repo = await mkdtemp(join(tmpdir(), "reviewr-commits-"));
+  repo = await mkdtemp(join(tmpdir(), "copper-commits-"));
   remote = null;
   await git("init", "-q", "-b", "main");
   await git("config", "user.email", "test@example.com");
@@ -116,7 +116,7 @@ describe("listLocalCommits", () => {
 describe("pushLocalBranch", () => {
   it("pushes a new branch and then uses its recorded upstream", async () => {
     await commit("a.txt", "a\n", "first");
-    remote = await mkdtemp(join(tmpdir(), "reviewr-remote-"));
+    remote = await mkdtemp(join(tmpdir(), "copper-remote-"));
     await run("git", ["init", "--bare", "-q", remote]);
     await git("remote", "add", "origin", remote);
 

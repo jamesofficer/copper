@@ -111,8 +111,8 @@ Reviewing pull requests on GitHub often feels like sifting through an unordered 
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/jamesofficer/reviewr.git
-   cd reviewr
+   git clone https://github.com/jamesofficer/copper.git
+   cd copper
    ```
 
 2. Install dependencies:
